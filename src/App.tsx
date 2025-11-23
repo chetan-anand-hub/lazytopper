@@ -24,14 +24,16 @@ function BottomNav() {
   const go = (path: string) => navigate(path);
 
   const isHome = current === "/";
-  const isChapters =
-    current.startsWith("/chapters") || current.startsWith("/topics/");
+  // Treat Chapters page + TopicHub + TrendsPage as the same “Trends” tab
+  const isTrends =
+    current.startsWith("/chapters") ||
+    current.startsWith("/topics/") ||
+    current.startsWith("/trends/");
   const isDashboard = current === "/dashboard";
   const isPredictive =
-  
-  current.startsWith("/predictive-papers") ||
-  current.startsWith("/mock-paper") ||
-  current.startsWith("/mock-builder");
+    current.startsWith("/predictive-papers") ||
+    current.startsWith("/mock-paper") ||
+    current.startsWith("/mock-builder");
 
   const baseBtnStyle: React.CSSProperties = {
     background: "transparent",
@@ -73,11 +75,11 @@ function BottomNav() {
         onClick={() => go("/chapters")}
         style={{
           ...baseBtnStyle,
-          color: isChapters ? activeColor : inactiveColor,
-          fontWeight: isChapters ? 700 : 500,
+          color: isTrends ? activeColor : inactiveColor,
+          fontWeight: isTrends ? 700 : 500,
         }}
       >
-        Chapters
+        Trends
       </button>
 
       <button
@@ -118,7 +120,7 @@ export default function App() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
 
-          {/* Chapters Overview */}
+          {/* Trends entry hub (old “Chapters” page) */}
           <Route path="/chapters" element={<Chapters />} />
 
           {/* Topic content hub – uses :topicKey param */}
@@ -132,7 +134,7 @@ export default function App() {
           />
           <Route path="/chapter/trigonometry/quiz" element={<TrigQuiz />} />
 
-          {/* Dynamic Trends Page */}
+          {/* Dynamic Trends Page (Maths / Science, grade-aware) */}
           <Route path="/trends/:grade/:subject" element={<TrendsPage />} />
 
           {/* Auto-mock paper view (legacy + predictive) */}
