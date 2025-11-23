@@ -128,8 +128,7 @@ interface RawTrendsShape {
   topics?: Record<string, RawTopicMeta>;
 }
 
-// IMPORTANT: derive tier using SAME logic as TrendsPage.tsx when
-// predictive meta hasn’t specified a tier.
+// Same tier logic as TrendsPage
 function deriveTier(weightagePercent: number, rawTier?: TierKey): TierKey {
   if (
     rawTier === "must-crack" ||
@@ -189,7 +188,7 @@ function buildTopicsFromRaw(raw: unknown): TopicTrend[] {
 
 const class10Topics: TopicTrend[] = buildTopicsFromRaw(rawTrends);
 
-// ---------- Difficulty + marks meta (kept local for now) ----------
+// ---------- Difficulty + marks meta (local) ----------
 
 const difficultyDistributionPercent: Record<DifficultyKey, number> = {
   Easy: 40,
@@ -234,7 +233,7 @@ interface ExampleQuestion {
 const exampleBank: Partial<
   Record<TopicKey, Record<string, ExampleQuestion[]>>
 > = {
-  // keep/extend later for mini examples
+  // hook for future “See examples / See solution” mini-PYQs
 };
 
 // ---------- Basket type + storage key ----------
@@ -285,6 +284,7 @@ const Chapters: React.FC = () => {
   const [difficultyFilter, setDifficultyFilter] = useState<
     "All levels" | DifficultyKey
   >("All levels");
+
   const [activeTierFilter, setActiveTierFilter] = useState<"all" | TierKey>(
     "all"
   );
@@ -317,6 +317,7 @@ const Chapters: React.FC = () => {
     }
   }, []);
 
+  // group topics by tier
   const topicsByTier = useMemo(() => {
     const base: Record<TierKey, TopicTrend[]> = {
       "must-crack": [],
@@ -328,7 +329,7 @@ const Chapters: React.FC = () => {
       base[t.tier].push(t);
     });
 
-    // Sort within each tier by descending weightage (heavier first)
+    // Sort within each tier by descending weightage
     tierOrder.forEach((tier) => {
       base[tier].sort((a, b) => b.weightagePercent - a.weightagePercent);
     });
@@ -380,14 +381,11 @@ const Chapters: React.FC = () => {
     });
   };
 
-  // AFTER
-const handleOpenMockBuilder = () => {
-  // keep saving the basket as you already do
-  persistBasket(basket);
-  // ✅ go to the new builder route
-  navigate("/mock-builder");
-};
-
+  const handleOpenMockBuilder = () => {
+    // Persist latest basket before navigating
+    persistBasket(basket);
+    navigate("/mock-builder");
+  };
 
   const difficultySummary = `Easy ${difficultyDistributionPercent["Easy"]}% • Medium ${difficultyDistributionPercent["Medium"]}% • Hard ${difficultyDistributionPercent["Hard"]}%`;
 
@@ -403,7 +401,7 @@ const handleOpenMockBuilder = () => {
 
   return (
     <div className="page-container">
-      {/* Hero header – closer to earlier “Topic Hub” look */}
+      {/* Hero header – Topic Hub flavour */}
       <header
         className="page-header"
         style={{
@@ -444,14 +442,15 @@ const handleOpenMockBuilder = () => {
             maxWidth: 720,
           }}
         >
-          Use the filters to see{" "}
+          Use the tier filters to see{" "}
           <strong>must-crack, high-ROI, and good-to-do</strong> chapters based
-          on CBSE board trends and your predictive model. Tap any card to open
-          its full concept notes, examples, and board tips.
+          on CBSE trends and your predictive engine. Tap any chapter to open its
+          subtopics, and hit{" "}
+          <strong>&ldquo;Open topic hub&rdquo; for quick revision</strong>.
         </p>
       </header>
 
-      {/* Difficulty mix / exam blueprint strip – keep as is */}
+      {/* Difficulty mix / exam blueprint strip */}
       <section className="difficulty-section">
         <div className="difficulty-header">
           <h2>Difficulty mix</h2>
@@ -536,7 +535,7 @@ const handleOpenMockBuilder = () => {
         {/* Difficulty note */}
         <p className="section-subtitle">{difficultySummary}</p>
 
-        {/* Tier accordion + topic cards (with summary + Open topic hub CTA) */}
+        {/* Tier accordion + topic cards */}
         <div className="tier-accordion">
           {tierOrder.map((tier) => {
             if (activeTierFilter !== "all" && activeTierFilter !== tier) {
@@ -605,12 +604,12 @@ const handleOpenMockBuilder = () => {
                           </div>
                         </button>
 
-                        {/* NEW: short predictive summary line */}
+                        {/* Predictive summary line */}
                         {topic.summary && (
                           <p className="topic-summary">{topic.summary}</p>
                         )}
 
-                        {/* CTA row – restores Open topic hub link */}
+                        {/* CTA row – topic hub / quick revision */}
                         <div className="topic-cta-row">
                           <button
                             className="topic-quick-revise-btn"
@@ -667,7 +666,7 @@ const handleOpenMockBuilder = () => {
         </div>
       </section>
 
-      {/* Next step / CTAs */}
+      {/* Next step / CTAs – HPQ + Mock Builder (“exam stack”) */}
       <section className="blueprint-preview">
         <div
           style={{
@@ -695,20 +694,20 @@ const handleOpenMockBuilder = () => {
         >
           {/* HPQ button – primary pill */}
           <button
-           className="chapter-secondary-cta exam-stack-btn-primary"
-  style={{ flex: "1 1 180px", minWidth: 0 }}
-  onClick={() => navigate("/highly-probable")}
->
-  🎯 View highly probable questions
+            className="chapter-secondary-cta exam-stack-btn-primary"
+            style={{ flex: "1 1 180px", minWidth: 0 }}
+            onClick={() => navigate("/highly-probable")}
+          >
+            🎯 View highly probable questions
           </button>
 
-          {/* Mock builder button – keeps existing style */}
+          {/* Mock builder button */}
           <button
-           className="chapter-secondary-cta exam-stack-btn-secondary"
-  style={{ flex: "1 1 180px", minWidth: 0 }}
-  onClick={handleOpenMockBuilder}
->
-  📄 Open mock builder
+            className="chapter-secondary-cta exam-stack-btn-secondary"
+            style={{ flex: "1 1 180px", minWidth: 0 }}
+            onClick={handleOpenMockBuilder}
+          >
+            📄 Open mock builder
           </button>
         </div>
 
@@ -724,7 +723,7 @@ const handleOpenMockBuilder = () => {
         )}
       </section>
 
-      {/* Examples modal (for future mini examples) */}
+      {/* Examples modal (for future mini examples / “see solution”) */}
       {modalTopic && modalConcept && (
         <div className="examples-modal-backdrop" onClick={closeModal}>
           <div className="examples-modal" onClick={(e) => e.stopPropagation()}>

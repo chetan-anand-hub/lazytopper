@@ -93,7 +93,7 @@ const paperSectionMeta: {
     label: "Section E • 4 marks",
     vibe: "Case study (1,1,2)",
   },
-]
+];
 
 // ---- Topic content for three key chapters ----
 
@@ -315,11 +315,17 @@ const topicContentMap: Partial<Record<Class10TopicKey, TopicContent>> = {
 
 const TopicHub: React.FC = () => {
   const navigate = useNavigate();
-  const { topicSlug } = useParams<{ topicSlug: string }>();
+  const { topicKey: topicSlug } = useParams<{ topicKey: string }>();
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
   const highlightedConceptName = searchParams.get("concept") ?? "";
+
+  const gradeQuery = searchParams.get("grade") ?? "10";
+  const subjectRaw = searchParams.get("subject") ?? "Maths";
+  const subjectLabel = subjectRaw.toLowerCase().startsWith("sci")
+    ? "Science"
+    : "Maths";
 
   const decodedSlug = decodeURIComponent(topicSlug ?? "");
   const allTopicKeys = useMemo(
@@ -344,7 +350,6 @@ const TopicHub: React.FC = () => {
   const handleBack = () => navigate("/chapters");
 
   const handleSectionChipClick = (section: PaperSectionKey) => {
-    // Jump to auto-mock paper with this section focused.
     navigate(`/mock-paper?section=${section}`);
   };
 
@@ -459,7 +464,7 @@ const TopicHub: React.FC = () => {
               marginBottom: 4,
             }}
           >
-            Class 10 · Maths
+            Class {gradeQuery} · {subjectLabel}
           </div>
           <h1
             className="page-title"
@@ -922,8 +927,8 @@ const TopicHub: React.FC = () => {
               </p>
               <p style={{ margin: 0 }}>
                 3. Use the section chips above (A–E) to jump into{" "}
-                <strong>Auto-mock paper</strong> and see how this topic shows
-                up in each part of the board exam.
+                <strong>Auto-mock paper</strong> and see how this topic shows up
+                in each part of the board exam.
               </p>
             </section>
           </aside>

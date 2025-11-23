@@ -4340,3 +4340,35 @@ select:focus {
   font-size: 0.9rem;
   color: #111827;
 }
+/* --- Chapters Topic Hub small tweaks --- */
+
+/* Short predictive summary line under each topic */
+.topic-summary {
+  font-size: 0.85rem;
+  color: #4b5563;
+  padding: 0 14px 4px;
+}
+
+/* Exam stack buttons at the bottom of Chapters page */
+.exam-stack-btn-primary {
+  background: linear-gradient(135deg, #22c55e, #4f46e5);
+  color: #f9fafb;
+  border-color: transparent;
+}
+
+.exam-stack-btn-primary:hover {
+  filter: brightness(1.03);
+}
+
+.exam-stack-btn-secondary {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Make "Open topic hub" button feel clickable but light */
+.topic-quick-revise-btn {
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
