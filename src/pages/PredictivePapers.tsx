@@ -11,13 +11,8 @@ const PredictivePapersPage: React.FC = () => {
   const navigate = useNavigate();
 
   const openPaper = (paper: PredictivePaper) => {
-    navigate("/mock-paper", {
-      state: {
-        mode: "predictive" as const,
-        paperId: paper.id,
-        // optional: you could also pass targetSection: "A" here
-      },
-    });
+    // Navigate using slug in the URL so MockPaper can read it via useParams
+    navigate(`/mock-paper/${paper.slug}`);
   };
 
   return (

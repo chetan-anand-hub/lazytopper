@@ -14,6 +14,7 @@ import HighlyProbableQuestions from "./pages/HighlyProbableQuestions";
 import PredictivePapersPage from "./pages/PredictivePapers";
 import TopicHub from "./pages/TopicHub";
 import MockBuilder from "./pages/MockBuilder";
+import AiMentorPage from "./pages/AiMentorPage";
 
 function BottomNav() {
   const location = useLocation();
@@ -138,7 +139,8 @@ export default function App() {
           <Route path="/trends/:grade/:subject" element={<TrendsPage />} />
 
           {/* Auto-mock paper view (legacy + predictive) */}
-          <Route path="/mock-paper" element={<MockPaper />} />
+          <Route path="/mock-paper/:slug" element={<MockPaper />} />
+
 
           {/* New Mock Builder v1 (80-mark paper from HPQ bank) */}
           <Route path="/mock-builder" element={<MockBuilder />} />
@@ -154,6 +156,8 @@ export default function App() {
             path="/predictive-papers"
             element={<PredictivePapersPage />}
           />
+
+          <Route path="/ai-mentor" element={<AiMentorPage />} />
         </Routes>
       </div>
 

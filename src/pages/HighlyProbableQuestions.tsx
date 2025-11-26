@@ -1,50 +1,37 @@
 // src/pages/HighlyProbableQuestions.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
 import {
   highlyProbableQuestions,
   type HPQTopicBucket,
   type HPQQuestion,
-  type HPQDifficulty,
-  type HPQTier,
   type HPQSubject,
   type HPQStream,
+  type HPQTier,
+  type HPQDifficulty,
 } from "../data/highlyProbableQuestions";
-import { class10MathTopicTrends } from "../data/class10MathTopicTrends";
-import { class10ScienceTopicTrends } from "../data/class10ScienceTopicTrends";
 
-// ---------- Local types used only in this page ----------
+// ---------- Local types / helpers ----------
 
-type SubjectKey = HPQSubject;
-type StreamFilter = "all" | "Physics" | "Chemistry" | "Biology";
+type StreamFilterKey = "all" | HPQStream;
 type TierFilter = "all" | HPQTier;
-type DifficultyFilter = "All" | HPQDifficulty;
-type SectionTab = "All" | "A" | "B" | "C" | "D" | "E" | "AR";
+type DifficultyFilter = "all" | HPQDifficulty;
+type TopicFilter = "all" | string;
 
-interface TopicMeta {
-  tier?: HPQTier;
-  weightagePercent?: number;
-  summary?: string;
-  conceptWeightage?: Record<string, number>;
+interface BasketItem {
+  id: string;
+  subject: HPQSubject;
+  topic: string;
   stream?: HPQStream;
+  marks: number;
+  difficulty?: HPQDifficulty;
+  section?: string;
+  question: string;
 }
 
-interface TopicTrendsData {
-  subject: string;
-  grade: string;
-  topics: Record<string, TopicMeta>;
-}
-
-interface BucketView {
-  bucket: HPQTopicBucket;
-  tier: HPQTier;
-  topicMeta: TopicMeta;
-  questions: HPQQuestion[];
-  marksInBucket: number;
-}
-
-// ---------- Helpers ----------
+const MOCK_BASKET_KEY = "lazyTopperMockBasket_v1";
 
 const tierMeta: Record<
   HPQTier,
@@ -53,274 +40,343 @@ const tierMeta: Record<
   "must-crack": {
     label: "Must-crack",
     emoji: "🔥",
-    blurb: "Appears almost every year – lock these first.",
+    blurb: "Shows up almost every year – non-negotiable.",
   },
   "high-roi": {
     label: "High-ROI",
     emoji: "💎",
-    blurb: "Great marks for the time spent – drill after must-crack.",
+    blurb: "Big marks for the time you invest – do after must-crack.",
   },
   "good-to-do": {
     label: "Good-to-do",
     emoji: "🌈",
-    blurb: "Safety net + confidence once core topics are done.",
+    blurb: "Nice safety net once the big boys are done.",
   },
 };
 
-function normaliseSubject(raw?: string | null): SubjectKey {
+const difficultyChipStyle: Record<HPQDifficulty, { bg: string; color: string }> =
+  {
+    Easy: { bg: "#ecfdf3", color: "#15803d" },
+    Medium: { bg: "#fffbeb", color: "#a16207" },
+    Hard: { bg: "#fef2f2", color: "#b91c1c" },
+  };
+
+// Decide bucket tier from bucket.defaultTier or first question with a tier
+function getBucketTier(bucket: HPQTopicBucket): HPQTier {
+  if (bucket.defaultTier) return bucket.defaultTier;
+  for (const q of bucket.questions) {
+    if (q.tier) return q.tier;
+  }
+  return "good-to-do";
+}
+
+function normaliseSubject(raw: string | null): HPQSubject {
   const val = (raw || "").toLowerCase();
   if (val === "science" || val === "sci") return "Science";
   return "Maths";
-}
-
-function pickTrendsDataset(subject: SubjectKey): TopicTrendsData {
-  if (subject === "Science") {
-    return class10ScienceTopicTrends as unknown as TopicTrendsData;
-  }
-  return class10MathTopicTrends as unknown as TopicTrendsData;
 }
 
 // ---------- Component ----------
 
 const HighlyProbableQuestions: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const searchParams = new URLSearchParams(location.search);
   const grade = searchParams.get("grade") || "10";
-  const subjectFromUrl = searchParams.get("subject");
-  const topicFromUrl = searchParams.get("topic") || "";
-  const subjectKey: SubjectKey = normaliseSubject(subjectFromUrl);
+  const subjectParam = searchParams.get("subject");
+  const topicParam = searchParams.get("topic");
 
-  // Filters
-  const [activeTier, setActiveTier] = useState<TierFilter>("all");
-  const [activeDifficulty, setActiveDifficulty] =
-    useState<DifficultyFilter>("All");
-  const [activeStream, setActiveStream] = useState<StreamFilter>("all");
-  const [selectedTopic, setSelectedTopic] = useState<string>(topicFromUrl);
-  const [selectedConcept, setSelectedConcept] = useState<string>("");
-  const [activeSectionTab, setActiveSectionTab] =
-    useState<SectionTab>("All");
+  const subjectKey: HPQSubject = normaliseSubject(subjectParam);
 
-  // Reset stream when subject changes (Maths vs Science)
+  const [activeStream, setActiveStream] = useState<StreamFilterKey>("all");
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const [difficultyFilter, setDifficultyFilter] =
+    useState<DifficultyFilter>("all");
+
+  // topic filter (dropdown + deep-link from Trends)
+  const initialTopic: TopicFilter = (topicParam as TopicFilter) || "all";
+  const [topicFilter, setTopicFilter] = useState<TopicFilter>(initialTopic);
+
   useEffect(() => {
-    setActiveStream("all");
-  }, [subjectKey]);
+    setTopicFilter((topicParam as TopicFilter) || "all");
+  }, [topicParam]);
 
-  // When deep-linked from Trends with a topic, sync into local state
+  const [basket, setBasket] = useState<BasketItem[]>([]);
+
+  // load basket once
   useEffect(() => {
-    if (topicFromUrl) {
-      setSelectedTopic(topicFromUrl);
-    }
-  }, [topicFromUrl]);
-
-  // When topic changes, clear concept so dropdown feels natural
-  useEffect(() => {
-    setSelectedConcept("");
-  }, [selectedTopic]);
-
-  const trendsData = pickTrendsDataset(subjectKey);
-
-  // -------- Buckets filtered by subject + stream --------
-
-  const bucketsForSubject: HPQTopicBucket[] = useMemo(() => {
-    return highlyProbableQuestions.filter((bucket) => {
-      const bucketSubject: SubjectKey = bucket.subject ?? "Maths";
-      if (bucketSubject !== subjectKey) return false;
-
-      if (subjectKey === "Science" && activeStream !== "all") {
-        const bucketStream = bucket.stream ?? "General";
-        return bucketStream === activeStream;
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(MOCK_BASKET_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as BasketItem[];
+        if (Array.isArray(parsed)) setBasket(parsed);
       }
+    } catch {
+      // ignore
+    }
+  }, []);
 
-      return true;
-    });
-  }, [subjectKey, activeStream]);
+  const persistBasket = (items: BasketItem[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(MOCK_BASKET_KEY, JSON.stringify(items));
+    } catch {
+      // ignore
+    }
+  };
 
-  // Topic + concept options for dropdowns
-  const topicOptions = useMemo(() => {
-    const names = bucketsForSubject.map((b) => b.topic);
-    const unique = Array.from(new Set(names));
-    unique.sort();
-    return unique;
-  }, [bucketsForSubject]);
-
-  const conceptOptions = useMemo(() => {
-    const list: string[] = [];
-    bucketsForSubject.forEach((bucket) => {
-      if (selectedTopic && bucket.topic !== selectedTopic) return;
-      bucket.questions.forEach((q) => {
-        if (q.concept) list.push(q.concept);
-      });
-    });
-    const unique = Array.from(new Set(list));
-    unique.sort();
-    return unique;
-  }, [bucketsForSubject, selectedTopic]);
-
-  // Pool-wide totals (for hero snapshot)
-  const allQuestions: HPQQuestion[] = useMemo(
-    () => bucketsForSubject.flatMap((b) => b.questions),
-    [bucketsForSubject]
+  // Subject-level buckets (Maths vs Science)
+  const subjectBuckets = useMemo(
+    () =>
+      highlyProbableQuestions.filter(
+        (bucket) => (bucket.subject ?? "Maths") === subjectKey
+      ),
+    [subjectKey]
   );
 
-  const totalQuestionCount = allQuestions.length;
-  const totalMarks = allQuestions.reduce(
-    (sum, q) => sum + (q.marks ?? 0),
-    0
+  // Topic options for dropdown (for current subject)
+  const topicOptions = useMemo(
+    () =>
+      Array.from(new Set(subjectBuckets.map((b) => b.topic))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [subjectBuckets]
   );
-  const targetPaperMarks = 80;
 
-  // Topic-based filtering (for dropdown)
-  const topicFilteredBuckets: HPQTopicBucket[] = useMemo(() => {
-    if (!selectedTopic) return bucketsForSubject;
-    const lower = selectedTopic.toLowerCase();
-    const filtered = bucketsForSubject.filter(
-      (b) => b.topic.toLowerCase() === lower
-    );
-    return filtered.length > 0 ? filtered : bucketsForSubject;
-  }, [bucketsForSubject, selectedTopic]);
+  const handleSubjectToggle = (next: HPQSubject) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("subject", next);
+    // keep grade; reset topic for new subject
+    nextParams.delete("topic");
+    setSearchParams(nextParams);
+    if (next === "Maths") {
+      setActiveStream("all"); // no stream for maths
+    }
+  };
 
-  // Bucket views with all filters (tier, difficulty, concept, section)
-  const bucketViews: BucketView[] = useMemo(() => {
-    const views: BucketView[] = [];
+  const handleStreamToggle = (next: StreamFilterKey) => {
+    setActiveStream(next);
+  };
 
-    for (const bucket of topicFilteredBuckets) {
-      const topicMeta: TopicMeta =
-        (trendsData.topics[bucket.topic] as TopicMeta) || {};
+  const handleBackToTrends = () => {
+    navigate(`/trends/${grade}/${subjectKey}`);
+  };
 
-      const questions = bucket.questions.filter((q) => {
-        // Tier filter: from question > bucket > trends meta
-        const qTier: HPQTier | undefined =
-          q.tier ?? bucket.defaultTier ?? (topicMeta.tier as HPQTier | undefined);
+  const handleOpenMockBuilder = () => {
+    persistBasket(basket);
+    navigate("/mock-builder");
+  };
 
-        if (activeTier !== "all" && qTier !== activeTier) return false;
+  const handleAddToBasket = (bucket: HPQTopicBucket, q: HPQQuestion) => {
+    setBasket((prev) => {
+      if (prev.some((b) => b.id === q.id)) return prev;
+      const marks = q.marks ?? 0;
+      const next: BasketItem[] = [
+        ...prev,
+        {
+          id: q.id,
+          subject: bucket.subject ?? subjectKey,
+          topic: bucket.topic,
+          stream: bucket.stream,
+          marks,
+          difficulty: q.difficulty,
+          section: q.section,
+          question: q.question,
+        },
+      ];
+      persistBasket(next);
+      return next;
+    });
+  };
 
-        if (
-          activeDifficulty !== "All" &&
-          q.difficulty &&
-          q.difficulty !== activeDifficulty
-        ) {
-          return false;
-        }
+  const handleAskAiMentor = (bucket: HPQTopicBucket, q: HPQQuestion) => {
+    navigate("/ai-mentor", {
+      state: {
+        from: "hpq",
+        grade,
+        subject: subjectKey,
+        topic: bucket.topic,
+        hpqQuestionId: q.id,
+        hpqQuestion: q.question,
+        gpt_directive:
+          "Think like an expert CBSE Class 10 " +
+          (subjectKey === "Maths" ? "Mathematics" : "Science") +
+          " tutor. Explain this question step by step, show working, common mistakes, and give exam-friendly presentation.",
+      },
+    });
+  };
 
-        if (selectedConcept && q.concept !== selectedConcept) return false;
+  const totalBasketMarks = useMemo(
+    () => basket.reduce((sum, item) => sum + (item.marks ?? 0), 0),
+    [basket]
+  );
 
-        if (activeSectionTab === "AR") {
-          const isAR =
-            q.type === "AssertionReason" || q.kind === "assertion-reason";
-          if (!isAR) return false;
-        } else if (activeSectionTab !== "All") {
-          if (!q.section || q.section !== activeSectionTab) return false;
-        }
+  // Core filtered data
+  const filteredBuckets: HPQTopicBucket[] = useMemo(() => {
+    let buckets = subjectBuckets;
 
-        return true;
-      });
-
-      if (questions.length === 0) continue;
-
-      const marksInBucket = questions.reduce(
-        (sum, q) => sum + (q.marks ?? 0),
-        0
+    // Topic filter (dropdown or deep link)
+    if (topicFilter !== "all") {
+      const topicLower = topicFilter.toLowerCase();
+      buckets = buckets.filter(
+        (b) => b.topic.toLowerCase() === topicLower
       );
+    }
 
-      const tier: HPQTier =
-        (topicMeta.tier as HPQTier | undefined) ??
-        bucket.defaultTier ??
-        "good-to-do";
-
-      views.push({
-        bucket,
-        tier,
-        topicMeta,
-        questions,
-        marksInBucket,
+    // Stream filter – only for Science
+    if (subjectKey === "Science" && activeStream !== "all") {
+      buckets = buckets.filter((bucket) => {
+        if (bucket.stream && bucket.stream !== "General") {
+          return bucket.stream === activeStream;
+        }
+        // fallback: check question-level stream (in case)
+        return bucket.questions.some((q) => {
+          if (!q.stream || q.stream === "General") {
+            return activeStream === "General";
+          }
+          return q.stream === activeStream;
+        });
       });
     }
 
-    return views;
+    // Tier filter
+    if (tierFilter !== "all") {
+      buckets = buckets.filter(
+        (bucket) => getBucketTier(bucket) === tierFilter
+      );
+    }
+
+    // Difficulty filter – keep only questions of that difficulty
+    if (difficultyFilter !== "all") {
+      buckets = buckets
+        .map((bucket) => ({
+          ...bucket,
+          questions: bucket.questions.filter(
+            (q) => q.difficulty === difficultyFilter
+          ),
+        }))
+        .filter((bucket) => bucket.questions.length > 0);
+    }
+
+    return buckets;
   }, [
-    topicFilteredBuckets,
-    trendsData,
-    activeTier,
-    activeDifficulty,
-    selectedConcept,
-    activeSectionTab,
+    subjectBuckets,
+    subjectKey,
+    activeStream,
+    tierFilter,
+    difficultyFilter,
+    topicFilter,
   ]);
 
-  const filteredQuestions: HPQQuestion[] = useMemo(
-    () => bucketViews.flatMap((view) => view.questions),
-    [bucketViews]
-  );
+  // ---------- Render helpers ----------
 
-  const filteredQuestionCount = filteredQuestions.length;
-  const filteredMarks = filteredQuestions.reduce(
-    (sum, q) => sum + (q.marks ?? 0),
-    0
-  );
+  const renderQuestionMetaChips = (q: HPQQuestion) => {
+    const chips: React.ReactNode[] = [];
 
-  // Pattern summary: how boards usually ask current topic/concept
-  const patternSummary = useMemo(() => {
-    if (!selectedTopic && !selectedConcept) return null;
-    if (filteredQuestions.length === 0) return null;
+    if (q.section) {
+      chips.push(
+        <span
+          key="sec"
+          style={{
+            borderRadius: 999,
+            padding: "3px 8px",
+            backgroundColor: "#eef2ff",
+            border: "1px solid rgba(129,140,248,0.65)",
+            fontSize: "0.7rem",
+          }}
+        >
+          Section {q.section}
+        </span>
+      );
+    }
 
-    const relevant = filteredQuestions.filter((q) => {
-      if (selectedConcept && q.concept !== selectedConcept) return false;
-      return true;
-    });
+    if (typeof q.marks === "number") {
+      chips.push(
+        <span
+          key="marks"
+          style={{
+            borderRadius: 999,
+            padding: "3px 8px",
+            backgroundColor: "#ecfeff",
+            border: "1px solid rgba(6,182,212,0.6)",
+            fontSize: "0.7rem",
+          }}
+        >
+          {q.marks} mark{q.marks === 1 ? "" : "s"}
+        </span>
+      );
+    }
 
-    if (relevant.length === 0) return null;
+    if (q.difficulty) {
+      const style = difficultyChipStyle[q.difficulty];
+      chips.push(
+        <span
+          key="diff"
+          style={{
+            borderRadius: 999,
+            padding: "3px 8px",
+            backgroundColor: style.bg,
+            color: style.color,
+            fontSize: "0.7rem",
+          }}
+        >
+          {q.difficulty}
+        </span>
+      );
+    }
 
-    const sections = new Set<string>();
-    const types = new Set<string>();
+    if (q.likelihood) {
+      chips.push(
+        <span
+          key="prob"
+          style={{
+            borderRadius: 999,
+            padding: "3px 8px",
+            backgroundColor: "#f5f3ff",
+            border: "1px solid rgba(167,139,250,0.7)",
+            fontSize: "0.7rem",
+            color: "#4c1d95",
+          }}
+        >
+          {q.likelihood} chance
+        </span>
+      );
+    }
 
-    relevant.forEach((q) => {
-      if (q.section) sections.add(q.section);
-      if (q.type) types.add(q.type);
-    });
+    if (q.bloomSkill) {
+      chips.push(
+        <span
+          key="bloom"
+          style={{
+            borderRadius: 999,
+            padding: "3px 8px",
+            backgroundColor: "#f9fafb",
+            border: "1px dashed rgba(148,163,184,0.7)",
+            fontSize: "0.7rem",
+            color: "#475569",
+          }}
+        >
+          {q.bloomSkill}
+        </span>
+      );
+    }
 
-    return {
-      sections: Array.from(sections),
-      types: Array.from(types),
-    };
-  }, [filteredQuestions, selectedTopic, selectedConcept]);
-
-  // ---------- Handlers ----------
-
-  const handleBack = () => {
-    navigate(-1);
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          marginBottom: 4,
+        }}
+      >
+        {chips}
+      </div>
+    );
   };
 
-  const handleSubjectToggle = (next: SubjectKey) => {
-    const params = new URLSearchParams(location.search);
-    params.set("subject", next);
-    if (!params.get("grade")) params.set("grade", grade);
-    navigate(`/highly-probable?${params.toString()}`);
-  };
-
-  const handleTierClick = (tier: "all" | HPQTier) => {
-    setActiveTier((prev) => {
-      if (tier === "all") return "all";
-      // clicking again clears that tier
-      return prev === tier ? "all" : tier;
-    });
-  };
-
-  const handleDifficultyClick = (diff: DifficultyFilter) => {
-    setActiveDifficulty(diff);
-  };
-
-  const sectionTabs: { id: SectionTab; label: string }[] = [
-    { id: "All", label: "All sections" },
-    { id: "A", label: "Sec A – MCQ" },
-    { id: "B", label: "Sec B – VSA (2 m)" },
-    { id: "C", label: "Sec C – SA (3 m)" },
-    { id: "D", label: "Sec D – LA (4–5 m)" },
-    { id: "E", label: "Sec E – Case-based" },
-    { id: "AR", label: "Assertion–Reason" },
-  ];
-
-  // ---------- Render ----------
+  // ---------- JSX ----------
 
   return (
     <div
@@ -340,7 +396,7 @@ const HighlyProbableQuestions: React.FC = () => {
       >
         {/* Back link */}
         <button
-          onClick={handleBack}
+          onClick={handleBackToTrends}
           style={{
             background: "none",
             border: "none",
@@ -354,16 +410,16 @@ const HighlyProbableQuestions: React.FC = () => {
           }}
         >
           <span style={{ fontSize: "1rem" }}>←</span>
-          <span>Back to chapters</span>
+          <span>Back to trends</span>
         </button>
 
-        {/* Hero card – same vibe as TrendsPage */}
+        {/* Hero: HPQ hub */}
         <section
           style={{
             borderRadius: 32,
             padding: "24px 24px 24px 28px",
             background:
-              "linear-gradient(135deg, #020617 0%, #0f172a 15%, #1d4ed8 60%, #22c1c3 100%)",
+              "linear-gradient(135deg, #020617 0%, #0f172a 20%, #1d4ed8 65%, #22c1c3 100%)",
             color: "#f9fafb",
             boxShadow: "0 24px 60px rgba(15,23,42,0.55)",
             display: "flex",
@@ -379,11 +435,11 @@ const HighlyProbableQuestions: React.FC = () => {
                 fontSize: "0.7rem",
                 letterSpacing: "0.22em",
                 textTransform: "uppercase",
-                opacity: 0.9,
+                opacity: 0.85,
                 marginBottom: 8,
               }}
             >
-              Class {grade} • {subjectKey} • Highly probable bank
+              Class {grade} • {subjectKey} • HPQ Bank
             </div>
             <h1
               style={{
@@ -393,7 +449,7 @@ const HighlyProbableQuestions: React.FC = () => {
                 marginBottom: 10,
               }}
             >
-              Highly Probable Questions – Class {grade} {subjectKey}
+              Highly Probable Questions Hub
             </h1>
             <p
               style={{
@@ -402,74 +458,127 @@ const HighlyProbableQuestions: React.FC = () => {
                 opacity: 0.96,
               }}
             >
-              Built from last <strong>8–10 years</strong> of CBSE PYQs +
-              sample papers. Start with{" "}
-              <strong style={{ fontWeight: 700 }}>Must-crack</strong>, then
-              move to <strong style={{ fontWeight: 700 }}>High-ROI</strong>,
-              and finally <strong>Good-to-do</strong> for buffer. This
-              view shows one run of your{" "}
-              <strong>2026 prediction engine.</strong>
+              Your{" "}
+              <strong style={{ fontWeight: 700 }}>last-week weapon</strong>:
+              topic-wise questions that keep coming back. Flip between{" "}
+              <strong>Maths</strong> and{" "}
+              <strong>Science + Physics/Chem/Bio filters</strong>, then send
+              any juicy Q straight to your mock paper.
             </p>
 
+            {/* Tier filter row */}
             <div
               style={{
-                marginTop: 14,
-                padding: "10px 12px",
-                borderRadius: 18,
-                backgroundColor: "rgba(15,23,42,0.55)",
+                marginTop: 16,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {(
+                [
+                  { id: "all", label: "All tiers" },
+                  { id: "must-crack", label: "🔥 Must-crack" },
+                  { id: "high-roi", label: "💎 High-ROI" },
+                  { id: "good-to-do", label: "🌈 Good-to-do" },
+                ] as { id: TierFilter; label: string }[]
+              ).map((item) => {
+                const active = tierFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setTierFilter(item.id)}
+                    style={{
+                      borderRadius: 999,
+                      padding: "6px 14px",
+                      border: active
+                        ? "1px solid rgba(15,23,42,0.2)"
+                        : "1px solid rgba(241,245,249,0.3)",
+                      background: active
+                        ? "#f9fafb"
+                        : "rgba(15,23,42,0.35)",
+                      color: active ? "#020617" : "#e5e7eb",
+                      fontSize: "0.75rem",
+                      fontWeight: active ? 600 : 500,
+                      cursor: "pointer",
+                      boxShadow: active
+                        ? "0 6px 18px rgba(15,23,42,0.4)"
+                        : "none",
+                      transition: "all 0.15s ease-out",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Difficulty filter row */}
+            <div
+              style={{
+                marginTop: 10,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
                 fontSize: "0.78rem",
               }}
             >
-              <div
-                style={{
-                  fontWeight: 600,
-                  marginBottom: 4,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.14em",
-                  color: "#e5e7eb",
-                }}
-              >
-                Current prediction pool snapshot
-              </div>
-              <div>
-                <span style={{ fontWeight: 600 }}>
-                  {totalQuestionCount} questions
-                </span>{" "}
-                in prediction bank · target paper:{" "}
-                <span style={{ fontWeight: 600 }}>{targetPaperMarks}</span>{" "}
-                marks
-              </div>
-              <div style={{ marginTop: 2, opacity: 0.9 }}>
-                Right now the pool holds{" "}
-                <strong>{totalMarks} marks</strong> worth of questions
-                for Class {grade} {subjectKey}. As you keep adding to the
-                HPQ bank, this pool will grow and feed into your
-                mock-paper builder.
-              </div>
+              {(
+                [
+                  { id: "all", label: "All levels" },
+                  { id: "Easy", label: "🟢 Easy focus" },
+                  { id: "Medium", label: "🟡 Medium focus" },
+                  { id: "Hard", label: "🔴 Hard / full rigour" },
+                ] as { id: DifficultyFilter; label: string }[]
+              ).map((item) => {
+                const active = difficultyFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setDifficultyFilter(item.id)}
+                    style={{
+                      borderRadius: 999,
+                      padding: "5px 11px",
+                      border: active
+                        ? "1px solid rgba(248,250,252,0.9)"
+                        : "1px solid rgba(248,250,252,0.35)",
+                      background: active
+                        ? "rgba(248,250,252,0.95)"
+                        : "transparent",
+                      color: active ? "#020617" : "#e5e7eb",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease-out",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Subject + stream toggles */}
+          {/* Subject + stream toggles + basket summary */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               alignItems: "flex-end",
+              gap: 12,
             }}
           >
-            {/* Subject pill – Maths / Science */}
+            {/* Subject toggle pill */}
             <div
               style={{
                 alignSelf: "flex-end",
                 borderRadius: 999,
                 padding: 4,
-                background: "rgba(15,23,42,0.85)",
+                background: "rgba(15,23,42,0.9)",
                 display: "inline-flex",
                 gap: 4,
               }}
             >
-              {(["Maths", "Science"] as SubjectKey[]).map((subj) => {
+              {(["Maths", "Science"] as HPQSubject[]).map((subj) => {
                 const active = subj === subjectKey;
                 return (
                   <button
@@ -500,14 +609,14 @@ const HighlyProbableQuestions: React.FC = () => {
             {subjectKey === "Science" && (
               <div
                 style={{
-                  marginTop: 18,
+                  marginTop: 10,
                   padding: "10px 12px",
                   borderRadius: 999,
                   background: "rgba(15,23,42,0.7)",
                   display: "flex",
                   flexDirection: "column",
                   gap: 4,
-                  minWidth: 220,
+                  minWidth: 230,
                 }}
               >
                 <div
@@ -516,7 +625,7 @@ const HighlyProbableQuestions: React.FC = () => {
                     letterSpacing: "0.15em",
                     textTransform: "uppercase",
                     color: "#cbd5f5",
-                    opacity: 0.85,
+                    opacity: 0.9,
                   }}
                 >
                   Streams
@@ -535,13 +644,13 @@ const HighlyProbableQuestions: React.FC = () => {
                       { id: "Physics", label: "Physics" },
                       { id: "Chemistry", label: "Chemistry" },
                       { id: "Biology", label: "Biology" },
-                    ] as { id: StreamFilter; label: string }[]
+                    ] as { id: StreamFilterKey; label: string }[]
                   ).map((stream) => {
                     const active = activeStream === stream.id;
                     return (
                       <button
                         key={stream.id}
-                        onClick={() => setActiveStream(stream.id)}
+                        onClick={() => handleStreamToggle(stream.id)}
                         style={{
                           borderRadius: 999,
                           padding: "4px 10px",
@@ -564,325 +673,141 @@ const HighlyProbableQuestions: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Basket summary */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: "8px 10px",
+                borderRadius: 16,
+                background: "rgba(15,23,42,0.6)",
+                fontSize: "0.75rem",
+                color: "#e5e7eb",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                alignItems: "flex-end",
+              }}
+            >
+              <div>
+                Mock basket:{" "}
+                <strong>
+                  {basket.length} Q • {totalBasketMarks} marks
+                </strong>
+              </div>
+              <button
+                onClick={handleOpenMockBuilder}
+                style={{
+                  marginTop: 2,
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  border: "1px solid rgba(248,250,252,0.85)",
+                  background: "#f9fafb",
+                  color: "#020617",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                📄 Open mock builder
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* Dark control panel card */}
-        <section
-          style={{
-            marginTop: 20,
-            borderRadius: 28,
-            backgroundColor: "#020617",
-            color: "#e5e7eb",
-            boxShadow: "0 22px 55px rgba(15,23,42,0.75)",
-            padding: "18px 22px 20px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "0.9rem",
-              fontWeight: 600,
-              marginBottom: 4,
-            }}
-          >
-            Current prediction pool
-          </div>
-          <div
-            style={{
-              fontSize: "0.86rem",
-              marginBottom: 8,
-              opacity: 0.95,
-            }}
-          >
-            <strong>{filteredQuestionCount} questions</strong> in pool ·
-            target paper: <strong>{targetPaperMarks} marks</strong>
-          </div>
-          <p
-            style={{
-              fontSize: "0.8rem",
-              maxWidth: 820,
-              marginBottom: 10,
-              color: "#cbd5f5",
-            }}
-          >
-            Use the filters below to focus on{" "}
-            <strong>must-crack vs high-ROI</strong> topics, choose the{" "}
-            <strong>difficulty</strong> you want to drill today, and
-            narrow down to one <strong>chapter / concept</strong>. Later,
-            an &ldquo;Add to mock&rdquo; button will send questions
-            straight into your auto-mock basket.
-          </p>
-
-          {/* Tier chips */}
+        {/* Topic dropdown row (under hero) */}
+        <section style={{ marginTop: 24, marginBottom: 8 }}>
           <div
             style={{
               display: "flex",
+              justifyContent: "space-between",
+              gap: 16,
+              alignItems: "flex-end",
               flexWrap: "wrap",
-              gap: 8,
-              alignItems: "center",
-              marginTop: 8,
-              marginBottom: 8,
             }}
           >
-            <span
-              style={{
-                fontSize: "0.8rem",
-                opacity: 0.9,
-                marginRight: 4,
-              }}
-            >
-              Tier:
-            </span>
-            {[
-              { id: "all" as const, label: "All tiers" },
-              { id: "must-crack" as const, label: "🔥 Must-crack" },
-              { id: "high-roi" as const, label: "💎 High-ROI" },
-              { id: "good-to-do" as const, label: "🌈 Good-to-do" },
-            ].map((item) => {
-              const active = activeTier === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() =>
-                    handleTierClick(
-                      item.id === "all" ? "all" : (item.id as HPQTier)
-                    )
-                  }
-                  style={{
-                    borderRadius: 999,
-                    padding: "5px 13px",
-                    border: active
-                      ? "1px solid rgba(248,250,252,0.95)"
-                      : "1px solid rgba(148,163,184,0.5)",
-                    background: active
-                      ? "#f9fafb"
-                      : "rgba(15,23,42,0.65)",
-                    color: active ? "#020617" : "#e5e7eb",
-                    fontSize: "0.75rem",
-                    fontWeight: active ? 600 : 500,
-                    cursor: "pointer",
-                    boxShadow: active
-                      ? "0 6px 18px rgba(15,23,42,0.45)"
-                      : "none",
-                    transition: "all 0.15s ease-out",
-                  }}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Difficulty chips */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              alignItems: "center",
-              marginBottom: 10,
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.8rem",
-                opacity: 0.9,
-                marginRight: 4,
-              }}
-            >
-              Difficulty:
-            </span>
-            {(["All", "Easy", "Medium", "Hard"] as DifficultyFilter[]).map(
-              (diff) => {
-                const active = activeDifficulty === diff;
-                return (
-                  <button
-                    key={diff}
-                    onClick={() => handleDifficultyClick(diff)}
-                    style={{
-                      borderRadius: 999,
-                      padding: "5px 13px",
-                      border: active
-                        ? "1px solid rgba(248,250,252,0.95)"
-                        : "1px solid rgba(148,163,184,0.5)",
-                      background: active
-                        ? "#f9fafb"
-                        : "rgba(15,23,42,0.65)",
-                      color: active ? "#020617" : "#e5e7eb",
-                      fontSize: "0.75rem",
-                      fontWeight: active ? 600 : 500,
-                      cursor: "pointer",
-                      boxShadow: active
-                        ? "0 6px 18px rgba(15,23,42,0.45)"
-                        : "none",
-                      transition: "all 0.15s ease-out",
-                    }}
-                  >
-                    {diff}
-                  </button>
-                );
-              }
-            )}
-          </div>
-
-          {/* Topic + concept dropdowns */}
-          <div
-            style={{
-              marginTop: 8,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 12,
-              fontSize: "0.8rem",
-              color: "#e5e7eb",
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ marginBottom: 4, opacity: 0.9 }}>
-                Chapter / Topic
-              </span>
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <h2
                 style={{
-                  minWidth: 220,
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(148,163,184,0.7)",
-                  backgroundColor: "#020617",
-                  color: "#e5e7eb",
-                  fontSize: "0.8rem",
-                  outline: "none",
+                  fontSize: "1.25rem",
+                  fontWeight: 650,
+                  color: "#020617",
+                  marginBottom: 4,
                 }}
               >
-                <option value="">All topics in this subject</option>
+                Class {grade} {subjectKey} — Highly Probable Questions
+              </h2>
+              <p
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#64748b",
+                }}
+              >
+                Each card = one chapter. Inside you get a mini{" "}
+                <strong>HPQ stack</strong>: quick MCQs, ARs, short/long,
+                case-based – exactly the pattern that keeps repeating in boards.
+              </p>
+            </div>
+
+            <div style={{ minWidth: 260 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.78rem",
+                  color: "#475569",
+                  marginBottom: 4,
+                }}
+              >
+                Topic:
+              </label>
+              <select
+                value={topicFilter}
+                onChange={(e) => {
+                  const next = e.target.value as TopicFilter;
+                  setTopicFilter(next);
+                  const nextParams = new URLSearchParams(
+                    searchParams.toString()
+                  );
+                  if (next === "all") nextParams.delete("topic");
+                  else nextParams.set("topic", next);
+                  setSearchParams(nextParams);
+                }}
+                style={{
+                  width: "100%",
+                  borderRadius: 999,
+                  border: "1px solid rgba(148,163,184,0.6)",
+                  padding: "8px 14px",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                  backgroundColor: "#ffffff",
+                  boxShadow: "0 8px 18px rgba(148,163,184,0.25)",
+                }}
+              >
+                <option value="all">All topics</option>
                 {topicOptions.map((topic) => (
                   <option key={topic} value={topic}>
                     {topic}
                   </option>
                 ))}
               </select>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ marginBottom: 4, opacity: 0.9 }}>
-                Key concept / pattern
-              </span>
-              <select
-                value={selectedConcept}
-                onChange={(e) => setSelectedConcept(e.target.value)}
-                style={{
-                  minWidth: 220,
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(148,163,184,0.7)",
-                  backgroundColor: "#020617",
-                  color: "#e5e7eb",
-                  fontSize: "0.8rem",
-                  outline: "none",
-                }}
-              >
-                <option value="">
-                  All concepts inside chosen topic
-                </option>
-                {conceptOptions.map((concept) => (
-                  <option key={concept} value={concept}>
-                    {concept}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* Section tabs */}
-          <div
-            style={{
-              marginTop: 14,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              fontSize: "0.78rem",
-            }}
-          >
-            {sectionTabs.map((tab) => {
-              const active = activeSectionTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSectionTab(tab.id)}
-                  style={{
-                    borderRadius: 999,
-                    padding: "5px 11px",
-                    border: active
-                      ? "1px solid rgba(248,250,252,0.95)"
-                      : "1px solid rgba(148,163,184,0.55)",
-                    background: active
-                      ? "#f9fafb"
-                      : "rgba(15,23,42,0.7)",
-                    color: active ? "#020617" : "#e5e7eb",
-                    cursor: "pointer",
-                    fontWeight: active ? 600 : 500,
-                    transition: "all 0.15s ease-out",
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+            </div>
           </div>
         </section>
 
-        {/* Pattern summary strip */}
-        {patternSummary && (
-          <section
+        {/* HPQ topic list */}
+        {filteredBuckets.length === 0 ? (
+          <p
             style={{
-              marginTop: 16,
-              borderRadius: 18,
-              backgroundColor: "rgba(248,250,252,0.95)",
-              border: "1px solid rgba(148,163,184,0.18)",
-              boxShadow: "0 12px 26px rgba(148,163,184,0.35)",
-              padding: "10px 14px",
-              fontSize: "0.8rem",
-              color: "#0f172a",
+              fontSize: "0.82rem",
+              color: "#64748b",
+              padding: "8px 4px",
             }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 2 }}>
-              What can the board ask from this slice?
-            </div>
-            <div>
-              Often appears as{" "}
-              <strong>
-                {patternSummary.sections.length > 0
-                  ? patternSummary.sections
-                      .map((s) => `Sec ${s}`)
-                      .join(" • ")
-                  : "mixed sections"}
-              </strong>{" "}
-              with question types{" "}
-              <strong>
-                {patternSummary.types.length > 0
-                  ? patternSummary.types.join(", ")
-                  : "varied"}
-              </strong>
-              .
-            </div>
-          </section>
-        )}
-
-        {/* Question buckets */}
-        <section style={{ marginTop: 22 }}>
-          {bucketViews.length === 0 ? (
-            <p
-              style={{
-                fontSize: "0.82rem",
-                color: "#64748b",
-                padding: "8px 4px",
-              }}
-            >
-              Nothing visible with the current filters. Try switching the
-              tier, difficulty, topic, or section tabs above to see
-              questions again.
-            </p>
-          ) : (
+            Nothing visible with the current filters. Try toggling back “All
+            tiers / All levels / All streams / All topics”.
+          </p>
+        ) : (
+          <section>
             <div
               style={{
                 display: "flex",
@@ -890,221 +815,266 @@ const HighlyProbableQuestions: React.FC = () => {
                 gap: 14,
               }}
             >
-              {bucketViews.map(
-                ({ bucket, tier, topicMeta, questions, marksInBucket }) => {
-                  const tierInfo = tierMeta[tier];
+              {filteredBuckets.map((bucket) => {
+                const tier = getBucketTier(bucket);
+                const tMeta = tierMeta[tier];
 
-                  return (
+                const totalQuestions = bucket.questions.length;
+                const totalMarks = bucket.questions.reduce(
+                  (sum, q) => sum + (q.marks ?? 0),
+                  0
+                );
+
+                const isScience =
+                  (bucket.subject ?? subjectKey) === "Science";
+                const streamLabel =
+                  bucket.stream || (isScience ? "General" : undefined);
+
+                return (
+                  <div
+                    key={`${bucket.topic}-${bucket.subject ?? subjectKey}`}
+                    style={{
+                      borderRadius: 22,
+                      padding: "16px 18px 12px",
+                      backgroundColor: "rgba(248,250,252,0.98)",
+                      border:
+                        tier === "must-crack"
+                          ? "1px solid rgba(248,113,113,0.7)"
+                          : tier === "high-roi"
+                          ? "1px solid rgba(129,140,248,0.7)"
+                          : "1px solid rgba(148,163,184,0.4)",
+                      boxShadow:
+                        tier === "must-crack"
+                          ? "0 14px 30px rgba(248,113,113,0.35)"
+                          : tier === "high-roi"
+                          ? "0 14px 30px rgba(129,140,248,0.35)"
+                          : "0 10px 24px rgba(148,163,184,0.28)",
+                    }}
+                  >
+                    {/* Header row */}
                     <div
-                      key={bucket.topic}
                       style={{
-                        borderRadius: 22,
-                        padding: "16px 18px 14px",
-                        backgroundColor: "rgba(248,250,252,0.98)",
-                        border:
-                          tier === "must-crack"
-                            ? "1px solid rgba(248,113,113,0.7)"
-                            : tier === "high-roi"
-                            ? "1px solid rgba(129,140,248,0.7)"
-                            : "1px solid rgba(148,163,184,0.4)",
-                        boxShadow:
-                          tier === "must-crack"
-                            ? "0 14px 30px rgba(248,113,113,0.35)"
-                            : tier === "high-roi"
-                            ? "0 14px 30px rgba(129,140,248,0.35)"
-                            : "0 10px 24px rgba(148,163,184,0.28)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 14,
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: 16,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              marginBottom: 4,
-                            }}
-                          >
-                            <h3
-                              style={{
-                                fontSize: "1rem",
-                                fontWeight: 650,
-                                color: "#020617",
-                              }}
-                            >
-                              {bucket.topic}
-                            </h3>
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                borderRadius: 999,
-                                padding: "4px 10px",
-                                fontSize: "0.75rem",
-                                backgroundColor:
-                                  tier === "must-crack"
-                                    ? "#fee2e2"
-                                    : tier === "high-roi"
-                                    ? "#e0e7ff"
-                                    : "#e0f2fe",
-                                color:
-                                  tier === "must-crack"
-                                    ? "#b91c1c"
-                                    : tier === "high-roi"
-                                    ? "#3730a3"
-                                    : "#0369a1",
-                              }}
-                            >
-                              <span>{tierInfo.emoji}</span>
-                              <span>{tierInfo.label}</span>
-                            </span>
-                          </div>
-                          <p
-                            style={{
-                              fontSize: "0.85rem",
-                              color: "#475569",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {topicMeta.summary || tierInfo.blurb}
-                          </p>
-                        </div>
+                      <div style={{ flex: 1 }}>
                         <div
                           style={{
-                            fontSize: "0.78rem",
-                            color: "#64748b",
-                            whiteSpace: "nowrap",
-                            textAlign: "right",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 4,
                           }}
                         >
-                          ~
-                          {topicMeta.weightagePercent != null
-                            ? topicMeta.weightagePercent
-                            : 0}
-                          % weightage ·{" "}
-                          <span style={{ fontWeight: 600 }}>
-                            {marksInBucket} marks
-                          </span>{" "}
-                          currently in pool
-                        </div>
-                      </div>
-
-                      {/* Questions inside this topic bucket */}
-                      <div
-                        style={{
-                          marginTop: 6,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 10,
-                        }}
-                      >
-                        {questions.map((q) => (
-                          <div
-                            key={q.id}
+                          <h3
                             style={{
-                              borderRadius: 18,
-                              padding: "10px 12px",
-                              backgroundColor: "#ffffff",
-                              border:
-                                "1px solid rgba(226,232,240,0.9)",
+                              fontSize: "1rem",
+                              fontWeight: 650,
+                              color: "#020617",
                             }}
                           >
-                            <div
+                            {bucket.topic}
+                          </h3>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              borderRadius: 999,
+                              padding: "4px 10px",
+                              fontSize: "0.75rem",
+                              backgroundColor:
+                                tier === "must-crack"
+                                  ? "#fee2e2"
+                                  : tier === "high-roi"
+                                  ? "#e0e7ff"
+                                  : "#e0f2fe",
+                              color:
+                                tier === "must-crack"
+                                  ? "#b91c1c"
+                                  : tier === "high-roi"
+                                  ? "#3730a3"
+                                  : "#0369a1",
+                            }}
+                          >
+                            <span>{tMeta.emoji}</span>
+                            <span>{tMeta.label}</span>
+                          </span>
+                          {isScience && streamLabel && (
+                            <span
                               style={{
-                                fontSize: "0.78rem",
-                                color: "#6b7280",
-                                marginBottom: 4,
+                                borderRadius: 999,
+                                padding: "3px 9px",
+                                fontSize: "0.7rem",
+                                backgroundColor: "#ecfeff",
+                                border: "1px solid rgba(6,182,212,0.6)",
+                                color: "#0369a1",
                               }}
                             >
-                              {q.subtopic && (
-                                <>
-                                  <strong>Subtopic:</strong> {q.subtopic}{" "}
-                                </>
-                              )}
-                              {q.concept && (
-                                <>
-                                  <span style={{ marginLeft: 8 }}>
-                                    <strong>Concept:</strong> {q.concept}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                            <div
+                              {streamLabel}
+                            </span>
+                          )}
+                        </div>
+
+                        <p
+                          style={{
+                            fontSize: "0.83rem",
+                            color: "#475569",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {tMeta.blurb} • This stack has{" "}
+                          <strong>{totalQuestions} Q</strong> (~
+                          {totalMarks} marks) in board-style formats
+                          (MCQs/AR/short/case-based).
+                        </p>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "#64748b",
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Subject:{" "}
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "#111827",
+                          }}
+                        >
+                          {bucket.subject ?? subjectKey}
+                        </span>
+                        {isScience && streamLabel && (
+                          <>
+                            <br />
+                            Stream:{" "}
+                            <span
                               style={{
-                                fontSize: "0.9rem",
+                                fontWeight: 600,
                                 color: "#111827",
-                                marginBottom: 4,
                               }}
                             >
-                              {q.question}
-                            </div>
-                            {q.answer && (
-                              <div
-                                style={{
-                                  fontSize: "0.85rem",
-                                  color: "#166534",
-                                  marginTop: 4,
-                                }}
-                              >
-                                <strong>Answer (board-style key):</strong>{" "}
-                                {q.answer}
-                              </div>
-                            )}
-                            {q.solutionSteps && q.solutionSteps.length > 0 && (
-                              <ul
-                                style={{
-                                  marginTop: 6,
-                                  paddingLeft: 18,
-                                  fontSize: "0.8rem",
-                                  color: "#374151",
-                                }}
-                              >
-                                {q.solutionSteps.map((step, idx) => (
-                                  <li key={idx}>{step}</li>
-                                ))}
-                              </ul>
-                            )}
-                            <div
-                              style={{
-                                marginTop: 6,
-                                fontSize: "0.78rem",
-                                color: "#6b7280",
-                                display: "flex",
-                                flexWrap: "wrap",
-                                gap: 10,
-                              }}
-                            >
-                              {q.marks != null && (
-                                <span>{q.marks} marks</span>
-                              )}
-                              {q.difficulty && (
-                                <span>• {q.difficulty}</span>
-                              )}
-                              <span>• {q.likelihood} chance</span>
-                              {q.section && (
-                                <span>• Sec {q.section}</span>
-                              )}
-                              {q.type && <span>• {q.type}</span>}
-                            </div>
-                          </div>
-                        ))}
+                              {streamLabel}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
-                  );
-                }
-              )}
+
+                    {/* Question list */}
+                    <div
+                      style={{
+                        marginTop: 10,
+                        paddingTop: 8,
+                        borderTop: "1px dashed rgba(148,163,184,0.6)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {bucket.questions.map((q) => (
+                        <div
+                          key={q.id}
+                          style={{
+                            borderRadius: 16,
+                            padding: "8px 10px",
+                            backgroundColor: "rgba(248,250,252,0.96)",
+                            border:
+                              "1px solid rgba(203,213,225,0.8)",
+                          }}
+                        >
+                          {renderQuestionMetaChips(q)}
+                          <div
+                            style={{
+                              fontSize: "0.85rem",
+                              color: "#0f172a",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {q.question}
+                          </div>
+                          {q.answer && (
+                            <div
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "#4b5563",
+                                marginTop: 2,
+                              }}
+                            >
+                              <span style={{ fontWeight: 500 }}>
+                                Ans:
+                              </span>{" "}
+                              {q.answer}
+                            </div>
+                          )}
+                          {q.pastBoardYear && (
+                            <div
+                              style={{
+                                fontSize: "0.7rem",
+                                color: "#6b7280",
+                                marginTop: 2,
+                              }}
+                            >
+                              Pattern seen in:{" "}
+                              <strong>{q.pastBoardYear}</strong>
+                            </div>
+                          )}
+                          <div
+                            style={{
+                              marginTop: 6,
+                              display: "flex",
+                              justifyContent: "flex-end",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              onClick={() =>
+                                handleAskAiMentor(bucket, q)
+                              }
+                              style={{
+                                borderRadius: 999,
+                                border:
+                                  "1px solid rgba(59,130,246,0.8)",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                cursor: "pointer",
+                              }}
+                            >
+                              🤖 AI mentor solution
+                            </button>
+                            <button
+                              onClick={() => handleAddToBasket(bucket, q)}
+                              style={{
+                                borderRadius: 999,
+                                border:
+                                  "1px solid rgba(148,163,184,0.8)",
+                                padding: "4px 10px",
+                                fontSize: "0.75rem",
+                                background: "#ffffff",
+                                cursor: "pointer",
+                              }}
+                            >
+                              ➕ Add to mock
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </div>
   );

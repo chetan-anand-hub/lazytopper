@@ -1,938 +1,1001 @@
 // src/pages/TopicHub.tsx
-import React, { useMemo } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+
+import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import type {
+  Class10SubjectKey,
+  TopicContentConfig,
+  TopicSectionConfig,
+} from "../data/class10ContentConfig";
 import {
-  class10MathTopicTrends,
-  type Class10TopicKey,
-  type TopicTier,
-} from "../data/class10MathTopicTrends";
+  getTopicContent,
+  buildGenericTopicConfig,
+} from "../data/class10ContentConfig";
 
-type Priority = "must-do" | "should-do" | "good-to-know";
+// --- Helpers -----------------------------------------------------
 
-interface ConceptNote {
-  id: string;
-  title: string;
-  priority: Priority;
-  summary: string;
-  examTip: string;
-}
+type TopicTier = "must-crack" | "high-roi" | "good-to-do";
 
-interface ExampleNote {
-  id: string;
-  label: string;
-  question: string;
-  idea: string;
-}
-
-interface MistakeNote {
-  id: string;
-  title: string;
-  whatHappens: string;
-  fix: string;
-}
-
-interface TopicContent {
-  topicKey: Class10TopicKey;
-  tagline: string;
-  roadmap: string;
-  concepts: ConceptNote[];
-  examples: ExampleNote[];
-  mistakes: MistakeNote[];
-}
-
-// For navigation only (matches CBSE paper sections)
-type PaperSectionKey = "A" | "B" | "C" | "D" | "E";
-
-// Small helpers
-const priorityLabel: Record<Priority, string> = {
-  "must-do": "Must-do",
-  "should-do": "Should-do",
-  "good-to-know": "Good-to-know",
-};
-
-const priorityColor: Record<Priority, string> = {
-  "must-do": "rgba(34,197,94,0.14)",
-  "should-do": "rgba(59,130,246,0.12)",
-  "good-to-know": "rgba(148,163,184,0.16)",
-};
-
-const tierEmoji: Record<TopicTier, string> = {
-  "must-crack": "🔥",
-  "high-roi": "💎",
-  "good-to-do": "🌱",
-};
-
-// CBSE paper mapping strip
-const paperSectionMeta: {
-  key: PaperSectionKey;
-  label: string;
-  vibe: string;
-}[] = [
+const tierMeta: Record<
+  TopicTier,
   {
-    key: "A",
-    label: "Section A • 1 mark",
-    vibe: "MCQs + assertion–reason",
+    label: string;
+    emoji: string;
+    chipBg: string;
+    chipText: string;
+    gradient: string;
+  }
+> = {
+  "must-crack": {
+    label: "Must-crack topic",
+    emoji: "🔥",
+    chipBg: "#fee2e2",
+    chipText: "#b91c1c",
+    gradient:
+      "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 25%, #f97316 65%, #facc15 100%)",
   },
-  {
-    key: "B",
-    label: "Section B • 2 marks",
-    vibe: "Very short answer",
+  "high-roi": {
+    label: "High-ROI topic",
+    emoji: "💎",
+    chipBg: "#e0e7ff",
+    chipText: "#3730a3",
+    gradient:
+      "linear-gradient(135deg, #020617 0%, #0f172a 15%, #1d4ed8 55%, #22c1c3 100%)",
   },
-  {
-    key: "C",
-    label: "Section C • 3 marks",
-    vibe: "Short answer",
-  },
-  {
-    key: "D",
-    label: "Section D • 5 marks",
-    vibe: "Long answer",
-  },
-  {
-    key: "E",
-    label: "Section E • 4 marks",
-    vibe: "Case study (1,1,2)",
-  },
-];
-
-// ---- Topic content for three key chapters ----
-
-const topicContentMap: Partial<Record<Class10TopicKey, TopicContent>> = {
-  "Pair of Linear Equations": {
-    topicKey: "Pair of Linear Equations",
-    tagline: "Algebra + graphs + word problems — guaranteed board presence.",
-    roadmap:
-      "Start with algebraic methods (elimination, substitution, cross-multiplication). Then practise graphical interpretation and finally word/application problems including questions on consistency.",
-    concepts: [
-      {
-        id: "ple-concept-1",
-        title: "Algebraic Solution Methods",
-        priority: "must-do",
-        summary:
-          "Understand elimination, substitution and cross-multiplication as three equivalent ways to solve ax + by = c, a'x + b'y = c'.",
-        examTip:
-          "For most board questions, elimination is fastest. Arrange terms in the same order (x, y, constant) before eliminating.",
-      },
-      {
-        id: "ple-concept-2",
-        title: "Graphical Interpretation & Nature of Solutions",
-        priority: "must-do",
-        summary:
-          "Visualise each linear equation as a straight line. Intersecting lines ⇒ unique solution, parallel distinct ⇒ no solution, coincident ⇒ infinitely many solutions.",
-        examTip:
-          "Always link algebra with geometry: equal ratios a1/a2 = b1/b2 ≠ c1/c2 ⇒ parallel lines (no solution).",
-      },
-      {
-        id: "ple-concept-3",
-        title: "Word & Application Problems",
-        priority: "should-do",
-        summary:
-          "Translate situations into two variables and two equations: age problems, money, speed–time–distance and mixture problems.",
-        examTip:
-          "Write a statement for each equation. Clearly define variables before forming equations to avoid confusion.",
-      },
-    ],
-    examples: [
-      {
-        id: "ple-ex-1",
-        label: "Example: Typical 3-mark algebraic question",
-        question:
-          "Solve 3x + 4y = 10 and 2x − y = 1 using the elimination method. State the nature of the solution.",
-        idea:
-          "Multiply second equation by 4, add/subtract to eliminate y. Conclude that lines intersect at a unique point, so there is a unique solution.",
-      },
-      {
-        id: "ple-ex-2",
-        label: "Example: Application problem",
-        question:
-          "The sum of two numbers is 70. Three times the smaller exceeds the larger by 10. Form a pair of linear equations and find the numbers.",
-        idea:
-          "Let x, y be the numbers (x > y). Form x + y = 70 and 3y = x + 10. Solve by substitution or elimination.",
-      },
-    ],
-    mistakes: [
-      {
-        id: "ple-m1",
-        title: "Mismatching variable order in elimination",
-        whatHappens:
-          "Students add/subtract equations where x and y terms are not aligned, leading to wrong cancellation.",
-        fix: "Always rewrite equations with x, y and constant in the same order before eliminating.",
-      },
-      {
-        id: "ple-m2",
-        title: "Mixing up consistency conditions",
-        whatHappens:
-          "Students memorise ratios incorrectly and misjudge whether the system has no solution or infinitely many.",
-        fix: "Write the rule on the side: a1/a2 ≠ b1/b2 ⇒ unique solution; a1/a2 = b1/b2 ≠ c1/c2 ⇒ no solution; a1/a2 = b1/b2 = c1/c2 ⇒ infinitely many solutions.",
-      },
-    ],
-  },
-
-  "Quadratic Equations": {
-    topicKey: "Quadratic Equations",
-    tagline:
-      "Three pillars: forming the equation, nature of roots and application problems.",
-    roadmap:
-      "First be fluent in converting word problems into ax² + bx + c = 0. Then master discriminant-based nature of roots and solving using factorisation or quadratic formula.",
-    concepts: [
-      {
-        id: "qe-concept-1",
-        title: "Forming Quadratic Equations",
-        priority: "must-do",
-        summary:
-          "Translate statements like 'product is 56' or 'sum of reciprocals is 1/4' into x² terms and form ax² + bx + c = 0.",
-        examTip:
-          "Always bring everything to one side and simplify before identifying a, b, c.",
-      },
-      {
-        id: "qe-concept-2",
-        title: "Nature of Roots using Discriminant",
-        priority: "must-do",
-        summary:
-          "Use D = b² − 4ac: D > 0 ⇒ real & distinct, D = 0 ⇒ real & equal, D < 0 ⇒ no real roots.",
-        examTip:
-          "For board questions asking 'find k so that roots are equal/real', directly put D = 0 or D ≥ 0 and solve for k.",
-      },
-      {
-        id: "qe-concept-3",
-        title: "Solving Quadratic Equations",
-        priority: "should-do",
-        summary:
-          "Solve by factorisation when possible; otherwise use x = [−b ± √(b² − 4ac)] / 2a.",
-        examTip:
-          "Check if common factor can be taken out first; it simplifies both the equation and discriminant.",
-      },
-    ],
-    examples: [
-      {
-        id: "qe-ex-1",
-        label: "Example: Parameter k with equal roots",
-        question:
-          "For what value of k does the equation 3x² + 6x + k = 0 have equal roots?",
-        idea:
-          "Set D = 0 ⇒ 6² − 4·3·k = 0 ⇒ 36 − 12k = 0 ⇒ k = 3. Conclude that roots are equal for k = 3.",
-      },
-      {
-        id: "qe-ex-2",
-        label: "Example: Word problem leading to quadratic",
-        question:
-          "The product of two consecutive positive integers is 156. Form the quadratic equation and find the numbers.",
-        idea:
-          "Let smaller integer be n. Then n(n + 1) = 156 ⇒ n² + n − 156 = 0. Factorise to get n = 12, so numbers are 12 and 13.",
-      },
-    ],
-    mistakes: [
-      {
-        id: "qe-m1",
-        title: "Wrong substitution into discriminant",
-        whatHappens:
-          "a, b, c are read incorrectly (especially sign of c), so D is wrong and the nature of roots answer fails.",
-        fix: "Write ax² + bx + c above the given equation and match term-by-term with signs before computing D.",
-      },
-      {
-        id: "qe-m2",
-        title: "Losing one root when taking square roots",
-        whatHappens:
-          "When solving by taking square roots, the negative root is often missed.",
-        fix: "Remember: whenever you take √ on both sides, write ±. That automatically gives two possible roots.",
-      },
-    ],
-  },
-
-  Trigonometry: {
-    topicKey: "Trigonometry",
-    tagline:
-      "Ratios, identities and heights–distances: one of the highest weightage units.",
-    roadmap:
-      "Start by memorising standard trig values and sign rules in each quadrant. Then practise proving basic identities and finally solve heights and distances questions using diagrams.",
-    concepts: [
-      {
-        id: "trig-concept-1",
-        title: "Trig Ratios & Standard Values",
-        priority: "must-do",
-        summary:
-          "Know sin, cos, tan values for 0°, 30°, 45°, 60°, 90°. Understand that tanθ = sinθ/cosθ and reciprocal ratios sec, cosec, cot.",
-        examTip:
-          "Write the ‘magic triangle’ or standard table at the top of the paper as soon as the exam starts to avoid memory slips.",
-      },
-      {
-        id: "trig-concept-2",
-        title: "Basic Identities",
-        priority: "must-do",
-        summary:
-          "Use sin²θ + cos²θ = 1, 1 + tan²θ = sec²θ, 1 + cot²θ = cosec²θ for simplifications and proofs.",
-        examTip:
-          "In proofs, convert everything to sin and cos first; this often makes the LHS and RHS meet cleanly.",
-      },
-      {
-        id: "trig-concept-3",
-        title: "Heights and Distances",
-        priority: "should-do",
-        summary:
-          "Convert word problems into right-triangle diagrams with angles of elevation and depression, then apply tan, sin or cos.",
-        examTip:
-          "Always mark the right angle, horizontal line and angle clearly. Decide which side you know and which you need before choosing tan/sin/cos.",
-      },
-    ],
-    examples: [
-      {
-        id: "trig-ex-1",
-        label: "Example: Identity proof",
-        question:
-          "Prove that (1 − tan²θ) / (1 + tan²θ) = cos 2θ, for all θ where both sides are defined.",
-        idea:
-          "Write tanθ = sinθ/cosθ, simplify numerator and denominator to get (cos²θ − sin²θ)/(cos²θ + sin²θ) = cos2θ.",
-      },
-      {
-        id: "trig-ex-2",
-        label: "Example: Heights & distances",
-        question:
-          "From the top of a 20 m building, angle of elevation of a tower top is 30° and angle of depression of its foot is 45°. Find the height of the tower.",
-        idea:
-          "Find horizontal distance using tan45° = 20/x ⇒ x = 20 m. Then use tan30° = (h − 20)/20 to get the remaining height.",
-      },
-    ],
-    mistakes: [
-      {
-        id: "trig-m1",
-        title: "Confusing angle of elevation & depression",
-        whatHappens:
-          "Students draw the angle on the wrong side, which changes which side is opposite/adjacent.",
-        fix: "Angle of elevation is always measured upwards from the horizontal of the observer; angle of depression is measured downwards from the observer’s horizontal.",
-      },
-      {
-        id: "trig-m2",
-        title: "Using wrong trig ratio/standard value",
-        whatHappens:
-          "Using tan instead of sin, or mixing values like sin30° and cos30°.",
-        fix: "Before calculating, say aloud: ‘opposite/hypotenuse → sin, adjacent/hypotenuse → cos, opposite/adjacent → tan’. Cross-check the angle and ratio.",
-      },
-    ],
+  "good-to-do": {
+    label: "Good-to-do topic",
+    emoji: "🌈",
+    chipBg: "#e0f2fe",
+    chipText: "#0369a1",
+    gradient:
+      "linear-gradient(135deg, #0f172a 0%, #0369a1 35%, #22c55e 80%, #a3e635 100%)",
   },
 };
 
-// ---- React component ----
+function normaliseSubject(raw?: string | null): Class10SubjectKey {
+  const v = (raw || "").toLowerCase();
+  if (v === "science" || v === "sci") return "Science";
+  return "Maths";
+}
+
+// Little safe helpers to cope with partial / generic configs
+function getSafeTier(config: TopicContentConfig | undefined): TopicTier {
+  const t = (config as any)?.tier;
+  if (t === "must-crack" || t === "high-roi" || t === "good-to-do") return t;
+  return "high-roi";
+}
+
+function getDisplayTitle(
+  topicParam: string,
+  config: TopicContentConfig
+): string {
+  return (
+    (config as any).displayName ||
+    (config as any).title ||
+    topicParam ||
+    "Generic"
+  );
+}
+
+// --- Component ---------------------------------------------------
 
 const TopicHub: React.FC = () => {
   const navigate = useNavigate();
-  const { topicKey: topicSlug } = useParams<{ topicKey: string }>();
   const location = useLocation();
 
-  const searchParams = new URLSearchParams(location.search);
-  const highlightedConceptName = searchParams.get("concept") ?? "";
+  const search = new URLSearchParams(location.search);
+  const grade = search.get("grade") || "10";
+  const subjectKey = normaliseSubject(search.get("subject"));
+  const topicParam = search.get("topic") || "Generic";
 
-  const gradeQuery = searchParams.get("grade") ?? "10";
-  const subjectRaw = searchParams.get("subject") ?? "Maths";
-  const subjectLabel = subjectRaw.toLowerCase().startsWith("sci")
-    ? "Science"
-    : "Maths";
+  const rawConfig = getTopicContent(subjectKey, topicParam);
+  const config: TopicContentConfig =
+    (rawConfig as TopicContentConfig) ??
+    buildGenericTopicConfig({
+      subjectKey,
+      topicKey: topicParam,
+      topicName: topicParam,
+    });
 
-  const decodedSlug = decodeURIComponent(topicSlug ?? "");
-  const allTopicKeys = useMemo(
-    () => Object.keys(class10MathTopicTrends.topics) as Class10TopicKey[],
-    []
-  );
+  const tier = getSafeTier(config);
+  const tierInfo = tierMeta[tier];
 
-  const isValidTopic = allTopicKeys.includes(decodedSlug as Class10TopicKey);
-  const topicKey = isValidTopic ? (decodedSlug as Class10TopicKey) : undefined;
+  const title = getDisplayTitle(topicParam, config);
+  const weightage =
+    (config as any).weightagePercent ?? (config as any).approxWeightage ?? 0;
 
-  const trendInfo = topicKey
-    ? class10MathTopicTrends.topics[topicKey]
-    : undefined;
+  // ---- content coming from config ------------------------------
 
-  const tier = (trendInfo as any)?.tier as TopicTier | undefined;
-  const weightage = trendInfo?.weightagePercent;
+  const heroTagline: string =
+    (config as any).heroTagline ??
+    "Fast-track your prep for this topic with a single scroll-friendly page. Start with NCERT + PYQs, then use LazyTopper’s HPQ bank and AI Mentor to lock the patterns.";
 
-  const content: TopicContent | undefined = topicKey
-    ? topicContentMap[topicKey]
-    : undefined;
+  const examLinkCaption: string =
+    (config as any).examLinkCaption ??
+    "See how this topic shows up across CBSE sections. Tap a chip to jump straight to Highly Probable Questions for that section.";
 
-  const handleBack = () => navigate("/chapters");
+  const rawExamSections: TopicSectionConfig[] =
+    (config as any).examSections ?? [];
 
-  const handleSectionChipClick = (section: PaperSectionKey) => {
-    navigate(`/mock-paper?section=${section}`);
+  const examSections:
+    | { id: string; label: string; blurb?: string }[]
+    | undefined =
+    rawExamSections.length > 0
+      ? rawExamSections.map((sec) => ({
+          id: sec.id,
+          label: `${sec.label} · ${sec.marksLabel}`,
+          blurb: sec.blurb,
+        }))
+      : undefined;
+
+  const quickRoadmap: string[] =
+    (config as any).quickRevisionRoadmap ??
+    (config as any).roadmap ?? [
+      "First, revise all NCERT solved examples for this chapter.",
+      "Next, solve the last 3–5 years of PYQs for this topic.",
+      "Finally, attempt 1–2 full section-wise mocks and analyse mistakes.",
+    ];
+
+  const howToUse: string[] =
+    (config as any).howToUseSteps ??
+    (config as any).howToUse ?? [
+      "Skim this page once before starting PYQs / mocks for this topic.",
+      "After every mock, come back and match your mistakes with the ‘Common mistakes’ list.",
+      "Turn repeated mistakes into small flashcards and revise them 2–3 times before boards.",
+    ];
+
+  const keyConceptsSummary: string =
+    (config as any).keyConceptsSummary ??
+    "We’re still writing detailed concept cards for this topic. For now, maintain a tiny list in your notebook: (1) core definitions, (2) formulas / key results, (3) 2–3 most common PYQ patterns.";
+
+  const boardExamplesSummary: string =
+    (config as any).boardExamplesSummary ??
+    "Full board-style examples for this topic are coming soon. Till then, practise from the Highly Probable questions and use the AI Mentor to check your steps.";
+
+  const recommendedVideoSummary: string =
+    (config as any).recommendedVideoSummary ??
+    "We’re shortlisting the best one-shot video for this topic. For now, search on YouTube by the topic name plus “one-shot”.";
+
+  const recommendedVideoUrl: string | undefined = (config as any)
+    .recommendedVideoUrl;
+  const recommendedVideo: any = (config as any).recommendedVideo;
+
+  // For richer cards
+  const concepts: Array<any> = (config as any).conceptNotes ?? [];
+  const boardExamples: Array<any> = (config as any).boardExamples ?? [];
+
+  const mistakes: Array<string | any> =
+    (config as any).commonMistakes ?? [];
+
+  // --- navigation handlers --------------------------------------
+
+  const handleBackToTrends = () => {
+    navigate(`/trends/${grade}/${subjectKey}`);
   };
 
-  // If topic is unknown, show generic coming soon
-  if (!topicKey) {
-    return (
-      <div className="page topic-page">
-        <button
-          onClick={handleBack}
-          className="link-back"
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "#6b7280",
-            marginTop: 16,
-            marginLeft: 16,
-            cursor: "pointer",
-          }}
-        >
-          ← Back to chapters
-        </button>
-        <div
-          style={{
-            maxWidth: 900,
-            margin: "40px auto",
-            padding: "32px 24px",
-          }}
-        >
-          <h1 className="page-title">Topic coming soon</h1>
-          <p className="page-subtitle">
-            We haven’t wired this chapter into TopicHub yet. It’ll get the same
-            rich concept notes + examples treatment soon.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handleAskMentor = (
+    conceptId?: string,
+    extra?: Record<string, any>
+  ) => {
+    navigate("/ai-mentor", {
+      state: {
+        grade,
+        subject: subjectKey,
+        topic: title,
+        topicKey: (config as any).topicKey || topicParam,
+        conceptId,
+        ...extra,
+      },
+    });
+  };
 
-  // Topic is valid but we don't have content yet → show the same placeholder
-  if (!content) {
-    return (
-      <div className="page topic-page">
-        <button
-          onClick={handleBack}
-          className="link-back"
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "#6b7280",
-            marginTop: 16,
-            marginLeft: 16,
-            cursor: "pointer",
-          }}
-        >
-          ← Back to chapters
-        </button>
-        <div
-          style={{
-            maxWidth: 900,
-            margin: "40px auto",
-            padding: "32px 24px",
-          }}
-        >
-          <h1 className="page-title">Topic coming soon</h1>
-          <p className="page-subtitle">
-            We’re still preparing concept notes + examples for{" "}
-            <strong>{topicKey}</strong>. For now, use NCERT + PYQs and the
-            trends view to plan your revision.
-          </p>
-        </div>
-      </div>
+  // Clicking exam section chips -> open HPQ pre-filtered by section
+  const handleExamSectionClick = (sectionId: string) => {
+    navigate(
+      `/highly-probable?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
+        title
+      )}&section=${sectionId}`
     );
-  }
+  };
 
   return (
-    <div className="page topic-page">
-      {/* Back link */}
-      <button
-        onClick={handleBack}
-        className="link-back"
-        style={{
-          border: "none",
-          background: "transparent",
-          color: "#6b7280",
-          marginTop: 16,
-          marginLeft: 16,
-          cursor: "pointer",
-        }}
-      >
-        ← Back to chapters
-      </button>
-
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at top, #e0f2ff 0, #dde7ff 30%, #e5edff 60%, #f1f5f9 100%)",
+        paddingBottom: "80px",
+      }}
+    >
       <div
         style={{
-          maxWidth: 1080,
-          margin: "24px auto 40px",
-          padding: "0 16px 40px",
+          maxWidth: "1120px",
+          margin: "0 auto",
+          padding: "16px 16px 32px",
         }}
       >
-        {/* Header */}
-        <header
+        {/* Back link */}
+        <button
+          onClick={handleBackToTrends}
           style={{
-            marginBottom: 24,
+            background: "none",
+            border: "none",
+            color: "#4b5563",
+            fontSize: "0.85rem",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            cursor: "pointer",
+            marginBottom: 12,
           }}
         >
-          <div
-            style={{
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              fontSize: "0.75rem",
-              color: "#6b7280",
-              marginBottom: 4,
-            }}
-          >
-            Class {gradeQuery} · {subjectLabel}
-          </div>
-          <h1
-            className="page-title"
-            style={{
-              margin: 0,
-              fontSize: "1.9rem",
-              fontWeight: 700,
-              color: "#020617",
-            }}
-          >
-            {topicKey}
-          </h1>
-          <p
-            className="page-subtitle"
-            style={{
-              marginTop: 6,
-              maxWidth: 640,
-              fontSize: "0.95rem",
-              color: "#4b5563",
-              lineHeight: 1.6,
-            }}
-          >
-            {content.tagline}
-          </p>
+          <span style={{ fontSize: "1rem" }}>←</span>
+          <span>Back to trends</span>
+        </button>
 
-          {/* meta pills */}
-          <div
-            style={{
-              marginTop: 12,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              fontSize: "0.8rem",
-            }}
-          >
-            {tier && (
+        {/* Hero */}
+        <section
+          style={{
+            borderRadius: 32,
+            padding: "24px 24px 24px 28px",
+            background: tierInfo.gradient,
+            color: "#f9fafb",
+            boxShadow: "0 24px 60px rgba(15,23,42,0.55)",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "stretch",
+            justifyContent: "space-between",
+            gap: 24,
+          }}
+        >
+          <div style={{ maxWidth: 640 }}>
+            <div
+              style={{
+                fontSize: "0.7rem",
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                opacity: 0.85,
+                marginBottom: 8,
+              }}
+            >
+              Class {grade} · {subjectKey} · Topic
+            </div>
+
+            <h1
+              style={{
+                fontSize: "2.1rem",
+                lineHeight: 1.15,
+                fontWeight: 650,
+                marginBottom: 8,
+              }}
+            >
+              {title}
+            </h1>
+
+            <p
+              style={{
+                fontSize: "0.95rem",
+                lineHeight: 1.6,
+                opacity: 0.96,
+              }}
+            >
+              {heroTagline}
+            </p>
+
+            <div
+              style={{
+                marginTop: 16,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              {/* Tier pill */}
               <span
                 style={{
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  background: "#eff6ff",
-                  color: "#1d4ed8",
-                  border: "1px solid #bfdbfe",
                   display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  backgroundColor: tierInfo.chipBg,
+                  color: tierInfo.chipText,
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                }}
+              >
+                <span>{tierInfo.emoji}</span>
+                <span>{tierInfo.label}</span>
+              </span>
+
+              {/* Weightage pill */}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  backgroundColor: "rgba(15,23,42,0.35)",
+                  color: "#e5e7eb",
+                  fontSize: "0.8rem",
+                }}
+              >
+                <span>≈ {weightage || "?"}% exam weightage</span>
+              </span>
+
+              {/* Quick revision / board-style practice tags */}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  backgroundColor: "rgba(15,23,42,0.35)",
+                  color: "#e5e7eb",
+                  fontSize: "0.8rem",
+                }}
+              >
+                ⚡ Quick revision
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  backgroundColor: "rgba(15,23,42,0.35)",
+                  color: "#e5e7eb",
+                  fontSize: "0.8rem",
+                }}
+              >
+                🎯 Board-style practice
+              </span>
+            </div>
+          </div>
+
+          {/* Small right column – generic tips */}
+          <div
+            style={{
+              alignSelf: "stretch",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              gap: 12,
+              fontSize: "0.8rem",
+              maxWidth: 260,
+            }}
+          >
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: 18,
+                background: "rgba(15,23,42,0.45)",
+                border: "1px solid rgba(248,250,252,0.3)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  marginBottom: 4,
+                  opacity: 0.9,
+                }}
+              >
+                Topic game-plan
+              </div>
+              <p style={{ lineHeight: 1.5, opacity: 0.95 }}>
+                1️⃣ Read this page once. 2️⃣ Do NCERT & PYQs. 3️⃣ Use{" "}
+                <strong>HPQ</strong> & <strong>AI Mentor</strong> to clean up
+                doubts.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Main content grid */}
+        <section style={{ marginTop: 24 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
+            {/* Exam link card */}
+            <div
+              style={{
+                borderRadius: 24,
+                backgroundColor: "rgba(248,250,252,0.98)",
+                border: "1px solid rgba(148,163,184,0.3)",
+                boxShadow: "0 18px 40px rgba(148,163,184,0.35)",
+                padding: "18px 20px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  fontWeight: 650,
+                  color: "#0f172a",
+                  marginBottom: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span role="img" aria-label="paperclip">
+                  📎
+                </span>
+                Exam link
+              </div>
+              <p
+                style={{
+                  fontSize: "0.83rem",
+                  color: "#475569",
+                  marginBottom: 10,
+                }}
+              >
+                {examLinkCaption}
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginTop: 4,
+                }}
+              >
+                {(examSections && examSections.length > 0
+                  ? examSections
+                  : [
+                      {
+                        id: "A",
+                        label: "MCQs / Objective · 1 mark",
+                      },
+                      {
+                        id: "B",
+                        label: "Very short answer · 2 marks",
+                      },
+                      {
+                        id: "C",
+                        label: "Short answer · 3 marks",
+                      },
+                      {
+                        id: "D",
+                        label: "Long answer · 4–5 marks",
+                      },
+                      {
+                        id: "E",
+                        label: "Case-based · 4 marks",
+                      },
+                    ]
+                ).map((sec) => (
+                  <button
+                    key={sec.id + sec.label}
+                    onClick={() => handleExamSectionClick(sec.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 999,
+                      padding: "6px 12px",
+                      backgroundColor: "#eef2ff",
+                      border: "1px solid rgba(129,140,248,0.55)",
+                      fontSize: "0.78rem",
+                      color: "#1e293b",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        backgroundColor: "#4f46e5",
+                      }}
+                    />
+                    <span>{sec.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* How to use this page */}
+            <div
+              style={{
+                borderRadius: 24,
+                backgroundColor: "rgba(255,247,237,0.98)",
+                border: "1px solid rgba(251,146,60,0.5)",
+                boxShadow: "0 18px 40px rgba(251,146,60,0.35)",
+                padding: "18px 20px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  fontWeight: 650,
+                  color: "#7c2d12",
+                  marginBottom: 6,
+                }}
+              >
+                How to use this page
+              </div>
+              <ol
+                style={{
+                  fontSize: "0.83rem",
+                  color: "#7c2d12",
+                  paddingLeft: 18,
+                  lineHeight: 1.6,
+                }}
+              >
+                {howToUse.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          {/* Second row – Quick revision + Recommended video */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
+            {/* Quick revision roadmap */}
+            <div
+              style={{
+                borderRadius: 24,
+                backgroundColor: "rgba(248,250,252,0.98)",
+                border: "1px solid rgba(148,163,184,0.3)",
+                boxShadow: "0 18px 40px rgba(148,163,184,0.28)",
+                padding: "18px 20px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  fontWeight: 650,
+                  color: "#0f172a",
+                  marginBottom: 6,
+                  display: "flex",
                   alignItems: "center",
                   gap: 6,
                 }}
               >
-                <span>{tierEmoji[tier]}</span>
-                <span>{tier.replace("-", " ")}</span>
-              </span>
-            )}
-            {typeof weightage === "number" && (
-              <span
-                style={{
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  background: "#fef3c7",
-                  color: "#92400e",
-                  border: "1px solid #fed7aa",
-                }}
-              >
-                ≈ {weightage}% exam weightage
-              </span>
-            )}
-          </div>
-
-          {/* CBSE paper mapping + section chips */}
-          <section
-            style={{
-              marginTop: 16,
-              padding: 12,
-              borderRadius: 18,
-              border: "1px solid #e5e7eb",
-              background:
-                "linear-gradient(135deg, rgba(239,246,255,0.9), #ffffff)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "0.8rem",
-                color: "#4b5563",
-                marginBottom: 6,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span>
-                🧪 <strong>Exam link:</strong> See how this topic appears in the
-                CBSE paper.
-              </span>
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#6b7280",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Tap a section to build mocks →
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              {paperSectionMeta.map((sec) => (
-                <button
-                  key={sec.key}
-                  type="button"
-                  onClick={() => handleSectionChipClick(sec.key)}
-                  style={{
-                    borderRadius: 999,
-                    border: "1px solid #dbeafe",
-                    background: "#ffffff",
-                    padding: "6px 10px",
-                    fontSize: "0.78rem",
-                    color: "#1d4ed8",
-                    display: "inline-flex",
-                    flexShrink: 0,
-                    alignItems: "center",
-                    gap: 6,
-                    cursor: "pointer",
-                    boxShadow: "0 4px 10px rgba(37,99,235,0.05)",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "999px",
-                      background: "#eff6ff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      color: "#1d4ed8",
-                    }}
-                  >
-                    {sec.key}
-                  </span>
-                  <span>{sec.label}</span>
-                  <span
-                    style={{
-                      fontSize: "0.7rem",
-                      color: "#6b7280",
-                    }}
-                  >
-                    · {sec.vibe}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        </header>
-
-        {/* Layout: main + side */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 2.2fr) minmax(0, 1.2fr)",
-            gap: 24,
-          }}
-        >
-          {/* Main column: roadmap + concepts + examples */}
-          <main>
-            {/* Roadmap */}
-            <section
-              style={{
-                marginBottom: 20,
-                padding: 16,
-                borderRadius: 20,
-                background: "#f9fafb",
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  marginBottom: 6,
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
-              >
+                <span role="img" aria-label="lightning">
+                  ⚡
+                </span>
                 Quick revision roadmap
-              </h2>
-              <p
+              </div>
+              <ul
                 style={{
-                  margin: 0,
-                  fontSize: "0.9rem",
-                  color: "#4b5563",
+                  fontSize: "0.83rem",
+                  color: "#475569",
+                  paddingLeft: 18,
                   lineHeight: 1.6,
                 }}
               >
-                {content.roadmap}
-              </p>
-            </section>
+                {quickRoadmap.map((step, idx) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ul>
+            </div>
 
-            {/* Concepts */}
-            <section style={{ marginBottom: 24 }}>
-              <h2
-                style={{
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  marginBottom: 10,
-                  color: "#111827",
-                }}
-              >
-                Key concepts & ideas
-              </h2>
+            {/* Recommended board video */}
+            <div
+              style={{
+                borderRadius: 24,
+                backgroundColor: "rgba(240,249,255,0.98)",
+                border: "1px solid rgba(56,189,248,0.5)",
+                boxShadow: "0 18px 40px rgba(59,130,246,0.32)",
+                padding: "18px 20px 16px",
+              }}
+            >
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr)",
-                  gap: 10,
+                  fontSize: "0.9rem",
+                  fontWeight: 650,
+                  color: "#0f172a",
+                  marginBottom: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                {content.concepts.map((c) => {
-                  const isHighlighted =
-                    highlightedConceptName &&
-                    c.title
-                      .toLowerCase()
-                      .includes(highlightedConceptName.toLowerCase());
-                  return (
-                    <article
+                <span role="img" aria-label="headphones">
+                  🎧
+                </span>
+                Recommended board video
+              </div>
+              {recommendedVideoUrl ? (
+                <>
+                  {recommendedVideo && (
+                    <>
+                      <p
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "#0f172a",
+                          marginBottom: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {recommendedVideo.title}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "#64748b",
+                          marginBottom: 6,
+                        }}
+                      >
+                        {recommendedVideo.channel && (
+                          <>
+                            {recommendedVideo.channel}
+                            {" · "}
+                          </>
+                        )}
+                        {recommendedVideo.meta}
+                      </p>
+                    </>
+                  )}
+
+                  <p
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#475569",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {recommendedVideoSummary}
+                  </p>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      marginTop: 4,
+                    }}
+                  >
+                    <a
+                      href={recommendedVideoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        borderRadius: 999,
+                        padding: "6px 12px",
+                        fontSize: "0.8rem",
+                        backgroundColor: "#0f172a",
+                        color: "#f9fafb",
+                        textDecoration: "none",
+                      }}
+                    >
+                      ▶ Watch on YouTube
+                    </a>
+
+                    <button
+                      onClick={() =>
+                        handleAskMentor("summarise-video", {
+                          videoUrl: recommendedVideoUrl,
+                        })
+                      }
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        borderRadius: 999,
+                        padding: "6px 12px",
+                        fontSize: "0.8rem",
+                        border: "1px solid rgba(37,99,235,0.6)",
+                        backgroundColor: "#eff6ff",
+                        color: "#1d4ed8",
+                        cursor: "pointer",
+                      }}
+                    >
+                      🤖 Summarise this video
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p
+                  style={{
+                    fontSize: "0.83rem",
+                    color: "#475569",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {recommendedVideoSummary}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Concepts + mistakes / board examples */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
+              gap: 16,
+            }}
+          >
+            {/* Key concepts */}
+            <div
+              style={{
+                borderRadius: 24,
+                backgroundColor: "rgba(248,250,252,0.98)",
+                border: "1px solid rgba(148,163,184,0.3)",
+                boxShadow: "0 18px 40px rgba(148,163,184,0.28)",
+                padding: "18px 20px 16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    fontWeight: 650,
+                    color: "#0f172a",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span role="img" aria-label="brain">
+                    🧠
+                  </span>
+                  Key concepts & ideas
+                </div>
+
+                <button
+                  onClick={() => handleAskMentor(undefined)}
+                  style={{
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    border: "1px solid rgba(37,99,235,0.6)",
+                    backgroundColor: "#eff6ff",
+                    fontSize: "0.78rem",
+                    color: "#1d4ed8",
+                    cursor: "pointer",
+                  }}
+                >
+                  🤖 Ask AI Mentor about this topic
+                </button>
+              </div>
+
+              {concepts.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: "0.83rem",
+                    color: "#475569",
+                  }}
+                >
+                  {keyConceptsSummary}
+                </p>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+                    gap: 10,
+                    marginTop: 4,
+                  }}
+                >
+                  {concepts.map((c: any) => (
+                    <div
                       key={c.id}
                       style={{
-                        padding: 16,
-                        borderRadius: 18,
-                        border: isHighlighted
-                          ? "1.5px solid #fb923c"
-                          : "1px solid #e5e7eb",
-                        background: isHighlighted
-                          ? "linear-gradient(135deg,#fff7ed,#fffbeb)"
-                          : "#ffffff",
-                        boxShadow: isHighlighted
-                          ? "0 10px 25px rgba(248,153,72,0.18)"
-                          : "0 4px 12px rgba(15,23,42,0.04)",
-                        transition: "box-shadow 0.15s ease",
+                        borderRadius: 16,
+                        padding: "10px 12px",
+                        backgroundColor: "#f9fafb",
+                        border: "1px solid rgba(226,232,240,0.9)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
                       }}
                     >
                       <div
                         style={{
-                          marginBottom: 6,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 8,
+                          fontSize: "0.83rem",
+                          fontWeight: 600,
+                          color: "#0f172a",
                         }}
                       >
-                        <h3
-                          style={{
-                            margin: 0,
-                            fontSize: "0.95rem",
-                            fontWeight: 600,
-                            color: "#111827",
-                          }}
-                        >
-                          {c.title}
-                        </h3>
-                        <span
-                          style={{
-                            borderRadius: 999,
-                            padding: "3px 8px",
-                            fontSize: "0.7rem",
-                            background: priorityColor[c.priority],
-                          }}
-                        >
-                          {priorityLabel[c.priority]}
-                        </span>
+                        {c.title}
                       </div>
-                      <p
-                        style={{
-                          margin: 0,
-                          marginBottom: 6,
-                          fontSize: "0.85rem",
-                          color: "#4b5563",
-                        }}
-                      >
-                        {c.summary}
-                      </p>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "0.8rem",
-                          color: "#6b7280",
-                        }}
-                      >
-                        <strong>Exam tip:</strong> {c.examTip}
-                      </p>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
+                      {c.summary && (
+                        <div
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "#64748b",
+                          }}
+                        >
+                          {c.summary}
+                        </div>
+                      )}
+                      {c.examTip && (
+                        <div
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "#0f172a",
+                            marginTop: 4,
+                          }}
+                        >
+                          <strong>Board tip:</strong> {c.examTip}
+                        </div>
+                      )}
 
-            {/* Examples */}
-            <section>
-              <h2
-                style={{
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  marginBottom: 10,
-                  color: "#111827",
-                }}
-              >
-                Board-flavoured examples
-              </h2>
+                      <button
+                        onClick={() => handleAskMentor(c.id)}
+                        style={{
+                          marginTop: 6,
+                          alignSelf: "flex-start",
+                          borderRadius: 999,
+                          padding: "4px 10px",
+                          border: "1px solid rgba(37,99,235,0.5)",
+                          backgroundColor: "#eff6ff",
+                          fontSize: "0.75rem",
+                          color: "#1d4ed8",
+                          cursor: "pointer",
+                        }}
+                      >
+                        🤖 Ask AI Mentor for this concept
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right column – mistakes + board examples */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              {/* Common mistakes */}
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr)",
-                  gap: 10,
+                  borderRadius: 24,
+                  backgroundColor: "rgba(255,247,237,0.98)",
+                  border: "1px solid rgba(251,146,60,0.5)",
+                  boxShadow: "0 14px 30px rgba(251,146,60,0.32)",
+                  padding: "16px 18px 14px",
                 }}
               >
-                {content.examples.map((ex) => (
-                  <article
-                    key={ex.id}
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    fontWeight: 650,
+                    color: "#7c2d12",
+                    marginBottom: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span role="img" aria-label="party">
+                    🎉
+                  </span>
+                  Common mistakes to avoid
+                </div>
+                {mistakes.length === 0 ? (
+                  <ul
                     style={{
-                      padding: 14,
-                      borderRadius: 16,
-                      border: "1px solid #e5e7eb",
-                      background: "#ffffff",
+                      fontSize: "0.82rem",
+                      color: "#7c2d12",
+                      paddingLeft: 18,
+                      lineHeight: 1.6,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "#6b7280",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {ex.label}
-                    </div>
-                    <p
-                      style={{
-                        margin: 0,
-                        marginBottom: 6,
-                        fontSize: "0.9rem",
-                        color: "#111827",
-                      }}
-                    >
-                      {ex.question}
-                    </p>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "0.8rem",
-                        color: "#4b5563",
-                      }}
-                    >
-                      <strong>Idea:</strong> {ex.idea}
-                    </p>
-                  </article>
-                ))}
+                    <li>
+                      Skipping NCERT examples and jumping straight to tests.
+                    </li>
+                    <li>
+                      Not analysing mistakes from PYQs / mocks and repeating the
+                      same pattern.
+                    </li>
+                  </ul>
+                ) : (
+                  <ul
+                    style={{
+                      fontSize: "0.82rem",
+                      color: "#7c2d12",
+                      paddingLeft: 18,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {mistakes.map((m: any, idx: number) => {
+                      if (typeof m === "string") {
+                        return <li key={idx}>{m}</li>;
+                      }
+                      return (
+                        <li key={m.id ?? idx}>
+                          <strong>{m.title}:</strong> {m.whatGoesWrong}{" "}
+                          {m.fix && <>→ {m.fix}</>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
-            </section>
-          </main>
 
-          {/* Side column: mistakes etc. */}
-          <aside>
-            <section
-              style={{
-                marginBottom: 18,
-                padding: 14,
-                borderRadius: 18,
-                border: "1px solid #e5e7eb",
-                background:
-                  "radial-gradient(circle at top left,#eff6ff,#ffffff)",
-              }}
-            >
-              <h3
+              {/* Board-flavoured examples */}
+              <div
                 style={{
-                  margin: 0,
-                  marginBottom: 6,
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  color: "#111827",
+                  borderRadius: 24,
+                  backgroundColor: "rgba(248,250,252,0.98)",
+                  border: "1px solid rgba(148,163,184,0.3)",
+                  boxShadow: "0 14px 30px rgba(148,163,184,0.28)",
+                  padding: "16px 18px 14px",
                 }}
               >
-                Common mistakes to avoid
-              </h3>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  fontSize: "0.8rem",
-                  color: "#4b5563",
-                }}
-              >
-                {content.mistakes.map((m) => (
-                  <li
-                    key={m.id}
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    fontWeight: 650,
+                    color: "#0f172a",
+                    marginBottom: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span role="img" aria-label="target">
+                    🎯
+                  </span>
+                  Board-flavoured examples
+                </div>
+
+                {boardExamples.length === 0 ? (
+                  <p
                     style={{
-                      padding: 8,
-                      borderRadius: 12,
-                      background: "rgba(248,250,252,0.9)",
+                      fontSize: "0.83rem",
+                      color: "#475569",
                     }}
                   >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        marginBottom: 2,
-                        color: "#111827",
-                      }}
-                    >
-                      {m.title}
-                    </div>
-                    <div>
-                      <span style={{ fontWeight: 500 }}>What goes wrong: </span>
-                      {m.whatHappens}
-                    </div>
-                    <div>
-                      <span style={{ fontWeight: 500 }}>Fix: </span>
-                      {m.fix}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section
-              style={{
-                padding: 14,
-                borderRadius: 18,
-                border: "1px dashed #e5e7eb",
-                background: "#f9fafb",
-                fontSize: "0.8rem",
-                color: "#4b5563",
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  marginBottom: 6,
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
-              >
-                How to use this page
-              </h3>
-              <p style={{ margin: 0, marginBottom: 4 }}>
-                1. Skim the roadmap once before solving PYQs or mocks.
-              </p>
-              <p style={{ margin: 0, marginBottom: 4 }}>
-                2. For every wrong mock question, click{" "}
-                <em>“Revise theory for this concept”</em> — it will bring you
-                here with the related concept highlighted.
-              </p>
-              <p style={{ margin: 0 }}>
-                3. Use the section chips above (A–E) to jump into{" "}
-                <strong>Auto-mock paper</strong> and see how this topic shows up
-                in each part of the board exam.
-              </p>
-            </section>
-          </aside>
-        </div>
+                    {boardExamplesSummary}
+                  </p>
+                ) : (
+                  <ul
+                    style={{
+                      fontSize: "0.82rem",
+                      color: "#475569",
+                      paddingLeft: 18,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {boardExamples.slice(0, 3).map((ex: any) => (
+                      <li key={ex.id}>
+                        <strong>{ex.title}:</strong> {ex.question}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

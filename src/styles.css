@@ -4372,3 +4372,518 @@ select:focus {
   align-items: center;
   gap: 4px;
 }
+/* ========== TopicHub Gen-Z layout ========== */
+
+.topic-hub-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+
+.topic-hero-card {
+  background: linear-gradient(90deg, #1b3bff 0%, #0096ff 40%, #12d8fa 100%);
+  color: #fff;
+  border-radius: 24px;
+  padding: 18px 18px 22px;
+  margin-bottom: 24px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.3);
+}
+
+.topic-back-link {
+  background: transparent;
+  border: none;
+  color: #e0f7ff;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.topic-hero-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.topic-breadcrumb {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(4px);
+}
+
+.topic-pill-tier {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.topic-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.topic-hero-tagline {
+  font-size: 0.98rem;
+  max-width: 720px;
+  margin-bottom: 12px;
+}
+
+.topic-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.topic-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 20px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+}
+
+.topic-card-exam-link {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f9fbff;
+  box-shadow: none;
+}
+
+.topic-card-exam-link .topic-body {
+  color: #ecf5ff;
+}
+
+.topic-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.topic-card-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.topic-card-icon {
+  font-size: 1.1rem;
+}
+
+.topic-body {
+  font-size: 0.95rem;
+}
+
+.topic-exam-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.topic-exam-chip {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.topic-exam-letter {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.topic-exam-label {
+  font-weight: 500;
+}
+
+.topic-exam-marks {
+  opacity: 0.9;
+  margin-left: 4px;
+}
+
+.topic-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.3fr);
+  gap: 20px;
+}
+
+.topic-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+}
+
+.topic-list.numbered {
+  list-style-type: decimal;
+}
+
+.topic-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.topic-ai-mentor-callout {
+  background: #fef3c7;
+}
+
+@media (max-width: 900px) {
+  .topic-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topic-hero-card {
+    border-radius: 0 0 24px 24px;
+  }
+}
+/* ========== Topic Hub v2 (LazyTopper) ========== */
+
+.lt-topic-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, #e4f1ff 0, #f4f5ff 35%, #fef7ff 75%);
+  padding-bottom: 80px;
+}
+
+.lt-topic-page-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+.lt-topic-back {
+  background: none;
+  border: none;
+  color: #4d6fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.lt-topic-back:hover {
+  text-decoration: underline;
+}
+
+/* HERO */
+
+.lt-topic-hero {
+  border-radius: 28px;
+  padding: 22px 22px 20px;
+  background: linear-gradient(135deg, #2142ff 0%, #0fb0ff 40%, #2fd39f 100%);
+  color: #ffffff;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.lt-topic-breadcrumb {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
+
+.lt-topic-title {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.lt-topic-tagline {
+  font-size: 0.98rem;
+  opacity: 0.94;
+  margin: 0 0 14px;
+}
+
+.lt-topic-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Chips */
+
+.lt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: none;
+}
+
+.lt-chip-soft {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fdfdfd;
+}
+
+.lt-chip-tier {
+  background: #ffffff;
+  color: #171c3b;
+}
+
+.lt-chip-emoji {
+  font-size: 0.9rem;
+}
+
+/* tier accent colours (small visual differences) */
+.lt-chip-tier.tier-must {
+  box-shadow: 0 0 0 1px rgba(255, 106, 106, 0.4);
+}
+.lt-chip-tier.tier-high {
+  box-shadow: 0 0 0 1px rgba(116, 208, 255, 0.4);
+}
+.lt-chip-tier.tier-good {
+  box-shadow: 0 0 0 1px rgba(197, 177, 255, 0.4);
+}
+
+.lt-chip-mini {
+  padding: 4px 10px;
+  font-size: 0.68rem;
+}
+
+/* GRID LAYOUT */
+
+.lt-topic-grid {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lt-topic-grid-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+/* CARDS */
+
+.lt-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 24px;
+  padding: 18px 20px 18px;
+  box-shadow: 0 10px 30px rgba(31, 41, 55, 0.04);
+}
+
+.lt-card-big {
+  padding: 20px 22px 20px;
+}
+
+.lt-card-pink {
+  background: linear-gradient(135deg, #ffeaf1 0%, #fff4ff 45%, #ffffff 100%);
+}
+
+.lt-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lt-card-emoji {
+  font-size: 1.1rem;
+}
+
+.lt-card-header h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.lt-card-title {
+  font-size: 1.05rem;
+  margin: 0 0 8px;
+}
+
+.lt-card-sub {
+  font-size: 0.88rem;
+  color: #4b5563;
+  margin-bottom: 10px;
+}
+
+.lt-bold {
+  font-weight: 600;
+}
+
+.lt-muted {
+  font-size: 0.86rem;
+  color: #6b7280;
+}
+
+/* Lists */
+
+.lt-list-bullets {
+  padding-left: 1.1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.lt-list-bullets li + li {
+  margin-top: 4px;
+}
+
+.lt-list-numbered {
+  padding-left: 1.2rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.lt-list-numbered li + li {
+  margin-top: 4px;
+}
+
+/* Exam section chips */
+
+.lt-exam-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lt-exam-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.lt-exam-chip:hover {
+  background: #eef2ff;
+}
+
+.lt-exam-chip-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.lt-exam-chip-text {
+  white-space: nowrap;
+}
+
+/* Concept pills */
+
+.lt-concept-pill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lt-concept-pill {
+  width: 100%;
+  text-align: left;
+  border-radius: 18px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.lt-concept-pill:hover {
+  background: #eef2ff;
+}
+
+.lt-concept-pill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.lt-concept-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.lt-concept-oneline {
+  font-size: 0.82rem;
+  color: #4b5563;
+  margin: 0;
+}
+
+/* priority chip colours (optional subtler accents) */
+.lt-chip-priority-must-do {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.lt-chip-priority-should-do {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.lt-chip-priority-good-to-know {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+/* Links */
+
+.lt-chip-link {
+  text-decoration: none;
+}
+
+.lt-chip-link:hover {
+  opacity: 0.9;
+}
+
+/* Small screen tweaks */
+
+@media (max-width: 768px) {
+  .lt-topic-page-inner {
+    padding: 18px 12px 80px;
+  }
+
+  .lt-topic-hero {
+    border-radius: 22px;
+    padding: 18px 16px 16px;
+  }
+
+  .lt-topic-title {
+    font-size: 1.5rem;
+  }
+
+  .lt-topic-chip-row {
+    gap: 6px;
+  }
+
+  .lt-topic-grid-row {
+    grid-template-columns: 1fr;
+  }
+}
