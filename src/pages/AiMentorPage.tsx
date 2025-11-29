@@ -1,562 +1,640 @@
 // src/pages/AiMentorPage.tsx
-
-import React, { useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { class10MathTopicTrends } from "../data/class10MathTopicTrends";
-import { class10ScienceTopicTrends } from "../data/class10ScienceTopicTrends";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  class10ContentConfig,
-  type Class10SubjectKey,
-  type Class10StreamKey,
-  type Class10ContentTopicConfig,
-  type ConceptNote,
-} from "../data/class10ContentConfig";
+  class10TopicTrendList,
+  class10MathTopicTrends,
+  type Class10TopicKey,
+  type TopicTrendEntry,
+  type TopicTier,
+} from "../data/class10MathTopicTrends";
 
-type TopicTier = "must-crack" | "high-roi" | "good-to-do";
+import {
+  class10ScienceTopicTrendList,
+  class10ScienceTopicTrends,
+  type Class10ScienceTopicKey,
+  type ScienceTopicTrend,
+} from "../data/class10ScienceTopicTrends";
 
-const tierEmoji: Record<TopicTier, string> = {
-  "must-crack": "🔥",
-  "high-roi": "💎",
-  "good-to-do": "🌱",
-};
+import {
+  getHighlyProbableQuestions,
+  type HPQSubject,
+  type HPQTopicBucket,
+  type HPQDifficulty,
+} from "../data/highlyProbableQuestions";
 
-const streamEmoji: Record<Class10StreamKey, string> = {
-  Physics: "⚡",
-  Chemistry: "🧪",
-  Biology: "🧬",
-};
+type SubjectOption = HPQSubject; // "Maths" | "Science"
 
-const streamLabel: Record<Class10StreamKey, string> = {
-  Physics: "Physics",
-  Chemistry: "Chemistry",
-  Biology: "Biology",
+interface HPQStats {
+  totalQuestions: number;
+  approxMarks: number;
+  byDifficulty: Partial<Record<HPQDifficulty, number>>;
+}
+
+const normalizeLabel = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]/g, "");
+
+// Helper to coerce difficulty mix from trends into {easyPercent, mediumPercent, hardPercent}
+const buildDifficultyPercentFromTrends = (mix: any) => ({
+  easyPercent: Number(mix?.Easy ?? 0),
+  mediumPercent: Number(mix?.Medium ?? 0),
+  hardPercent: Number(mix?.Hard ?? 0),
+});
+
+// Helper to convert HPQ difficulty counts into % mix
+const buildDifficultyPercentFromCounts = (
+  counts: Partial<Record<HPQDifficulty, number>> | undefined,
+  totalQuestions: number
+) => {
+  if (!counts || totalQuestions <= 0) {
+    return {
+      easyPercent: 0,
+      mediumPercent: 0,
+      hardPercent: 0,
+    };
+  }
+
+  const easy = counts.Easy ?? 0;
+  const medium = counts.Medium ?? 0;
+  const hard = counts.Hard ?? 0;
+  const total = easy + medium + hard || totalQuestions;
+
+  const toPct = (v: number) => Math.round((v / total) * 100);
+
+  return {
+    easyPercent: toPct(easy),
+    mediumPercent: toPct(medium),
+    hardPercent: toPct(hard),
+  };
 };
 
 const AiMentorPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const searchParams = new URLSearchParams(location.search);
+  // ---- Exam-level inputs ----
+  const [daysLeft, setDaysLeft] = useState<number>(90);
+  const [mathTargetPercent, setMathTargetPercent] = useState<number>(80);
+  const [scienceTargetPercent, setScienceTargetPercent] = useState<number>(80);
+  const [mathHoursPerDay, setMathHoursPerDay] = useState<number>(1);
+  const [scienceHoursPerDay, setScienceHoursPerDay] = useState<number>(1);
 
-  const grade = searchParams.get("grade") ?? "10";
-  const subjectRaw = searchParams.get("subject") ?? "Maths";
-  const subjectLabel: Class10SubjectKey =
-    subjectRaw.toLowerCase().startsWith("sci") ? "Science" : "Maths";
+  // ---- Subject + chapter focus (from trends/HPQ) ----
+  const [subject, setSubject] = useState<SubjectOption>("Maths");
 
-  const topicParam = searchParams.get("topic") ?? "";
-  const topicKey = decodeURIComponent(topicParam);
+  // For Maths we use topicKey (e.g. "Real Numbers")
+  const [selectedMathTopicKey, setSelectedMathTopicKey] =
+    useState<Class10TopicKey | "">("");
 
-  const conceptParam = searchParams.get("concept") ?? "";
-  const conceptTitle = decodeURIComponent(conceptParam);
+  // For Science we use topicName (e.g. "Life Processes")
+  const [selectedScienceTopicName, setSelectedScienceTopicName] =
+    useState<string>("");
 
-  // Which trend dataset to use
-  const isMath = subjectLabel === "Maths";
+  const difficultyMix =
+    subject === "Maths"
+      ? class10MathTopicTrends.difficultyDistributionPercent
+      : class10ScienceTopicTrends.difficultyDistributionPercent;
 
-  const trendInfo: any = useMemo(() => {
-    if (!topicKey) return undefined;
-    if (isMath) {
-      return (class10MathTopicTrends as any)?.topics?.[topicKey];
-    }
-    // class10ScienceTopicTrends may be { topics: { ... } } or flat
-    const sci = class10ScienceTopicTrends as any;
-    return sci?.topics?.[topicKey] ?? sci?.[topicKey];
-  }, [isMath, topicKey]);
+  const mathTopicOptions: TopicTrendEntry[] = class10TopicTrendList;
+  const scienceTopicOptions: ScienceTopicTrend[] = class10ScienceTopicTrendList;
 
-  const tier = (trendInfo?.tier ?? null) as TopicTier | null;
-  const weightage = trendInfo?.weightagePercent as number | undefined;
-
-  // Content lookup from shared config
-  const content: Class10ContentTopicConfig | undefined = useMemo(() => {
-    if (!topicKey) return undefined;
-    return class10ContentConfig.find(
-      (entry) => entry.subject === subjectLabel && entry.topicName === topicKey
-    );
-  }, [subjectLabel, topicKey]);
-
-  const stream = content?.stream;
-
-  const concept: ConceptNote | undefined = useMemo(() => {
-    if (!content) return undefined;
-    if (conceptTitle) {
-      const byTitle = content.concepts.find(
-        (c) => c.title.toLowerCase() === conceptTitle.toLowerCase()
+  // ---- Current chapter trend snapshot ----
+  const currentTrend = useMemo(() => {
+    if (subject === "Maths") {
+      if (!selectedMathTopicKey) return undefined;
+      const entry = mathTopicOptions.find(
+        (t) => t.topicKey === selectedMathTopicKey
       );
-      if (byTitle) return byTitle;
-    }
-    // Fallback: just take the first concept for this topic
-    return content.concepts[0];
-  }, [content, conceptTitle]);
-
-  const handleBack = () => {
-    // Prefer going back, else go to chapters
-    if (window.history.length > 1) {
-      navigate(-1);
+      if (!entry) return undefined;
+      return {
+        subject: "Maths" as SubjectOption,
+        topicKey: entry.topicKey,
+        topicLabel: entry.topicKey,
+        weightagePercent: entry.weightagePercent,
+        tier: entry.tier,
+        summary: entry.summary,
+      };
     } else {
-      navigate("/chapters");
+      if (!selectedScienceTopicName) return undefined;
+      const entry = scienceTopicOptions.find(
+        (t) => t.topicName === selectedScienceTopicName
+      );
+      if (!entry) return undefined;
+
+      const summaryFromConcepts = entry.concepts
+        ?.map((c) => c.summary_and_exam_tips)
+        .join(" ");
+
+      return {
+        subject: "Science" as SubjectOption,
+        topicKey: entry.topicKey as Class10ScienceTopicKey,
+        topicLabel: entry.topicName,
+        weightagePercent: entry.weightagePercent,
+        tier: entry.tier,
+        summary: summaryFromConcepts,
+      };
+    }
+  }, [
+    subject,
+    selectedMathTopicKey,
+    selectedScienceTopicName,
+    mathTopicOptions,
+    scienceTopicOptions,
+  ]);
+
+  // ---- HPQ lookup (robust name matching) ----
+  const hpqBucket: HPQTopicBucket | undefined = useMemo(() => {
+    if (subject === "Maths") {
+      if (!selectedMathTopicKey) return undefined;
+      const keyNorm = normalizeLabel(selectedMathTopicKey);
+      const buckets = getHighlyProbableQuestions("Maths");
+      return (
+        buckets.find((b) => normalizeLabel(b.topic) === keyNorm) || undefined
+      );
+    } else {
+      if (!selectedScienceTopicName) return undefined;
+      const nameNorm = normalizeLabel(selectedScienceTopicName);
+      const buckets = getHighlyProbableQuestions("Science");
+      return (
+        buckets.find((b) => normalizeLabel(b.topic) === nameNorm) || undefined
+      );
+    }
+  }, [subject, selectedMathTopicKey, selectedScienceTopicName]);
+
+  const hpqStats: HPQStats | null = useMemo(() => {
+    if (!hpqBucket) return null;
+    const totalQuestions = hpqBucket.questions.length;
+    const approxMarks = hpqBucket.questions.reduce(
+      (sum, q) => sum + (q.marks ?? 0),
+      0
+    );
+    const byDifficulty: Partial<Record<HPQDifficulty, number>> = {};
+    hpqBucket.questions.forEach((q) => {
+      if (q.difficulty) {
+        byDifficulty[q.difficulty] = (byDifficulty[q.difficulty] ?? 0) + 1;
+      }
+    });
+    return { totalQuestions, approxMarks, byDifficulty };
+  }, [hpqBucket]);
+
+  // ---- AI PlannerMentorRequest-style payload preview ----
+  const planningPayload = useMemo(() => {
+    const targetPercent =
+      subject === "Maths" ? mathTargetPercent : scienceTargetPercent;
+    const totalDailyHours = mathHoursPerDay + scienceHoursPerDay;
+
+    // Which chapter are we focusing on?
+    const mainChapterKey =
+      subject === "Maths"
+        ? (selectedMathTopicKey as string) || ""
+        : (currentTrend?.topicKey as string) || "";
+
+    const mainChapterName =
+      subject === "Maths"
+        ? (selectedMathTopicKey as string) || ""
+        : selectedScienceTopicName || "";
+
+    // Trend meta (tier + wt. + difficulty + summary)
+    const trendMeta = currentTrend
+      ? {
+          tier: (currentTrend.tier ?? "good-to-do") as TopicTier,
+          weightagePercent: currentTrend.weightagePercent ?? 0,
+          difficultyMix: buildDifficultyPercentFromTrends(difficultyMix),
+          summaryTips: currentTrend.summary ?? "",
+        }
+      : null;
+
+    // HPQ summary
+    const hpqSummary =
+      hpqBucket && hpqStats
+        ? {
+            totalQuestions: hpqStats.totalQuestions,
+            approxMarks: hpqStats.approxMarks,
+            difficultySplit: buildDifficultyPercentFromCounts(
+              hpqStats.byDifficulty,
+              hpqStats.totalQuestions
+            ),
+            tier:
+              (hpqBucket.defaultTier as TopicTier) ||
+              (currentTrend?.tier ?? "good-to-do"),
+          }
+        : null;
+
+    // Deep links into LazyTopper
+    const topicForUrl = mainChapterName || mainChapterKey || "";
+    const encodedTopic = topicForUrl
+      ? encodeURIComponent(topicForUrl)
+      : undefined;
+
+    const links = {
+      topicHubUrl: encodedTopic
+        ? `/topic-hub?grade=10&subject=${subject}&topic=${encodedTopic}`
+        : undefined,
+      hpqUrl: encodedTopic
+        ? `/highly-probable?grade=10&subject=${subject}&topic=${encodedTopic}`
+        : undefined,
+      mockBuilderUrl: `/mock-builder?grade=10&subject=${subject}`,
+      predictivePapersUrl: `/predictive-papers?grade=10&subject=${subject}`,
+    };
+
+    return {
+      subject,
+      classLevel: "10" as const,
+      board: "CBSE" as const,
+      daysLeft,
+      targetPercent,
+
+      hoursPerDay: {
+        total: totalDailyHours,
+        maths: mathHoursPerDay,
+        science: scienceHoursPerDay,
+      },
+
+      mainChapterKey,
+      mainChapterName,
+      // We’ll wire weak chapter selection later – for now keep it empty
+      weakChapters: [] as string[],
+
+      trendMeta,
+      hpqSummary,
+      links,
+    };
+  }, [
+    subject,
+    daysLeft,
+    mathTargetPercent,
+    scienceTargetPercent,
+    mathHoursPerDay,
+    scienceHoursPerDay,
+    selectedMathTopicKey,
+    selectedScienceTopicName,
+    currentTrend,
+    difficultyMix,
+    hpqBucket,
+    hpqStats,
+  ]);
+
+  // ---- Navigation to StudyPlan page ----
+  const handleOpenStudyPlan = () => {
+    navigate("/study-plan", {
+      state: {
+        daysLeft,
+        mathTargetPercent,
+        scienceTargetPercent,
+        mathHoursPerDay,
+        scienceHoursPerDay,
+        weakMathChapters: [] as string[],
+        weakScienceChapters: [] as string[],
+      },
+    });
+  };
+
+  // ---- Small helpers for UI labels ----
+  const difficultyLabel = (key: keyof typeof difficultyMix): string => {
+    switch (key) {
+      case "Easy":
+        return "Easy";
+      case "Medium":
+        return "Medium";
+      case "Hard":
+        return "Hard";
+      default:
+        return key;
     }
   };
 
-  // Build the payload preview we will (later) send to GPT
-  const payloadPreview = {
-    grade,
-    subject: subjectLabel,
-    topic: topicKey || null,
-    concept: concept ? { id: concept.id, title: concept.title } : null,
-    trends: trendInfo
-      ? {
-        tier: trendInfo.tier,
-        weightagePercent: trendInfo.weightagePercent,
-      }
-      : null,
-  };
+  const totalDailyHours = mathHoursPerDay + scienceHoursPerDay;
+  const focusSubjectHours =
+    subject === "Maths" ? mathHoursPerDay : scienceHoursPerDay;
 
   return (
-    <div className="page ai-mentor-page">
-      {/* Back link */}
-      <button
-        onClick={handleBack}
-        className="link-back"
-        style={{
-          border: "none",
-          background: "transparent",
-          color: "#6b7280",
-          marginTop: 16,
-          marginLeft: 16,
-          cursor: "pointer",
-        }}
-      >
-        ← Back
-      </button>
+    <div className="ai-mentor-page">
+      <div className="ai-mentor-header">
+        <h1>AI Mentor – Smart Study Planner</h1>
+        <p className="ai-mentor-tagline">
+          Planner mode only (for now). You tell it{" "}
+          <strong>targets, days left and hours/day</strong>; it sends you
+          chapter-wise hours and next-step nudges.
+        </p>
+      </div>
 
-      <div
-        style={{
-          maxWidth: 1080,
-          margin: "24px auto 40px",
-          padding: "0 16px 40px",
-        }}
-      >
-        {/* Header */}
-        <header
-          style={{
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              fontSize: "0.75rem",
-              color: "#6b7280",
-              marginBottom: 4,
-            }}
-          >
-            Class {grade} · {subjectLabel}
+      <div className="ai-mentor-layout">
+        {/* LEFT: Inputs / controls */}
+        <section className="ai-mentor-controls">
+          {/* 0. Exam inputs */}
+          <div className="ai-mentor-card ai-mentor-card--exam">
+            <h2>0. Board exam snapshot</h2>
+            <p className="ai-mentor-hint">
+              We&apos;ll later auto-fetch days left from CBSE. For now you can
+              tweak it manually.
+            </p>
+            <div className="ai-mentor-grid">
+              <label className="ai-mentor-field">
+                <span>Days left to boards</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={daysLeft}
+                  onChange={(e) => setDaysLeft(Number(e.target.value) || 1)}
+                />
+              </label>
+              <label className="ai-mentor-field">
+                <span>Maths target %</span>
+                <input
+                  type="number"
+                  min={40}
+                  max={100}
+                  value={mathTargetPercent}
+                  onChange={(e) =>
+                    setMathTargetPercent(Number(e.target.value) || 0)
+                  }
+                />
+              </label>
+              <label className="ai-mentor-field">
+                <span>Science target %</span>
+                <input
+                  type="number"
+                  min={40}
+                  max={100}
+                  value={scienceTargetPercent}
+                  onChange={(e) =>
+                    setScienceTargetPercent(Number(e.target.value) || 0)
+                  }
+                />
+              </label>
+              <label className="ai-mentor-field">
+                <span>Maths hours / day</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0.5}
+                  max={8}
+                  value={mathHoursPerDay}
+                  onChange={(e) =>
+                    setMathHoursPerDay(Number(e.target.value) || 0.5)
+                  }
+                />
+              </label>
+              <label className="ai-mentor-field">
+                <span>Science hours / day</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0.5}
+                  max={8}
+                  value={scienceHoursPerDay}
+                  onChange={(e) =>
+                    setScienceHoursPerDay(Number(e.target.value) || 0.5)
+                  }
+                />
+              </label>
+            </div>
           </div>
-          <h1
-            className="page-title"
-            style={{
-              margin: 0,
-              fontSize: "1.9rem",
-              fontWeight: 700,
-              color: "#020617",
-            }}
-          >
-            AI Mentor
-          </h1>
-          <p
-            className="page-subtitle"
-            style={{
-              marginTop: 6,
-              maxWidth: 640,
-              fontSize: "0.95rem",
-              color: "#4b5563",
-              lineHeight: 1.6,
-            }}
-          >
-            Personalised practice for{" "}
-            <strong>{topicKey || "this topic"}</strong>
-            {concept && (
+
+          {/* 1. Subject selector */}
+          <div className="ai-mentor-card">
+            <h2>1. Choose your subject</h2>
+            <div className="pill-row">
+              {(["Maths", "Science"] as SubjectOption[]).map((subj) => (
+                <button
+                  key={subj}
+                  type="button"
+                  className={
+                    "pill-button" +
+                    (subject === subj ? " pill-button--active" : "")
+                  }
+                  onClick={() => {
+                    setSubject(subj);
+                    setSelectedMathTopicKey("");
+                    setSelectedScienceTopicName("");
+                  }}
+                >
+                  {subj}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Chapter selector */}
+          <div className="ai-mentor-card">
+            <h2>2. Pick a chapter to focus</h2>
+            {subject === "Maths" ? (
+              <select
+                className="ai-mentor-select"
+                value={selectedMathTopicKey}
+                onChange={(e) =>
+                  setSelectedMathTopicKey(e.target.value as Class10TopicKey)
+                }
+              >
+                <option value="">— Select a Maths chapter —</option>
+                {mathTopicOptions.map((entry) => (
+                  <option key={entry.topicKey} value={entry.topicKey}>
+                    {entry.topicKey} ({entry.weightagePercent}%)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                className="ai-mentor-select"
+                value={selectedScienceTopicName}
+                onChange={(e) => setSelectedScienceTopicName(e.target.value)}
+              >
+                <option value="">— Select a Science chapter —</option>
+                {scienceTopicOptions.map((entry) => (
+                  <option key={entry.topicKey} value={entry.topicName}>
+                    {entry.topicName} ({entry.weightagePercent}%)
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {!currentTrend && (
+              <p className="ai-mentor-hint">
+                Pick any chapter to see weightage, tier and HPQ snapshot for
+                today&apos;s focus.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* RIGHT: Snapshot + payload */}
+        <section className="ai-mentor-summary">
+          {/* Planner snapshot card – match home “sneak peek” */}
+          <div className="ai-mentor-card ai-mentor-card--snapshot">
+            <div className="snapshot-header-line">
+              <span className="snapshot-kicker">
+                Planner snapshot for {subject} • Class 10
+              </span>
+              <span className="snapshot-pill">
+                {daysLeft} days left • {totalDailyHours.toFixed(1)} hr/day
+              </span>
+            </div>
+
+            <ul className="snapshot-list">
+              <li>
+                ~60% hours → 🔥 <strong>must-crack</strong> chapters +
+                currently weak topics.
+              </li>
+              <li>
+                ~30% hours → 💎 <strong>high-ROI</strong> +{" "}
+                <strong>revision</strong>.
+              </li>
+              <li>
+                ~10% hours → 🌈 <strong>good-to-do / buffer</strong> +
+                unexpected school tests.
+              </li>
+            </ul>
+
+            <p className="snapshot-focus-line">
+              Today’s focus:{" "}
+              <strong>
+                {currentTrend?.topicLabel ??
+                  "Start with your top must-crack chapter"}
+              </strong>{" "}
+              — {focusSubjectHours.toFixed(1)} hr {subject} + HPQs + quick mock.
+            </p>
+          </div>
+
+          {/* Trend + HPQ snapshot */}
+          <div className="ai-mentor-card">
+            <h2>Trend + HPQ snapshot</h2>
+
+            {!currentTrend ? (
+              <p className="ai-mentor-hint">
+                Once you choose a chapter, I’ll show how important it is and how
+                much of it is already covered in the HPQ bank.
+              </p>
+            ) : (
               <>
-                {" "}
-                · concept: <strong>{concept.title}</strong>
+                <div className="trend-row">
+                  <div>
+                    <div className="trend-label">Subject</div>
+                    <div className="trend-value">{currentTrend.subject}</div>
+                  </div>
+                  <div>
+                    <div className="trend-label">Chapter</div>
+                    <div className="trend-value">
+                      {currentTrend.topicLabel}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="trend-row">
+                  <div>
+                    <div className="trend-label">Tier</div>
+                    <div className="trend-value trend-tier">
+                      {currentTrend.tier ?? "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="trend-label">Weightage (of 80)</div>
+                    <div className="trend-value">
+                      {currentTrend.weightagePercent}%
+                    </div>
+                  </div>
+                </div>
+
+                {currentTrend.summary && (
+                  <p className="trend-summary">{currentTrend.summary}</p>
+                )}
+
+                <div className="difficulty-block">
+                  <h3>Difficulty mix (full paper)</h3>
+                  <ul className="difficulty-list">
+                    {(Object.keys(
+                      difficultyMix
+                    ) as (keyof typeof difficultyMix)[])
+                      .sort()
+                      .map((key) => (
+                        <li key={key}>
+                          <span>{difficultyLabel(key)}</span>
+                          <span>{difficultyMix[key]}%</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+
+                <div className="hpq-block">
+                  <h3>HPQ coverage for this chapter</h3>
+                  {!hpqBucket ? (
+                    <p className="ai-mentor-hint">
+                      We haven’t seeded HPQs for this exact label yet, but the
+                      AI Mentor can still plan using trends + mocks.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="hpq-topic-line">
+                        Bucket: <strong>{hpqBucket.topic}</strong>{" "}
+                        {hpqBucket.defaultTier && (
+                          <span className="hpq-tier-pill">
+                            {hpqBucket.defaultTier}
+                          </span>
+                        )}
+                      </p>
+                      {hpqStats && (
+                        <ul className="hpq-stats-list">
+                          <li>
+                            Questions:{" "}
+                            <strong>{hpqStats.totalQuestions}</strong>
+                          </li>
+                          <li>
+                            Approx. marks covered:{" "}
+                            <strong>{hpqStats.approxMarks}</strong>
+                          </li>
+                          <li>
+                            Difficulty split:&nbsp;
+                            <span>
+                              {(
+                                Object.entries(
+                                  hpqStats.byDifficulty
+                                ) as [HPQDifficulty, number][]
+                              )
+                                .map(
+                                  ([diff, count]) =>
+                                    `${diff}: ${count ?? 0}`
+                                )
+                                .join("  |  ")}
+                            </span>
+                          </li>
+                        </ul>
+                      )}
+                      <p className="ai-mentor-hint">
+                        When we wire the AI backend, this bucket will be used to
+                        pick &quot;must-do&quot; practice questions matching
+                        your plan.
+                      </p>
+                    </>
+                  )}
+                </div>
               </>
             )}
-            . This is where your Socratic, Gen-Z friendly AI tutor will live.
-          </p>
-
-          {/* Meta pills row */}
-          <div
-            style={{
-              marginTop: 12,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              fontSize: "0.8rem",
-            }}
-          >
-            {tier && (
-              <span
-                style={{
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  background: "#eff6ff",
-                  color: "#1d4ed8",
-                  border: "1px solid #bfdbfe",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span>{tierEmoji[tier]}</span>
-                <span>{tier.replace("-", " ")}</span>
-              </span>
-            )}
-            {typeof weightage === "number" && (
-              <span
-                style={{
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  background: "#fef3c7",
-                  color: "#92400e",
-                  border: "1px solid #fed7aa",
-                }}
-              >
-                ≈ {weightage}% exam weightage
-              </span>
-            )}
-
-            {subjectLabel === "Science" && stream && (
-              <span
-                style={{
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  background: "#ecfeff",
-                  color: "#0369a1",
-                  border: "1px solid #bae6fd",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span>{streamEmoji[stream]}</span>
-                <span>{streamLabel[stream]} stream</span>
-              </span>
-            )}
           </div>
-        </header>
 
-        {/* Two-column layout: left = AI session, right = context */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 2.1fr) minmax(0, 1.3fr)",
-            gap: 24,
-          }}
-        >
-          {/* LEFT: AI session stub + payload preview */}
-          <main>
-            <section
-              style={{
-                marginBottom: 18,
-                padding: 16,
-                borderRadius: 20,
-                background: "#f9fafb",
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  marginBottom: 8,
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
+          {/* Payload + CTA */}
+          <div className="ai-mentor-card">
+            <div className="ai-mentor-card-header">
+              <h2>AI Mentor payload preview</h2>
+              <button
+                type="button"
+                className="primary-pill-button"
+                onClick={handleOpenStudyPlan}
               >
-                🤖 Your AI practice space
-              </h2>
-              <p
-                style={{
-                  margin: 0,
-                  marginBottom: 10,
-                  fontSize: "0.9rem",
-                  color: "#4b5563",
-                  lineHeight: 1.6,
-                }}
-              >
-                Soon, this area will host a chat-like flow where the mentor asks
-                you step-by-step questions, gives hints and board-style
-                practice, and tracks your weak areas for{" "}
-                <strong>Class 10 {subjectLabel}</strong>.
-              </p>
+                Generate full study plan →
+              </button>
+            </div>
 
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: 10,
-                  borderRadius: 14,
-                  background: "#ffffff",
-                  border: "1px dashed #e5e7eb",
-                  fontSize: "0.8rem",
-                  color: "#4b5563",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 600,
-                    marginBottom: 6,
-                    color: "#111827",
-                  }}
-                >
-                  Debug preview: what we’ll send to GPT
-                </div>
-                <pre
-                  style={{
-                    margin: 0,
-                    padding: 8,
-                    borderRadius: 10,
-                    background: "#0f172a",
-                    color: "#e5e7eb",
-                    fontSize: "0.75rem",
-                    overflowX: "auto",
-                  }}
-                >
-                  {JSON.stringify(payloadPreview, null, 2)}
-                </pre>
-                <p
-                  style={{
-                    marginTop: 8,
-                    marginBottom: 0,
-                  }}
-                >
-                  On the backend, this will be combined with your{" "}
-                  <strong>gpt_directive</strong> and the full trends + content
-                  JSON to generate:
-                  <br />
-                  – theory notes, <br />
-                  – Socratic solved examples, <br />
-                  – board-style questions with marking scheme, <br />
-                  – common mistakes + strategy.
-                </p>
-              </div>
-            </section>
-
-            {/* Placeholder chat card */}
-            <section
-              style={{
-                padding: 16,
-                borderRadius: 20,
-                background:
-                  "radial-gradient(circle at top left,#eef2ff,#ffffff)",
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  marginBottom: 8,
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
-              >
-                Coming soon: Live AI session
-              </h2>
-              <p
-                style={{
-                  margin: 0,
-                  marginBottom: 6,
-                  fontSize: "0.9rem",
-                  color: "#4b5563",
-                  lineHeight: 1.6,
-                }}
-              >
-                Once wired, you&apos;ll:
-              </p>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  fontSize: "0.85rem",
-                  color: "#4b5563",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
-              >
-                <li>
-                  Answer short questions on{" "}
-                  <strong>{topicKey || "this topic"}</strong> and get instant
-                  feedback.
-                </li>
-                <li>
-                  See hints and partial guidance instead of direct answers, like
-                  a real teacher.
-                </li>
-                <li>
-                  Get auto-generated mock questions based on your mistakes.
-                </li>
-              </ul>
-            </section>
-          </main>
-
-          {/* RIGHT: context from TopicHub config */}
-          <aside>
-            {content && concept && (
-              <section
-                style={{
-                  marginBottom: 18,
-                  padding: 14,
-                  borderRadius: 18,
-                  border: "1px solid #e5e7eb",
-                  background:
-                    "radial-gradient(circle at top left,#f9fafb,#ffffff)",
-                  fontSize: "0.85rem",
-                  color: "#4b5563",
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    marginBottom: 6,
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
-                  Focus concept today
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
-                  {concept.title}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    marginBottom: 4,
-                  }}
-                >
-                  {concept.summary}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "0.8rem",
-                    color: "#6b7280",
-                  }}
-                >
-                  <strong>Exam tip:</strong> {concept.examTip}
-                </p>
-              </section>
-            )}
-
-            {/* YouTube recommendation, if any */}
-            {content?.youtube && (
-              <section
-                style={{
-                  marginBottom: 18,
-                  padding: 14,
-                  borderRadius: 18,
-                  border: "1px solid #e5e7eb",
-                  background:
-                    "radial-gradient(circle at top left,#e0f2fe,#ffffff)",
-                  fontSize: "0.8rem",
-                  color: "#0f172a",
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    marginBottom: 6,
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    color: "#111827",
-                  }}
-                >
-                  🎧 Watch this before you practice
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    marginBottom: 6,
-                    fontWeight: 500,
-                  }}
-                >
-                  {content.youtube.title}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    marginBottom: 8,
-                    color: "#4b5563",
-                  }}
-                >
-                  {content.youtube.why_recommended}
-                </p>
-                <a
-                  href={content.youtube.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 999,
-                    padding: "6px 10px",
-                    border: "1px solid #1d4ed8",
-                    color: "#1d4ed8",
-                    fontSize: "0.78rem",
-                    textDecoration: "none",
-                    background: "#eff6ff",
-                  }}
-                >
-                  ▶ Open YouTube
-                </a>
-              </section>
-            )}
-
-            <section
-              style={{
-                padding: 14,
-                borderRadius: 18,
-                border: "1px dashed #e5e7eb",
-                background: "#f9fafb",
-                fontSize: "0.8rem",
-                color: "#4b5563",
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  marginBottom: 6,
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
-              >
-                How this page will help you
-              </h3>
-              <p style={{ margin: 0, marginBottom: 4 }}>
-                1. Watch the recommended board-quality video.
-              </p>
-              <p style={{ margin: 0, marginBottom: 4 }}>
-                2. Start AI practice – answer questions, get hints and fix your
-                weak spots.
-              </p>
-              <p style={{ margin: 0 }}>
-                3. Your performance will feed back into{" "}
-                <strong>Mocks + HPQ</strong> so you&apos;re always practising
-                what matters most for boards.
-              </p>
-            </section>
-          </aside>
-        </div>
+            <p className="ai-mentor-hint">
+              This is the <strong>exact JSON</strong> we’ll send to the backend
+              Planner Mentor in Phase&nbsp;1.
+            </p>
+            <pre className="ai-mentor-payload">
+              {JSON.stringify(planningPayload, null, 2)}
+            </pre>
+          </div>
+        </section>
       </div>
     </div>
   );

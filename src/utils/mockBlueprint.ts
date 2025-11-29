@@ -50,6 +50,12 @@ function allocateByPercent<T extends string>(
   return result;
 }
 
+// ---- Types to help TS understand the topic metadata ----
+type TopicMeta = {
+  weightagePercent: number;
+  conceptWeightage: Record<string, number>;
+};
+
 /**
  * Build a mock blueprint for Class 10 Maths.
  *
@@ -62,15 +68,15 @@ export function buildClass10MathMockBlueprint(
   totalQuestions: number,
   difficultyFilter?: DifficultyKey
 ): QuestionSpec[] {
-  const topicsData = class10MathTopicTrends.topics;
+  // Cast so we can safely index with string keys
+  const topicsData = class10MathTopicTrends
+    .topics as Record<string, TopicMeta>;
 
   // 1) Allocate questions across topics
-  const topicDefs = Object.entries(topicsData).map(
-    ([name, meta]) => ({
-      key: name,
-      percent: meta.weightagePercent,
-    })
-  );
+  const topicDefs = Object.entries(topicsData).map(([name, meta]) => ({
+    key: name, // string
+    percent: meta.weightagePercent,
+  }));
 
   const topicCounts = allocateByPercent(totalQuestions, topicDefs);
 
@@ -80,14 +86,19 @@ export function buildClass10MathMockBlueprint(
 
   topicDefs.forEach(({ key }) => {
     const meta = topicsData[key];
-    const countForTopic = topicCounts[key];
-    if (countForTopic <= 0) return;
+    const countForTopic = topicCounts[key] ?? 0;
+    if (!meta || countForTopic <= 0) return;
 
-    const conceptEntries = Object.entries(meta.conceptWeightage);
-    const conceptDefs = conceptEntries.map(([cName, share]) => ({
-      key: cName,
-      percent: share,
-    }));
+    // Explicitly tell TS these values are numbers
+    const conceptEntries = Object.entries(
+      meta.conceptWeightage
+    ) as [string, number][];
+
+    const conceptDefs: { key: string; percent: number }[] =
+      conceptEntries.map(([cName, share]) => ({
+        key: cName,
+        percent: share,
+      }));
 
     const conceptCounts = allocateByPercent(
       countForTopic,
@@ -95,13 +106,13 @@ export function buildClass10MathMockBlueprint(
     );
 
     conceptDefs.forEach(({ key: conceptName }) => {
-      const countForConcept = conceptCounts[conceptName];
+      const countForConcept = conceptCounts[conceptName] ?? 0;
       for (let i = 0; i < countForConcept; i++) {
         questions.push({
           questionNumber: qNo++,
           topic: key,
           subtopic: conceptName,
-          // temporary, will be filled in next step
+          // filled properly in difficulty pass below
           difficulty: "Medium",
         });
       }
@@ -124,7 +135,7 @@ export function buildClass10MathMockBlueprint(
 
   const difficultyList: DifficultyKey[] = [];
   diffDefs.forEach(({ key }) => {
-    const count = diffCounts[key];
+    const count = diffCounts[key] ?? 0;
     for (let i = 0; i < count; i++) {
       difficultyList.push(key);
     }

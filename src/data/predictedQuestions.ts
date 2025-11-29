@@ -184,8 +184,7 @@ export const predictedQuestions: PredictedQuestion[] = [
       "If 2x + 3y = 11 and 3x − 2y = 4, then the value of y − x is:",
     options: ["1", "2", "3", "4"],
     answer: "2",
-    explanation:
-      "Solving gives x = 2, y = 4, so y − x = 4 − 2 = 2.",
+    explanation: "Solving gives x = 2, y = 4, so y − x = 4 − 2 = 2.",
     solutionSteps: [
       "Write the system: 2x + 3y = 11 and 3x − 2y = 4.",
       "Use elimination to remove one variable.",
@@ -904,4 +903,1037 @@ export const predictedQuestions: PredictedQuestion[] = [
     pastBoardYear: "2023",
     policyTag: "Simple complementary probability",
   },
+
+  // -------- END OF PART 1/2 --------
+   // ===== MORE: POLYNOMIALS =====
+  {
+    id: "2026-POLY-MCQ-02",
+    topicKey: "Polynomials",
+    subtopic: "Relationship Between Coefficients and Zeros",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Understanding",
+    questionText:
+      "If α and β are zeroes of x² − 7x + 12, then αβ equals:",
+    options: ["7", "−12", "12", "−7"],
+    answer: "12",
+    explanation:
+      "Product of zeroes for ax²+bx+c is c/a. Here c = 12, a = 1 ⇒ αβ = 12.",
+    pastBoardYear: "2024",
+    policyTag: "Formula-based MCQ",
+  },
+  {
+    id: "2026-POLY-AR-03",
+    topicKey: "Polynomials",
+    subtopic: "Zeros & Graph Behaviour",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): The graph of y = (x−2)(x−5) cuts the x-axis at two points. Reason (R): A quadratic with two distinct real zeroes has its graph intersecting the x-axis at two distinct points.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "The roots are x = 2 and x = 5 (distinct). Distinct real roots imply two x-intercepts.",
+    pastBoardYear: "2023",
+    policyTag: "AR/Graph link to roots",
+  },
+  {
+    id: "2026-POLY-CASE-04",
+    topicKey: "Polynomials",
+    subtopic: "Factor Theorem & Modelling",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A rectangular garden’s area (in m²) varies with its length x (m) as p(x)=x³−10x²+29x−20, for a fixed perimeter scheme. A contractor claims (x−1) and (x−4) are factors. (i) Verify both factors. (ii) Factorise p(x) completely. (iii) Find all possible integer lengths.",
+    answer:
+      "(i) p(1)=0, p(4)=0. (ii) p(x)=(x−1)(x−4)(x−5). (iii) x ∈ {1,4,5} (check feasibility).",
+    explanation:
+      "Use Factor Theorem for x = 1, 4, then divide to obtain the third factor x−5.",
+    pastBoardYear: "2022",
+    policyTag: "Case-based/realistic context",
+  },
+
+  // ===== MORE: PAIR OF LINEAR EQUATIONS =====
+  {
+    id: "2026-PLE-AR-05",
+    topicKey: "Pair of Linear Equations",
+    subtopic: "Consistency & Graphical Meaning",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): The system 2x+3y=7 and 4x+6y=14 has infinitely many solutions. Reason (R): If a₁/a₂ = b₁/b₂ = c₁/c₂, the pair is consistent and dependent.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Second equation is a multiple of the first; hence infinitely many solutions.",
+    pastBoardYear: "2021",
+    policyTag: "AR/Consistency conditions",
+  },
+  {
+    id: "2026-PLE-CASE-06",
+    topicKey: "Pair of Linear Equations",
+    subtopic: "Word Problems/Two Variables",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A school canteen sells samosas and idlis. On a day, 120 items were sold for ₹1,020. A samosa costs ₹9 and an idli costs ₹6. (i) Form linear equations. (ii) Solve to find quantities sold of each.",
+    answer:
+      "Let x,y be samosas,idlis: x+y=120; 9x+6y=1020 ⇒ x=60, y=60.",
+    explanation:
+      "Solve the linear pair using elimination/substitution.",
+    pastBoardYear: "2024",
+    policyTag: "Contextual/standard pair",
+  },
+
+  // ===== MORE: QUADRATIC EQUATIONS =====
+  {
+    id: "2026-QE-AR-05",
+    topicKey: "Quadratic Equations",
+    subtopic: "Nature of Roots",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): The equation x²−6x+11=0 has no real roots. Reason (R): If D=b²−4ac<0, the quadratic has complex (non-real) roots.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "D=36−44=−8<0 ⇒ no real roots.",
+    pastBoardYear: "2023",
+    policyTag: "AR/Discriminant test",
+  },
+  {
+    id: "2026-QE-SA-06",
+    topicKey: "Quadratic Equations",
+    subtopic: "Forming Equations",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Creating",
+    questionText:
+      "Form the quadratic equation whose roots are 3 and −2. Verify by expanding.",
+    answer:
+      "Equation: (x−3)(x+2)=0 ⇒ x²−x−6=0.",
+    explanation:
+      "Sum=1, product=−6 ⇒ x²−(sum)x+(product)=0 ⇒ x²−x−6=0.",
+    pastBoardYear: "2021",
+    policyTag: "Roots→Equation construction",
+  },
+
+  // ===== MORE: ARITHMETIC PROGRESSION =====
+  {
+    id: "2026-AP-AR-03",
+    topicKey: "Arithmetic Progression",
+    subtopic: "nth Term & Sum",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): If the 10th term of an AP is 25 and the 20th term is 45, then the common difference is 2. Reason (R): In any AP, aₙ = a + (n−1)d.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "a+9d=25 and a+19d=45 ⇒ 10d=20 ⇒ d=2.",
+    pastBoardYear: "2022",
+    policyTag: "AR/AP nth-term relation",
+  },
+  {
+    id: "2026-AP-CASE-04",
+    topicKey: "Arithmetic Progression",
+    subtopic: "Applications",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A staircase has steps whose heights (in cm) form an AP: 14, 15, 16, ... If the top step is 20 cm high, how many steps are there? What is the total height climbed?",
+    answer:
+      "d=1, last term=20 ⇒ n such that a+(n−1)d=20 ⇒ 14+(n−1)=20 ⇒ n=7. Total height Sₙ = n/2(2a+(n−1)d)=7/2(28+6)=7/2·34=119 cm.",
+    explanation:
+      "Use nth term for count; then AP sum for total height.",
+    pastBoardYear: "2024",
+    policyTag: "Practical AP modelling",
+  },
+
+  // ===== MORE: TRIANGLES =====
+  {
+    id: "2026-TRI-MCQ-03",
+    topicKey: "Triangles",
+    subtopic: "Area Ratio & Similarity",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "If two triangles are similar with side ratio 3:5, then the ratio of their areas is:",
+    options: ["3:5", "5:3", "9:25", "25:9"],
+    answer: "9:25",
+    explanation:
+      "Area ratio equals square of side ratio ⇒ (3/5)²=9/25.",
+    pastBoardYear: "2021",
+    policyTag: "Direct similarity fact",
+  },
+  {
+    id: "2026-TRI-SA-04",
+    topicKey: "Triangles",
+    subtopic: "Midpoint/Parallel Line Theorems",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "In ΔABC, D and E are midpoints of AB and AC respectively. Prove that DE ∥ BC and DE = (1/2)·BC.",
+    answer:
+      "DE ∥ BC and DE = (1/2)·BC.",
+    explanation:
+      "Midpoint theorem: segment joining midpoints of two sides is parallel to the third side and half of it.",
+    pastBoardYear: "2023",
+    policyTag: "Theorem application",
+  },
+
+  // ===== MORE: COORDINATE GEOMETRY =====
+  {
+    id: "2026-CG-MCQ-03",
+    topicKey: "Coordinate Geometry",
+    subtopic: "Area of Triangle (Coordinates)",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "Area of the triangle with vertices (0,0), (4,0), (0,3) is:",
+    options: ["6", "7", "12", "3"],
+    answer: "6",
+    explanation:
+      "Right triangle with legs 4 and 3: area = 1/2·4·3=6.",
+    pastBoardYear: "2022",
+    policyTag: "Direct area computation",
+  },
+  {
+    id: "2026-CG-SA-04",
+    topicKey: "Coordinate Geometry",
+    subtopic: "Collinearity Test",
+    kind: "Short",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Check whether the points (1,2), (3,6), (5,10) are collinear.",
+    answer:
+      "Yes, they are collinear.",
+    explanation:
+      "Area of triangle using determinant is zero (or equal slopes). Slopes 2→6 is 2; 6→10 is 2.",
+    pastBoardYear: "2023",
+    policyTag: "Collinearity via slope/area",
+  },
+
+  // ===== MORE: CIRCLES =====
+  {
+    id: "2026-CIRC-SA-02",
+    topicKey: "Circles",
+    subtopic: "Tangent-Secant Theorem",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "From an external point P, a tangent PT and a secant PAB are drawn to a circle with centre O. Prove that PT² = PA·PB.",
+    answer: "PT² = PA·PB.",
+    explanation:
+      "Power of a point theorem (tangent-secant).",
+    pastBoardYear: "2021",
+    policyTag: "Standard tangent-secant relation",
+  },
+  {
+    id: "2026-CIRC-AR-03",
+    topicKey: "Circles",
+    subtopic: "Tangent Properties",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): Tangents drawn from an external point to a circle are equal in length. Reason (R): The triangles formed by radii to the points of contact are congruent right triangles.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "OP ⟂ PT at point of contact; use congruence to show equality.",
+    pastBoardYear: "2022",
+    policyTag: "AR/Equal tangents",
+  },
+
+  // ===== MORE: AREAS RELATED TO CIRCLES =====
+  {
+    id: "2026-ARC-MCQ-02",
+    topicKey: "Areas Related to Circles",
+    subtopic: "Sector & Segment",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Understanding",
+    questionText:
+      "If arc length of a circle is L for central angle θ (in radians), then area of the sector is:",
+    options: ["Lr", "L/2", "1/2·r·L", "r²/L"],
+    answer: "1/2·r·L",
+    explanation:
+      "Area of sector = (1/2)·r·L (when θ is in radians).",
+    pastBoardYear: "2021",
+    policyTag: "Sector formula (radian form)",
+  },
+
+  // ===== MORE: SURFACE AREAS & VOLUMES =====
+  {
+    id: "2026-SAV-SA-02",
+    topicKey: "Surface Areas and Volumes",
+    subtopic: "Frustum/Combination",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A bucket is in the shape of a frustum of a cone with top radius 14 cm, bottom radius 7 cm and height 20 cm. Find its volume. (Use π = 22/7.)",
+    answer:
+      "Volume = (1/3)πh(R²+Rr+r²) = (1/3)·(22/7)·20·(196+98+49) = (20·22/21)·343 ≈ 7,180 cm³.",
+    explanation:
+      "Apply frustum volume formula with R=14, r=7, h=20.",
+    pastBoardYear: "2024",
+    policyTag: "Frustum formula application",
+  },
+
+  // ===== MORE: STATISTICS =====
+  {
+    id: "2026-STAT-SA-02",
+    topicKey: "Statistics",
+    subtopic: "Median of Grouped Data",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "Using the median formula for grouped data, find the median of the distribution:\nClass: 0–10, 10–20, 20–30, 30–40, 40–50\nFrequency: 5, 9, 14, 8, 4",
+    answer:
+      "Median class: 20–30; median ≈ 24.3 (approx.).",
+    explanation:
+      "Find cumulative frequencies; locate n/2; use median formula: L + [(n/2−cf)/f]·h.",
+    pastBoardYear: "2023",
+    policyTag: "Grouped median",
+  },
+  {
+    id: "2026-STAT-AR-03",
+    topicKey: "Statistics",
+    subtopic: "Mode (Grouped Data)",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): For grouped data, the modal class is the class with highest frequency. Reason (R): The mode of grouped data is given by the empirical formula Mode ≈ L + [(f₁−f₀)/(2f₁−f₀−f₂)]·h.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Highest frequency decides modal class; formula estimates the mode within that class.",
+    pastBoardYear: "2022",
+    policyTag: "AR/Mode estimation",
+  },
+
+  // ===== MORE: PROBABILITY =====
+  {
+    id: "2026-PROB-MCQ-03",
+    topicKey: "Probability",
+    subtopic: "Complement & Union",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Understanding",
+    questionText:
+      "If P(A)=0.3 and P(B)=0.5 and A,B are mutually exclusive, then P(A∪B)=?",
+    options: ["0.2", "0.5", "0.8", "0.15"],
+    answer: "0.8",
+    explanation:
+      "Mutually exclusive ⇒ P(A∪B)=P(A)+P(B)=0.3+0.5=0.8.",
+    pastBoardYear: "2021",
+    policyTag: "Basic addition rule",
+  },
+  {
+    id: "2026-PROB-SA-04",
+    topicKey: "Probability",
+    subtopic: "Without Replacement (Simple)",
+    kind: "Short",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A bag contains 4 red and 2 blue balls. Two balls are drawn without replacement. Find the probability that both are red.",
+    answer:
+      "P = (4/6)·(3/5)=2/5.",
+    explanation:
+      "First red: 4/6; then red: 3/5. Multiply.",
+    pastBoardYear: "2024",
+    policyTag: "Two-step probability",
+  },
+
+  // ===== APPLICATIONS OF TRIGONOMETRY (Heights & Distances) =====
+  {
+    id: "2026-TRIG-APP-MCQ-06",
+    topicKey: "Trigonometry",
+    subtopic: "Heights & Distances (single angle)",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Applying",
+    questionText:
+      "If the angle of elevation of the top of a tower from a point on level ground is 30° and the distance from the point to the foot of the tower is 20 m, the height of the tower is:",
+    options: ["10 m", "20/√3 m", "20√3 m", "10√3 m"],
+    answer: "20/√3 m",
+    explanation:
+      "tan 30° = h/20 ⇒ 1/√3 = h/20 ⇒ h = 20/√3.",
+    policyTag: "Direct single-angle model",
+  },
+  {
+    id: "2026-TRIG-APP-SA-07",
+    topicKey: "Trigonometry",
+    subtopic: "Two-positions method",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "From a point A on the ground, the angle of elevation of the top of a vertical tower is 45°. On walking 14 m towards the tower to a point B, the angle becomes 60°. Find the height of the tower (√3 ≈ 1.732).",
+    answer: "≈ 24.2 m",
+    explanation:
+      "Let height = h, initial distance = x. tan45° ⇒ h=x. tan60° ⇒ h/(x−14)=√3. Substitute h=x to get x/(x−14)=√3 ⇒ x≈24.2 ⇒ h≈24.2.",
+    policyTag: "Two-position standard",
+  },
+  {
+    id: "2026-TRIG-APP-CASE-08",
+    topicKey: "Trigonometry",
+    subtopic: "Mixed angles (elevation & depression)",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "From the top of a lighthouse, the angles of depression of two boats on the same straight line with the base are 30° and 45°. If the lighthouse is 40 m high, find the distance between the boats.",
+    answer:
+      "Let distances from foot be x (for 30°) and y (for 45°). x=40/ tan30°=40√3; y=40/ tan45°=40. Distance = 40(√3 − 1) m.",
+    explanation:
+      "Use tan for depression angles w.r.t. horizontal, distances on same line.",
+    policyTag: "Depression pair",
+  },
+
+  // ===== CONSTRUCTIONS =====
+  {
+    id: "2026-CONST-SA-01",
+    topicKey: "Constructions",
+    subtopic: "Divide a line segment",
+    kind: "Short",
+    section: "B",
+    marks: 2,
+    difficulty: "Easy",
+    bloomSkill: "Understanding",
+    questionText:
+      "Describe the steps of construction to divide a line segment AB in the ratio 3:5 using a compass and straightedge.",
+    answer:
+      "Draw a ray AX making an acute angle with AB; mark 8 equal points A1...A8 on AX; join A8 to B; draw through A3 a line parallel to A8B meeting AB at P; AP:PB = 3:5.",
+    explanation:
+      "Uses basic proportionality via parallel lines.",
+    policyTag: "Steps-only board style",
+  },
+  {
+    id: "2026-CONST-SA-02",
+    topicKey: "Constructions",
+    subtopic: "Construct a triangle similar to a given triangle",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "Construct a triangle similar to a given ΔABC with scale factor 3/2 (enlargement). Write steps.",
+    answer:
+      "Draw a ray from A; mark 2+1=3 equal segments; join second point to C; draw parallel through third point to obtain C′; similarly obtain B′; ΔAB′C′ ~ ΔABC with factor 3/2.",
+    explanation:
+      "Use intercept theorem to scale sides proportionally.",
+    policyTag: "Similarity construction",
+  },
+  {
+    id: "2026-CONST-AR-03",
+    topicKey: "Constructions",
+    subtopic: "Tangent to circle",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): To draw tangents from an external point P to a circle with centre O, one constructs the circle with OP as diameter. Reason (R): The right angle in a semicircle ensures the constructed points are points of tangency.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Radial right angle gives tangent condition.",
+    policyTag: "AR/tangent construction",
+  },
+
+  // ===== COORDINATE GEOMETRY (Richer sets) =====
+  {
+    id: "2026-CG-CASE-05",
+    topicKey: "Coordinate Geometry",
+    subtopic: "Section + Distance (combo)",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A(2,−1) and B(8,5). P divides AB internally in ratio 2:1. (i) Find P. (ii) Find distance AP. (iii) If Q is the midpoint of PB, find coordinates of Q.",
+    answer:
+      "(i) P( (1×2 + 2×8)/3, (1×(−1) + 2×5)/3 ) = (6, 3). (ii) AP = √[(6−2)²+(3+1)²]=√(16+16)=√32=4√2. (iii) Q midpoint of P(6,3) and B(8,5) ⇒ (7,4).",
+    explanation:
+      "Apply section formula, then distance and midpoint formulae.",
+    policyTag: "Multi-skill combo",
+  },
+  {
+    id: "2026-CG-SA-06",
+    topicKey: "Coordinate Geometry",
+    subtopic: "Triangle area (determinant)",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "Find k if the points (k,1), (2,3) and (4,7) are collinear.",
+    answer:
+      "Area = 0 ⇒ | k 1 1; 2 3 1; 4 7 1 | = 0 ⇒ k=−2.",
+    explanation:
+      "Use determinant area formula for collinearity.",
+    policyTag: "Determinant method",
+  },
+
+  // ===== CIRCLES (More patterns) =====
+  {
+    id: "2026-CIRC-CASE-04",
+    topicKey: "Circles",
+    subtopic: "Chord subtended angle",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "In a circle with centre O, chord AB subtends ∠AOB = 120°. (i) Show that arc length AB is (2πR)/3. (ii) Prove that the perpendicular from O to AB bisects AB. (iii) If radius is 6 cm, find area of sector AOB.",
+    answer:
+      "(i) θ=120° ⇒ (2πR)(120/360)=(2πR)/3. (ii) Radius ⟂ chord at midpoint. (iii) Area sector = (120/360)πR² = (1/3)π·36 = 12π cm².",
+    explanation:
+      "Use central angle relations and sector area formula.",
+    policyTag: "Central angle + sector",
+  },
+  {
+    id: "2026-CIRC-AR-05",
+    topicKey: "Circles",
+    subtopic: "Angle in the same segment",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): Angles in the same segment of a circle are equal. Reason (R): They subtend the same chord and intercept the same arc.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Same chord ⇒ same intercepted arc ⇒ equal subtended angles.",
+    policyTag: "Segment theorem",
+  },
+
+  // ===== SURFACE AREAS & VOLUMES (Richer) =====
+  {
+    id: "2026-SAV-MCQ-03",
+    topicKey: "Surface Areas and Volumes",
+    subtopic: "Right circular cylinder",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "The curved surface area of a cylinder of radius r and height h is:",
+    options: ["πr²h", "2πrh", "πrh", "2πr²h"],
+    answer: "2πrh",
+    explanation:
+      "CSA (lateral area) of cylinder is 2πrh.",
+    policyTag: "Direct formula",
+  },
+  {
+    id: "2026-SAV-SA-04",
+    topicKey: "Surface Areas and Volumes",
+    subtopic: "Spheres & Hemispheres (combo)",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A solid iron sphere of radius 6 cm is melted and recast into solid spheres each of radius 3 cm. Find the number of small spheres formed.",
+    answer:
+      "Volume ratio = (4/3)π·6³ : (4/3)π·3³ = 216 : 27 = 8 ⇒ 8 spheres.",
+    explanation:
+      "Volume is conserved during recasting.",
+    policyTag: "Volume conservation",
+  },
+
+  // ===== STATISTICS (Richer) =====
+  {
+    id: "2026-STAT-MCQ-03",
+    topicKey: "Statistics",
+    subtopic: "Mean/Median/Mode basics",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "Which of the following is not a measure of central tendency?",
+    options: ["Mean", "Median", "Mode", "Range"],
+    answer: "Range",
+    explanation:
+      "Range measures dispersion, not central tendency.",
+    policyTag: "Basics check",
+  },
+  {
+    id: "2026-STAT-SA-04",
+    topicKey: "Statistics",
+    subtopic: "Ogive interpretation (qualitative)",
+    kind: "Short",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Understanding",
+    questionText:
+      "A ‘less than’ ogive for marks of 100 students shows that 60 students scored below 40. Interpret the median approximately from the graph if the curve crosses 50 on the cumulative axis at 42 marks.",
+    answer:
+      "Median ≈ 42 marks.",
+    explanation:
+      "Median corresponds to N/2 on cumulative frequency; read x-value.",
+    policyTag: "Ogive reading",
+  },
+
+  // ===== PROBABILITY (Richer) =====
+  {
+    id: "2026-PROB-AR-05",
+    topicKey: "Probability",
+    subtopic: "Independence",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): When two fair coins are tossed, events ‘first coin is Head’ and ‘second coin is Head’ are independent. Reason (R): The outcome of one coin does not affect the outcome of the other.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Sample space factorises; independence holds.",
+    policyTag: "Independence concept",
+  },
+  {
+    id: "2026-PROB-CASE-06",
+    topicKey: "Probability",
+    subtopic: "Conditional probability (simple counts)",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A class has 12 boys and 8 girls. Two students are selected at random without replacement. (i) Find P(both girls). (ii) Find P(second is girl | first is boy). (iii) Which is more likely: both girls or a girl then a boy (in that order)?",
+    answer:
+      "(i) (8/20)·(7/19)=56/380=14/95. (ii) 8/19. (iii) Girl→Boy: (8/20)·(12/19)=96/380=24/95 > 14/95.",
+    explanation:
+      "Compute sequential probabilities; compare fractions.",
+    policyTag: "Without replacement + conditional",
+  },
+
+  // ===== POLYNOMIALS (extra board-flavour) =====
+  {
+    id: "2026-POLY-AR-03X",
+    topicKey: "Polynomials",
+    subtopic: "Zeroes & Graph link",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Understanding",
+    questionText:
+      "Assertion (A): If a quadratic polynomial has exactly one zero, its graph touches the x-axis at one point. Reason (R): Discriminant D=0 implies a repeated real root and the parabola is tangent to the x-axis.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "D=0 ⇒ equal roots ⇒ the vertex lies on x-axis; tangent contact.",
+    policyTag: "Graph-root relation",
+  },
+  {
+    id: "2026-POLY-CASE-04X",
+    topicKey: "Polynomials",
+    subtopic: "Remainder & Factor use",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A cubic p(x) leaves remainders 2, −4 when divided by (x−1) and (x+1) respectively. (i) Find p(1) and p(−1). (ii) If (x−2) is a factor and p has integer coefficients, find p(x) up to a leading constant k and determine k if p(0)=−8.",
+    answer:
+      "(i) p(1)=2, p(−1)=−4. (ii) p(x)=k(x−2)(x−1)(x+1)+ax+b form collapses to k(x−2)(x−1)(x+1). Using p(0)=−8 ⇒ −2k = −8 ⇒ k=4; hence p(x)=4(x−2)(x−1)(x+1).",
+    explanation:
+      "Remainder theorem + given factor; use p(0) to fix k.",
+    policyTag: "Remainder+factor synthesis",
+  },
+
+  // ===== PAIR OF LINEAR EQUATIONS (coverage extension) =====
+  {
+    id: "2026-PLE-AR-05X",
+    topicKey: "Pair of Linear Equations",
+    subtopic: "Consistency/Graph",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): If two linear equations represent parallel distinct lines, the system has no solution. Reason (R): For such pairs, a1/a2 = b1/b2 ≠ c1/c2.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Parallel distinct lines never intersect; ratio condition captures inconsistency.",
+    policyTag: "Consistency criteria",
+  },
+  {
+    id: "2026-PLE-CASE-06X",
+    topicKey: "Pair of Linear Equations",
+    subtopic: "Graph+Word mix",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A bus and a bike start from the same point. After t hours, their distances are given by d₁=40t and d₂=25t+15. (i) Find when they meet. (ii) If the bike increases speed by 5 km/h, re-calc meeting time.",
+    answer:
+      "(i) 40t=25t+15 ⇒ 15t=15 ⇒ t=1 h. (ii) New d₂=30t+15; 40t=30t+15 ⇒ 10t=15 ⇒ t=1.5 h.",
+    explanation:
+      "Form linear equations in t; solve directly.",
+    policyTag: "Linear modeling",
+  },
+
+  // ===== QUADRATIC EQUATIONS (extra practice) =====
+  {
+    id: "2026-QE-SA-05",
+    topicKey: "Quadratic Equations",
+    subtopic: "Roots sum & product",
+    kind: "Short",
+    section: "B",
+    marks: 2,
+    difficulty: "Easy",
+    bloomSkill: "Understanding",
+    questionText:
+      "If α and β are the roots of x² − 7x + 12 = 0, find (i) α+β and (ii) αβ. Hence evaluate α²+β².",
+    answer:
+      "α+β=7, αβ=12; α²+β²=(α+β)²−2αβ=49−24=25.",
+    explanation:
+      "Use sum/product of roots identities; expand and substitute.",
+    policyTag: "Roots identities",
+  },
+
+  // ===== ARITHMETIC PROGRESSION (richer cases) =====
+  {
+    id: "2026-AP-AR-03X",
+    topicKey: "Arithmetic Progression",
+    subtopic: "nth term vs sum",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Understanding",
+    questionText:
+      "Assertion (A): For a positive AP, if Sₙ is linear in n, then d=0. Reason (R): Sₙ=n/2[2a+(n−1)d] is quadratic in n unless d=0.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Only d=0 collapses quadratic term; otherwise Sₙ grows quadratically.",
+    policyTag: "AP growth logic",
+  },
+  {
+    id: "2026-AP-CASE-04X",
+    topicKey: "Arithmetic Progression",
+    subtopic: "Applications blend",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A stadium has 25 rows. The first row has 18 seats, each row has 3 more seats than the previous. (i) Find seats in the 25th row. (ii) Find total seats in the stadium.",
+    answer:
+      "(i) a=18, d=3 ⇒ a₂₅=18+24×3=90. (ii) S₂₅=25/2[2×18+(25−1)×3]=25/2[36+72]=25/2×108=1350.",
+    explanation:
+      "Use aₙ and Sₙ formulae with given a,d.",
+    policyTag: "Worded AP sum",
+  },
+
+  // ===== TRIANGLES (theorems + similarity) =====
+  {
+    id: "2026-TRI-AR-03",
+    topicKey: "Triangles",
+    subtopic: "Similarity criteria",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): If two angles of one triangle are equal to two angles of another triangle, the triangles are similar. Reason (R): In triangles, the sum of interior angles is 180°.",
+    answer:
+      "A is true; R is true; and R is the correct explanation of A.",
+    explanation:
+      "AA-criterion holds because third angle also equals; 180° sum ensures it.",
+    policyTag: "AA-similarity",
+  },
+  {
+    id: "2026-TRI-CASE-04",
+    topicKey: "Triangles",
+    subtopic: "BPT + ratios",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "In ΔABC, D and E are midpoints of AB and AC respectively. (i) Prove DE ∥ BC. (ii) If AB=12 cm, AC=16 cm, find DE and the ratio of areas of ΔADE and ΔABC.",
+    answer:
+      "(i) Midpoint theorem ⇒ DE ∥ BC. (ii) DE=BC/2 (or use similarity); area ratio (ADE:ABC)=1:4.",
+    explanation:
+      "Midpoint theorem + similarity scaling on sides and areas.",
+    policyTag: "Midpoint theorem usage",
+  },
+
+  // ===== COORDINATE GEOMETRY (finishing touches) =====
+  {
+    id: "2026-CG-AR-07",
+    topicKey: "Coordinate Geometry",
+    subtopic: "Slope & parallel/perpendicular",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): Lines with slopes m₁ and m₂ are perpendicular if m₁·m₂ = −1. Reason (R): The product of slopes equals −1 when angle between them is 90°.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Slope–angle relation gives perpendicularity condition.",
+    policyTag: "Slope criteria",
+  },
+
+  // ===== TRIGONOMETRY (identities + proofs) =====
+  {
+    id: "2026-TRIG-AR-06",
+    topicKey: "Trigonometry",
+    subtopic: "Identities",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "Assertion (A): For any angle θ where defined, 1+tan²θ = sec²θ. Reason (R): Dividing sin²θ+cos²θ=1 by cos²θ gives tan²θ+1=sec²θ.",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Direct derivation from Pythagorean identity.",
+    policyTag: "Core identity",
+  },
+
+  // ===== CIRCLES (quick MCQ + tangent-secant) =====
+  {
+    id: "2026-CIRC-MCQ-06",
+    topicKey: "Circles",
+    subtopic: "Angle subtended by diameter",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "The angle subtended by a diameter at any point on the circle is:",
+    options: ["30°", "45°", "60°", "90°"],
+    answer: "90°",
+    explanation:
+      "Angle in a semicircle is a right angle.",
+    policyTag: "Thales theorem",
+  },
+  {
+    id: "2026-CIRC-SA-07",
+    topicKey: "Circles",
+    subtopic: "Tangent-secant theorem",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "From a point P outside a circle, PT is tangent and PAB is a secant cutting the circle at A and B. Prove that PT² = PA·PB.",
+    answer:
+      "Power of a point: PT²=PA×PB.",
+    explanation:
+      "Equal angles subtend equal arcs; similar triangles yield the relation.",
+    policyTag: "Power of a point",
+  },
+
+  // ===== AREAS RELATED TO CIRCLES (extra) =====
+  {
+    id: "2026-ARC-AR-02",
+    topicKey: "Areas Related to Circles",
+    subtopic: "Sector/segment logic",
+    kind: "Assertion-Reasoning",
+    section: "B",
+    marks: 2,
+    difficulty: "Medium",
+    bloomSkill: "Understanding",
+    questionText:
+      "Assertion (A): The area of a sector is proportional to its central angle. Reason (R): A full circle corresponds to 360° and area πr².",
+    answer:
+      "Both A and R are true, and R is the correct explanation of A.",
+    explanation:
+      "Direct proportionality from (θ/360)πr².",
+    policyTag: "Sector formula reasoning",
+  },
+
+  // ===== SURFACE AREAS & VOLUMES (case study) =====
+  {
+    id: "2026-SAV-CASE-05",
+    topicKey: "Surface Areas and Volumes",
+    subtopic: "Frustum/real-life",
+    kind: "Case-Based",
+    section: "E",
+    marks: 4,
+    difficulty: "Medium",
+    bloomSkill: "Analysing",
+    questionText:
+      "A bucket is in the shape of a frustum of a cone with top radius 14 cm, bottom radius 7 cm, and height 20 cm. (i) Find its curved surface area. (ii) If filled with water, find the volume of water it can hold. (Use π=22/7.)",
+    answer:
+      "(i) l=√(h²+(R−r)²)=√(400+49)=√449. CSA=π(R+r)l. (ii) Volume=(1/3)πh(R²+Rr+r²). Substitute values to compute.",
+    explanation:
+      "Use frustum formulae for CSA and volume with given R,r,h.",
+    policyTag: "Frustum board-pattern",
+  },
+
+  // ===== STATISTICS (grouped median/mode) =====
+  {
+    id: "2026-STAT-SA-05",
+    topicKey: "Statistics",
+    subtopic: "Median of grouped data",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "Find the median of the following grouped data using the median formula: Classes: 0–10,10–20,20–30,30–40,40–50 with frequencies 5, 7, 12, 9, 7.",
+    answer:
+      "Compute cumulative frequencies, locate median class (N/2), then use median formula: L + [(N/2 − cf)/f]×h.",
+    explanation:
+      "Standard median-of-grouped-data procedure.",
+    policyTag: "Grouped median",
+  },
+  {
+    id: "2026-STAT-SA-06",
+    topicKey: "Statistics",
+    subtopic: "Mode (grouped)",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "For grouped data with modal class frequency f₁ = 18, preceding f₀ = 12, succeeding f₂ = 10, class width h = 5 and lower boundary L = 20, find the mode.",
+    answer:
+      "Mode = L + [(f₁−f₀)/(2f₁−f₀−f₂)]×h = 20 + [(6)/(36−22)]×5 = 20 + (6/14)×5 ≈ 22.14.",
+    explanation:
+      "Apply the grouped mode formula with given frequencies.",
+    policyTag: "Grouped mode",
+  },
+
+  // ===== PROBABILITY (finishing touches) =====
+  {
+    id: "2026-PROB-SA-07",
+    topicKey: "Probability",
+    subtopic: "Cards/dice blend",
+    kind: "Short",
+    section: "C",
+    marks: 3,
+    difficulty: "Medium",
+    bloomSkill: "Applying",
+    questionText:
+      "A card is drawn from a deck and a fair die is rolled. Find the probability that the card is a heart and the die shows an odd number.",
+    answer:
+      "P(heart)=13/52=1/4; P(odd on die)=3/6=1/2; Independent ⇒ total = 1/4×1/2=1/8.",
+    explanation:
+      "Independent events product rule.",
+    policyTag: "Compound independent events",
+  },
+  {
+    id: "2026-PROB-MCQ-08",
+    topicKey: "Probability",
+    subtopic: "Mutually exclusive vs independent",
+    kind: "MCQ",
+    section: "A",
+    marks: 1,
+    difficulty: "Easy",
+    bloomSkill: "Remembering",
+    questionText:
+      "If P(A)=0.5, P(B)=0.3 and A,B are mutually exclusive, then P(A∪B) is:",
+    options: ["0.2", "0.5", "0.3", "0.8"],
+    answer: "0.8",
+    explanation:
+      "Mutually exclusive ⇒ P(A∪B)=P(A)+P(B)=0.8.",
+    policyTag: "Basic properties",
+  },
 ];
+
