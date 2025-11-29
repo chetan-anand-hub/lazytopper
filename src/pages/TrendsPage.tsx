@@ -1,9 +1,16 @@
 // src/pages/TrendsPage.tsx
-
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { class10MathTopicTrends } from "../data/class10MathTopicTrends";
-import { class10ScienceTopicTrends } from "../data/class10ScienceTopicTrends";
+import {
+  class10MathTopicTrends,
+  type Class10MathTopicTrendsData,
+} from "../data/class10MathTopicTrends";
+import {
+  class10ScienceTopicTrends,
+  type Class10ScienceTopicKey,
+  type Class10ScienceTrendsRoot,
+  type ScienceTopicTrend,
+} from "../data/class10ScienceTopicTrends";
 
 // --- Local types -------------------------------------------------
 
@@ -17,14 +24,13 @@ interface TopicMeta {
   weightagePercent?: number;
   summary?: string;
   conceptWeightage?: Record<string, number>;
-  // optional stream tag for science topics
   stream?: "Physics" | "Chemistry" | "Biology";
 }
 
-interface TopicTrendsData {
-  subject: string;
-  grade: string;
-  topics: Record<string, TopicMeta>;
+interface DifficultyMix {
+  Easy: number;
+  Medium: number;
+  Hard: number;
 }
 
 // --- Small helpers -----------------------------------------------
@@ -56,11 +62,91 @@ function normaliseSubject(raw?: string): SubjectKey {
   return "Maths";
 }
 
-function pickDataset(subject: SubjectKey): TopicTrendsData {
+// Map each science topic to a stream so the filter works
+const SCIENCE_STREAM_BY_TOPIC: Partial<
+  Record<Class10ScienceTopicKey, "Physics" | "Chemistry" | "Biology">
+> = {
+  ChemicalReactions: "Chemistry",
+  AcidsBasesSalts: "Chemistry",
+  MetalsNonMetals: "Chemistry",
+  CarbonCompounds: "Chemistry",
+
+  LifeProcesses: "Biology",
+  ControlAndCoordination: "Biology",
+  Reproduction: "Biology",
+  HeredityEvolution: "Biology",
+  OurEnvironment: "Biology",
+
+  Light: "Physics",
+  HumanEyeAndColourfulWorld: "Physics",
+  Electricity: "Physics",
+  MagneticEffects: "Physics",
+};
+
+interface NormalisedDataset {
+  topicEntries: [string, TopicMeta][];
+  difficultyMix: DifficultyMix;
+}
+
+function normaliseMathDataset(
+  data: Class10MathTopicTrendsData
+): NormalisedDataset {
+  const topicEntries: [string, TopicMeta][] = Object.entries(data.topics).map(
+    ([topicName, meta]) => [
+      topicName,
+      {
+        tier: meta.tier as TierKey,
+        weightagePercent: meta.weightagePercent,
+        summary: (meta as any).summary,
+        conceptWeightage: meta.conceptWeightage,
+      },
+    ]
+  );
+
+  return {
+    topicEntries,
+    difficultyMix: data.difficultyDistributionPercent,
+  };
+}
+
+function normaliseScienceDataset(
+  data: Class10ScienceTrendsRoot
+): NormalisedDataset {
+  const topicEntries: [string, TopicMeta][] = Object.values(
+    data.topics
+  ).map((topic: ScienceTopicTrend) => {
+    const conceptWeightage: Record<string, number> = {};
+    topic.concepts.forEach((c) => {
+      conceptWeightage[c.name] = c.sharePercent;
+    });
+
+    const stream =
+      SCIENCE_STREAM_BY_TOPIC[topic.topicKey] ?? ("Biology" as const);
+
+    return [
+      topic.topicName,
+      {
+        tier: topic.tier,
+        weightagePercent: topic.weightagePercent,
+        // For now, take the first concept’s tips as a short summary
+        summary: topic.concepts[0]?.summary_and_exam_tips,
+        conceptWeightage,
+        stream,
+      },
+    ];
+  });
+
+  return {
+    topicEntries,
+    difficultyMix: data.difficultyDistributionPercent,
+  };
+}
+
+function getNormalisedDataset(subject: SubjectKey): NormalisedDataset {
   if (subject === "Science") {
-    return class10ScienceTopicTrends as unknown as TopicTrendsData;
+    return normaliseScienceDataset(class10ScienceTopicTrends);
   }
-  return class10MathTopicTrends as unknown as TopicTrendsData;
+  return normaliseMathDataset(class10MathTopicTrends);
 }
 
 // Fallback stream if science topic has no stream tagged
@@ -76,20 +162,17 @@ function getStream(meta: TopicMeta): StreamKey {
 const TrendsPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // typed params
   const params = useParams<"grade" | "subject">();
-
   const grade = params.grade || "10";
   const subjectKey = normaliseSubject(params.subject);
 
   const [activeTier, setActiveTier] = useState<TierFilter>("all");
   const [activeStream, setActiveStream] = useState<StreamKey>("all");
 
-  const trendsData = pickDataset(subjectKey);
-
-  const topicEntries = useMemo(
-    () => Object.entries(trendsData.topics),
-    [trendsData]
+  // Normalised data from our JSONs (Maths + Science)
+  const { topicEntries, difficultyMix } = useMemo(
+    () => getNormalisedDataset(subjectKey),
+    [subjectKey]
   );
 
   const filteredTopicEntries = useMemo(() => {
@@ -106,9 +189,7 @@ const TrendsPage: React.FC = () => {
     }
 
     if (activeTier !== "all") {
-      entries = entries.filter(
-        ([, meta]) => meta.tier === activeTier
-      );
+      entries = entries.filter(([_, meta]) => meta.tier === activeTier);
     }
 
     return entries;
@@ -135,7 +216,6 @@ const TrendsPage: React.FC = () => {
   };
 
   const handleSampleQuestion = (topicName: string) => {
-    // Deep-link into HPQ page – later we can read these query params
     navigate(
       `/highly-probable?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
         topicName
@@ -269,9 +349,7 @@ const TrendsPage: React.FC = () => {
                     key={item.id}
                     onClick={() =>
                       handleTierClick(
-                        item.id === "all"
-                          ? "all"
-                          : (item.id as TierKey)
+                        item.id === "all" ? "all" : (item.id as TierKey)
                       )
                     }
                     style={{
@@ -453,7 +531,6 @@ const TrendsPage: React.FC = () => {
                 fontSize: "0.8rem",
               }}
             >
-              {/* Easy / Medium / Hard chips */}
               <span
                 style={{
                   display: "inline-flex",
@@ -473,7 +550,7 @@ const TrendsPage: React.FC = () => {
                     backgroundColor: "#22c55e",
                   }}
                 />
-                Easy 40%
+                Easy {difficultyMix.Easy}%
               </span>
               <span
                 style={{
@@ -494,7 +571,7 @@ const TrendsPage: React.FC = () => {
                     backgroundColor: "#facc15",
                   }}
                 />
-                Medium 40%
+                Medium {difficultyMix.Medium}%
               </span>
               <span
                 style={{
@@ -515,10 +592,11 @@ const TrendsPage: React.FC = () => {
                     backgroundColor: "#ef4444",
                   }}
                 />
-                Hard 20%
+                Hard {difficultyMix.Hard}%
               </span>
             </div>
 
+            {/* Section chips kept generic for now */}
             <div
               style={{
                 display: "flex",
@@ -530,10 +608,10 @@ const TrendsPage: React.FC = () => {
               }}
             >
               {[
-                "Section A (MCQs / Objective, 1 mark, 20 Qs)",
-                "Section B (Very Short Answer, 2 marks, 6 Qs)",
-                "Section C (Short Answer, 3 marks, 8 Qs)",
-                "Section D (Long Answer, 4–5 marks, 4–6 Qs)",
+                "Section A (MCQs / Objective, 1 mark)",
+                "Section B (Very Short Answer, 2 marks)",
+                "Section C (Short Answer, 3 marks)",
+                "Section D (Long Answer, 4–5 marks)",
                 "Section E (Case-based, 4 marks)",
               ].map((chip) => (
                 <span
@@ -595,9 +673,9 @@ const TrendsPage: React.FC = () => {
               }}
             >
               Total weightage covered:{" "}
-              <span style={{ fontWeight: 600, color: "#020617" }}>
-                {totalWeightage}%
-              </span>
+                <span style={{ fontWeight: 600, color: "#020617" }}>
+                  {totalWeightage}%
+                </span>
             </div>
           </div>
 

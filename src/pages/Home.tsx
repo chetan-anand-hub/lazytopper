@@ -1,278 +1,384 @@
 // src/pages/Home.tsx
-import { useMemo, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 
-function getDaysLeft(targetDate: string) {
-  const today = new Date();
-  const exam = new Date(targetDate);
-  const diff = exam.getTime() - today.getTime();
-  return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
-}
-
-export default function Home() {
+const Home: React.FC = () => {
   const navigate = useNavigate();
 
-  // For now we assume Class 10 Maths as default for the badge.
-  const class10ExamDate = "2026-03-01";
-  const daysLeft10 = getDaysLeft(class10ExamDate);
+  const goToClass10Maths = () => {
+    navigate("/trends/10/Maths");
+  };
 
-  // Mentor mini-form
-  const [targetPercent, setTargetPercent] = useState(80);
-  const [hoursPerDay, setHoursPerDay] = useState(2);
+  const goToMentor = () => {
+    navigate("/mentor");
+  };
 
-  const mentorMessage = useMemo(() => {
-    const totalStudyHours = hoursPerDay * daysLeft10;
-    const expectedPercent = Math.min(
-      95,
-      Math.round((totalStudyHours / 180) * 80)
-    );
-    return {
-      expectedPercent,
-      gap: targetPercent - expectedPercent,
-    };
-  }, [hoursPerDay, daysLeft10, targetPercent]);
+  const goToTrends = () => {
+    navigate("/trends/10/Maths");
+  };
+
+  const goToPredictivePapers = () => {
+    navigate("/predictive-papers");
+  };
+
+  const goToMockBuilder = () => {
+    navigate("/mock-builder");
+  };
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const howItWorks = [
+    {
+      step: 1,
+      title: "Tell us your board & target",
+      body: "Class, subjects, target %, days left – that’s it.",
+      emoji: "🎯",
+    },
+    {
+      step: 2,
+      title: "We read your PYQs",
+      body: "AI scans 8–10 years of papers to find what actually shows up.",
+      emoji: "📊",
+    },
+    {
+      step: 3,
+      title: "We build a marks-first roadmap",
+      body: "Season 1: basics, Season 2: high-yield HPQs, Season 3: exam sprint.",
+      emoji: "🗺️",
+    },
+    {
+      step: 4,
+      title: "You follow the nudges",
+      body: "Daily tasks: HPQs, mini-mocks, revision. Mentor adjusts as you go.",
+      emoji: "⚡",
+    },
+  ];
 
   return (
-    <div className="page">
-      {/* HERO – pure marketing */}
-      <section className="hero-card card">
-        <div className="home-hero-layout">
-          {/* LEFT: copy + CTAs */}
-          <div className="home-hero-text">
-            <p className="hero-tagline">
-              Board exam prep for the lazy-but-smart.
-            </p>
-            <h1 className="hero-title">We plan. You execute. ✏️🏆</h1>
-            <p className="hero-subtitle">
-              LazyTopper mixes AI question prediction, PYQ brains and a chill
-              mentor so you can hit 60–90% without living inside books 10 hours
-              a day.
-            </p>
+    <div className="home-page">
+      <div className="home-container">
+        {/* TOP NAV */}
+        <header className="home-header">
+          <div className="home-logo-group">
+            <div className="home-logo-badge">LT</div>
+            <span className="home-logo-text">LazyTopper</span>
+          </div>
 
-            {/* Quick USP chips (what actually sells) */}
-            <div className="home-feature-pills">
-              <span className="feature-pill">📊 PYQ trend analysis</span>
-              <span className="feature-pill">🤖 AI question predictor</span>
-              <span className="feature-pill">📚 Smart practice sets</span>
-              <span className="feature-pill">👨‍🏫 Lazy-friendly AI mentor</span>
-            </div>
+          <nav className="home-nav-links">
+            <button
+              type="button"
+              onClick={() => scrollToId("how-it-works")}
+              className="home-nav-link"
+            >
+              How it works
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToId("features")}
+              className="home-nav-link"
+            >
+              Features
+            </button>
+            <button
+              type="button"
+              onClick={goToMentor}
+              className="home-nav-cta"
+            >
+              Try AI mentor
+            </button>
+          </nav>
+        </header>
 
-            <div className="hero-cta-row">
-              <button
-                className="cta-btn"
-                onClick={() => navigate("/chapters")}
-              >
-                🚀 Start with Class 10 Maths
-              </button>
+        {/* HERO SECTION */}
+        <section className="hero-section">
+          <div className="hero-card">
+            {/* Left */}
+            <div className="hero-left">
+              <p className="hero-eyebrow">
+                CBSE 10 &amp; 12 • Maths + Science
+              </p>
 
-              <button
-                className="cta-btn ghost"
-                onClick={() => {
-                  const el = document.getElementById("how-it-works");
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth" });
-                  }
-                }}
-              >
-                👀 How does this work?
-              </button>
-            </div>
+              <h1 className="hero-title">
+                Beat the boards, <span>the lazy way.</span>
+              </h1>
 
-            {/* Days left pill */}
-            <div className="days-left-pill">
-              <div className="days-left-number">{daysLeft10}</div>
-              <div className="days-left-text">
-                days left for Class 10 Maths board (approx).
-                <span className="days-left-sub">
-                  Let’s use them like a topper, not a zombie. 👀
+              <p className="hero-subtitle">
+                LazyTopper turns <strong>years of PYQs + HPQs</strong> into a{" "}
+                <strong>daily, marks-first study plan</strong> you can actually
+                follow.
+              </p>
+
+              <div className="hero-chips">
+                <span className="hero-chip hero-chip-orange">
+                  🔥 Must-crack chapters first
+                </span>
+                <span className="hero-chip hero-chip-green">
+                  📊 Based on real PYQ trends
+                </span>
+                <span className="hero-chip hero-chip-violet">
+                  🎧 Plan that fits your vibe
                 </span>
               </div>
-            </div>
-          </div>
 
-          {/* RIGHT: visual card – NOT trends, just all-in-one stack */}
-          <div className="home-hero-visual">
-            <div className="home-hero-visual-card">
-              <div className="home-hero-chip">LAZYTOPPER STACK</div>
-
-              <div className="home-hero-bars">
-                <div className="bar bar-1" />
-                <div className="bar bar-2" />
-                <div className="bar bar-3" />
-                <div className="bar bar-4" />
+              <div className="hero-form">
+                <select className="hero-input hero-select">
+                  <option>Class 10</option>
+                  <option>Class 12</option>
+                </select>
+                <input
+                  className="hero-input hero-text-input"
+                  type="text"
+                  placeholder="Phone or email"
+                />
+                <button type="button" className="hero-primary-btn">
+                  Get my board plan
+                </button>
               </div>
 
-              <p className="home-hero-visual-text">
-                One tab that replaces your:
+              <p className="hero-small-text">
+                No spam. Only exam-prep nudges and your plan link.
               </p>
-              <ul className="home-hero-visual-list">
-                <li>📊 Random PYQ spreadsheets</li>
-                <li>📝 Hand-made “important chapters” lists</li>
-                <li>📺 Endless YouTube video hopping</li>
-                <li>📅 Messy study planners</li>
+
+              <p className="hero-days-text">
+                Approx <strong>90+ days</strong> left for CBSE boards.{" "}
+                <span className="hero-days-highlight">
+                  Start a 1-day streak today. ✨
+                </span>
+              </p>
+
+              <div className="hero-links-row">
+                <button
+                  type="button"
+                  onClick={() => scrollToId("how-it-works")}
+                  className="hero-link hero-link-primary"
+                >
+                  See how it works ↓
+                </button>
+                <span className="hero-links-divider">|</span>
+                <button
+                  type="button"
+                  onClick={goToClass10Maths}
+                  className="hero-link"
+                >
+                  Jump into Class 10 Maths trends →
+                </button>
+              </div>
+            </div>
+
+            {/* Right “phone/dashboard” */}
+            <div className="hero-right">
+              <div className="hero-dashboard">
+                <div className="hero-dashboard-header">
+                  <span className="hero-dashboard-pill">
+                    <span className="hero-dashboard-dot" />
+                    Board mode
+                  </span>
+                  <span className="hero-dashboard-meta">Class 10 • Maths</span>
+                </div>
+
+                <div className="hero-dashboard-progress">
+                  <div className="hero-progress-bar">
+                    <div className="hero-progress-fill" />
+                  </div>
+                  <p className="hero-dashboard-text">
+                    Target <strong>85%</strong> • <strong>82 days</strong> left
+                  </p>
+                  <p className="hero-dashboard-text hero-dashboard-text-muted">
+                    Today: Trigonometry + Life Processes HPQs •{" "}
+                    <strong>40-min mini-mock</strong>.
+                  </p>
+                </div>
+
+                <div className="hero-dashboard-points">
+                  <div className="hero-dashboard-point">
+                    <div className="hero-dashboard-icon">🔍</div>
+                    <p>AI reads your PYQs and tags must-crack chapters.</p>
+                  </div>
+                  <div className="hero-dashboard-point">
+                    <div className="hero-dashboard-icon">📅</div>
+                    <p>Daily doable tasks, not 5-hour fantasy timetables.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className="how-section">
+          <h2 className="section-title">How LazyTopper works</h2>
+          <p className="section-subtitle">
+            4 quick steps from “Where do I start?” to “Board-ready”.
+          </p>
+
+          <div className="how-grid">
+            {howItWorks.map((card) => (
+              <div key={card.step} className="how-card">
+                <div className="how-card-top">
+                  <div className="how-step-badge">{card.step}</div>
+                  <div className="how-emoji">{card.emoji}</div>
+                </div>
+                <h3 className="how-title">{card.title}</h3>
+                <p className="how-body">{card.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* FOUR PIECES */}
+        <section id="features" className="pieces-section">
+          <h2 className="section-title">Four pieces. One calm exam brain.</h2>
+          <p className="section-subtitle">
+            Topic trends, predictive papers, smart practice and an AI mentor –
+            all talking to each other like one squad.
+          </p>
+
+          <div className="pieces-grid">
+            {/* Trends */}
+            <div className="piece-card">
+              <div className="piece-meta">
+                <span className="piece-tag">01 • Trends</span>
+                <span>📡</span>
+              </div>
+              <h3 className="piece-title">TopicHub PYQ radar</h3>
+              <p className="piece-body">
+                10-year CBSE analysis that shows which chapters actually move
+                your marks.
+              </p>
+              <button
+                type="button"
+                onClick={goToTrends}
+                className="piece-btn piece-btn-blue"
+              >
+                View trends →
+              </button>
+            </div>
+
+            {/* Predictive papers */}
+            <div className="piece-card">
+              <div className="piece-meta">
+                <span className="piece-tag">02 • Predict</span>
+                <span>📄</span>
+              </div>
+              <h3 className="piece-title">AI predictive papers</h3>
+              <p className="piece-body">
+                80-mark CBSE-style papers tuned to latest patterns and
+                blueprints.
+              </p>
+              <button
+                type="button"
+                onClick={goToPredictivePapers}
+                className="piece-btn piece-btn-violet"
+              >
+                See predicted papers →
+              </button>
+            </div>
+
+            {/* Practice */}
+            <div className="piece-card">
+              <div className="piece-meta">
+                <span className="piece-tag">03 • Practise</span>
+                <span>🎮</span>
+              </div>
+              <h3 className="piece-title">Smart practice &amp; mocks</h3>
+              <p className="piece-body">
+                Build mini-mocks by topic, tier and difficulty – like a playlist
+                for marks.
+              </p>
+              <button
+                type="button"
+                onClick={goToMockBuilder}
+                className="piece-btn piece-btn-green"
+              >
+                Build a mock →
+              </button>
+            </div>
+
+            {/* Mentor */}
+            <div className="piece-card">
+              <div className="piece-meta">
+                <span className="piece-tag">04 • Plan</span>
+                <span>🤖</span>
+              </div>
+              <h3 className="piece-title">AI mentor &amp; planner</h3>
+              <p className="piece-body">
+                Converts your target, days left and hours/day into a realistic{" "}
+                <strong>marks-first roadmap</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={goToMentor}
+                className="piece-btn piece-btn-blue"
+              >
+                Open AI mentor →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* SNEAK PEEK */}
+        <section className="mentor-section">
+          <div className="mentor-grid">
+            <div className="mentor-copy">
+              <h2 className="section-title">Sneak peek: your AI mentor 🎧</h2>
+              <p className="section-subtitle">
+                Planner-mode only (for now). You tell it{" "}
+                <strong>targets, days left and hours/day</strong>; it sends you
+                chapter-wise hours and next-step nudges.
+              </p>
+              <ul className="mentor-list">
+                <li>
+                  Distributes hours using{" "}
+                  <strong>board weightage + must-crack / high-ROI tags</strong>.
+                </li>
+                <li>
+                  Connects to <strong>TopicHub</strong>,{" "}
+                  <strong>HPQ bank</strong> and <strong>Mock Builder</strong> so
+                  “plan → study → practise” feels like one flow.
+                </li>
+                <li>
+                  Later: logs your mocks + scores to keep tweaking the roadmap.
+                </li>
               </ul>
-              <p className="home-hero-visual-foot">
-                Trends, predictions, plan and mentor – all fused into one chill
-                dashboard.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* MEET YOUR MENTOR – where the real journey starts */}
-      <section className="card mentor-card">
-        <div className="mentor-layout">
-          {/* LEFT: inputs + diagnostic paths */}
-          <div className="mentor-left">
-            <h2 className="title">Meet your AI mentor</h2>
-            <p className="subtitle">
-              Think of it as that nerdy senior who actually cares about your
-              score and keeps dragging you towards it.
-            </p>
-
-            <div className="mentor-form">
-              <div>
-                <label htmlFor="targetPercent">Target percentage</label>
-                <input
-                  id="targetPercent"
-                  type="number"
-                  min={50}
-                  max={100}
-                  value={targetPercent}
-                  onChange={(e) => setTargetPercent(Number(e.target.value))}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="hoursPerDay">
-                  Hours you can study per day
-                </label>
-                <input
-                  id="hoursPerDay"
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={hoursPerDay}
-                  onChange={(e) => setHoursPerDay(Number(e.target.value))}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={goToMentor}
+                className="mentor-btn"
+              >
+                Open planner →
+              </button>
             </div>
 
-            <div className="mentor-output">
-              <p>
-                With <strong>{hoursPerDay} hr/day</strong> for{" "}
-                <strong>{daysLeft10} days</strong>, a realistic target is around{" "}
-                <strong>{mentorMessage.expectedPercent}%</strong> in Maths.
-              </p>
-              {mentorMessage.gap > 0 ? (
-                <p className="mentor-warning">
-                  To chase <strong>{targetPercent}%</strong>, you&apos;ll
-                  probably need to add{" "}
-                  <strong>
-                    ~{Math.ceil(mentorMessage.gap / 5)} extra hr/day
-                  </strong>{" "}
-                  or cover more high-weight chapters.
+            <div className="mentor-card">
+              <div className="mentor-card-header">
+                <span>Maths • Class 10</span>
+                <span className="mentor-avatar">😶</span>
+              </div>
+              <div className="mentor-card-body">
+                <p className="mentor-card-title">
+                  <strong>Planner snapshot</strong> for 80% target:
                 </p>
-              ) : (
-                <p className="mentor-ok">
-                  Nice. Your current plan can realistically hit{" "}
-                  <strong>{targetPercent}%</strong> if you stay consistent.
-                </p>
-              )}
-            </div>
-
-            <div className="mentor-actions">
-              <p className="mentor-actions-title">Step 1: tell me who you are</p>
-              <div className="mentor-actions-buttons">
-                <button
-                  className="cta-btn diagnostic-btn"
-                  onClick={() => navigate("/login")} // later hook to real diagnostic
-                >
-                  ⚡ Take a 15Q smart diagnostic
-                </button>
-                <button
-                  className="cta-btn ghost diagnostic-alt-btn"
-                  onClick={() => navigate("/login")} // later: scores flow
-                >
-                  📝 Enter last 3 test scores
-                </button>
+                <ul className="mentor-card-list">
+                  <li>90 days left • 1 hr/day</li>
+                  <li>~60% hours → 🔥 must-crack chapters</li>
+                  <li>~30% → 💎 high-ROI + revision</li>
+                  <li>~10% → 🌈 good-to-do / buffer</li>
+                </ul>
               </div>
-            </div>
-
-            <button
-              className="cta-btn"
-              onClick={() => navigate("/chapters")}
-            >
-              Generate my personalised study plan →
-            </button>
-          </div>
-
-          {/* RIGHT: simple, fun mentor illustration */}
-          <div className="mentor-right">
-            <div className="mentor-illustration">
-              <div className="mentor-orb mentor-orb-main" />
-              <div className="mentor-orb mentor-orb-small" />
-              <div className="mentor-face">
-                <span className="mentor-eyes">◕ ◕</span>
-                <span className="mentor-mouth">▂</span>
-              </div>
-              <p className="mentor-illustration-text">Your LazyTopper mentor</p>
-              <p className="mentor-illustration-sub">
-                Watches your targets, time left and PYQ weightage — and nudges
-                you whenever you start slacking.
+              <p className="mentor-card-foot">
+                “Today’s focus: <strong>Pair of Linear Equations</strong> +
+                <strong> Statistics</strong> HPQs. 40-minute mock, then 20
+                minutes revision.”
               </p>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* HOW TO USE – flow diagram / comic vibe */}
-      <section id="how-it-works" className="card trends-card">
-        <h2 className="title">How to use LazyTopper</h2>
-        <p className="subtitle">
-          Mini flowchart for lazy legends 👇 Use this once, then chill and just
-          follow the nudges.
-        </p>
-
-        <div className="trends-grid ai-steps-grid">
-          <div className="trends-stat ai-step">
-            <div className="ai-step-badge">1</div>
-            <h3>Pick your class & subject</h3>
-            <p>
-              Hit <strong>Start with Class 10 Maths</strong> (or go to Chapters)
-              and choose what you&apos;re actually writing this year.
-            </p>
-          </div>
-
-          <div className="trends-stat ai-step">
-            <div className="ai-step-badge">2</div>
-            <h3>Tell us your current level</h3>
-            <p>
-              Either take the <strong>15Q smart diagnostic</strong> or feed in
-              your last 3 test scores – no judgment, only data.
-            </p>
-          </div>
-
-          <div className="trends-stat ai-step">
-            <div className="ai-step-badge">3</div>
-            <h3>Get a marks-first plan</h3>
-            <p>
-              LazyTopper ranks chapters by PYQ weightage, time left and your
-              level, then spits out a realistic daily roadmap.
-            </p>
-          </div>
-
-          <div className="trends-stat ai-step">
-            <div className="ai-step-badge">4</div>
-            <h3>Practise & level up</h3>
-            <p>
-              Solve AI-generated, CBSE-vibe questions + mini mocks. Mentor keeps
-              track and shouts when it&apos;s revision time.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
-}
+};
+
+export default Home;

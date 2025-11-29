@@ -1,13 +1,22 @@
 // src/pages/MockBuilder.tsx
 
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   predictedQuestions,
   type PredictedQuestion,
   type DifficultyKey,
   type SectionKey,
 } from "../data/predictedQuestions";
+import {
+  predictedQuestionsScience,
+  type PredictedScienceQuestion,
+} from "../data/predictedQuestionsScience";
+
+// ----- Shared/local types -----
+
+// Subject toggle (Maths / Science)
+type SubjectKey = "Maths" | "Science";
 
 // Extend paper section id to also include E (case-study)
 type PaperSectionId = SectionKey | "E";
@@ -23,7 +32,10 @@ interface SectionConfig {
 }
 
 // Allow builder questions to carry Socratic fields
-type PredictedQuestionWithSteps = PredictedQuestion & {
+type PredictedQuestionWithSteps = (
+  | PredictedQuestion
+  | PredictedScienceQuestion
+) & {
   solutionSteps?: string[];
   finalAnswer?: string;
 };
@@ -83,7 +95,11 @@ const SECTION_CONFIGS: SectionConfig[] = [
   },
 ];
 
-const difficultyChipStyle: Record<DifficultyKey, React.CSSProperties> = {
+// Use plain literal union so both Maths & Science difficulty keys work
+const difficultyChipStyle: Record<
+  "Easy" | "Medium" | "Hard",
+  React.CSSProperties
+> = {
   Easy: {
     background: "rgba(34,197,94,0.12)",
     color: "#16a34a",
@@ -98,14 +114,46 @@ const difficultyChipStyle: Record<DifficultyKey, React.CSSProperties> = {
   },
 };
 
+function normaliseSubject(raw: string | null): SubjectKey {
+  const val = (raw || "").toLowerCase();
+  if (val === "science" || val === "sci") return "Science";
+  return "Maths";
+}
+
 const MockBuilder: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const grade = searchParams.get("grade") || "10";
+  const subjectParam = searchParams.get("subject");
+  const subjectKey: SubjectKey = normaliseSubject(subjectParam);
+
   const [openSectionId, setOpenSectionId] = useState<PaperSectionId | null>(
     "A"
   );
   const [openSolutions, setOpenSolutions] = useState<Record<string, boolean>>(
     {}
   );
+
+  // 🔁 Switch Maths/Science via URL param
+  const handleSubjectChange = (next: SubjectKey) => {
+    if (next === subjectKey) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("grade", grade);
+    params.set("subject", next);
+    navigate({
+      pathname: "/mock-builder",
+      search: `?${params.toString()}`,
+    });
+  };
+
+  // Pick the correct prediction bank based on subject
+  const questionBank: PredictedQuestionWithSteps[] = useMemo(() => {
+    if (subjectKey === "Science") {
+      return predictedQuestionsScience as PredictedQuestionWithSteps[];
+    }
+    return predictedQuestions as PredictedQuestionWithSteps[];
+  }, [subjectKey]);
 
   // Build sectioned paper from prediction bank
   const builtSections: BuiltSection[] = useMemo(() => {
@@ -117,10 +165,10 @@ const MockBuilder: React.FC = () => {
       E: [],
     };
 
-    predictedQuestions.forEach((q) => {
-      const sec = (q.section as PaperSectionId) ?? "A";
+    questionBank.forEach((q) => {
+      const sec = ((q.section as PaperSectionId) ?? "A") as PaperSectionId;
       if (!bySection[sec]) bySection[sec] = [];
-      bySection[sec].push(q as PredictedQuestionWithSteps);
+      bySection[sec].push(q);
     });
 
     return SECTION_CONFIGS.map((cfg) => {
@@ -135,7 +183,7 @@ const MockBuilder: React.FC = () => {
         sectionMarks: marks,
       };
     });
-  }, []);
+  }, [questionBank]);
 
   const totalQuestions = builtSections.reduce(
     (sum, s) => sum + s.questions.length,
@@ -159,7 +207,8 @@ const MockBuilder: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate("/trends/10/Maths");
+    // Go back to the same subject trends page
+    navigate(`/trends/${grade}/${subjectKey}`);
   };
 
   const sectionLabel = (id: PaperSectionId) => {
@@ -202,6 +251,53 @@ const MockBuilder: React.FC = () => {
         ← Back to chapter trends
       </button>
 
+      {/* 🌗 Subject toggle pill */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 10,
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            padding: 4,
+            borderRadius: 999,
+            background: "#0f172a",
+            boxShadow: "0 12px 30px rgba(15,23,42,0.55)",
+            border: "1px solid rgba(148,163,184,0.5)",
+            gap: 4,
+          }}
+        >
+          {(["Maths", "Science"] as SubjectKey[]).map((subj) => {
+            const active = subj === subjectKey;
+            return (
+              <button
+                key={subj}
+                onClick={() => handleSubjectChange(subj)}
+                style={{
+                  borderRadius: 999,
+                  border: "none",
+                  padding: "6px 14px",
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: active
+                    ? "linear-gradient(135deg,#facc15,#f97316)"
+                    : "transparent",
+                  color: active ? "#111827" : "#e5e7eb",
+                  transition: "all 0.15s ease",
+                  minWidth: 80,
+                }}
+              >
+                {subj}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Hero header – same vibe as HPQ */}
       <header
         style={{
@@ -223,7 +319,7 @@ const MockBuilder: React.FC = () => {
             marginBottom: 6,
           }}
         >
-          Class 10 • Maths
+          Class {grade} • {subjectKey}
         </div>
         <h1
           style={{
@@ -295,7 +391,7 @@ const MockBuilder: React.FC = () => {
           <strong>A: 20 × 1 mark</strong>, <strong>B: 6 × 2 marks</strong>,{" "}
           <strong>C: 8 × 3 marks</strong>, <strong>D: 6 × 4 marks</strong>,{" "}
           <strong>E: 3 × 4-mark case-studies</strong>. Everything here is built
-          from your <strong>prediction bank</strong>.
+          from your <strong>prediction bank</strong> for {subjectKey}.
         </p>
       </section>
 
@@ -413,7 +509,9 @@ const MockBuilder: React.FC = () => {
                     No questions available in this section yet. Add more entries
                     with section {section.id} to{" "}
                     <code style={{ fontSize: "0.8rem" }}>
-                      predictedQuestions.ts
+                      {subjectKey === "Science"
+                        ? "predictedQuestionsScience.ts"
+                        : "predictedQuestions.ts"}
                     </code>
                     .
                   </p>
@@ -467,7 +565,9 @@ const MockBuilder: React.FC = () => {
                               borderRadius: 999,
                               padding: "4px 10px",
                               fontWeight: 500,
-                              ...difficultyChipStyle[q.difficulty],
+                              ...difficultyChipStyle[
+                                q.difficulty as DifficultyKey
+                              ],
                             }}
                           >
                             {q.difficulty}

@@ -1,4 +1,3 @@
-// src/App.tsx
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -15,15 +14,21 @@ import PredictivePapersPage from "./pages/PredictivePapers";
 import TopicHub from "./pages/TopicHub";
 import MockBuilder from "./pages/MockBuilder";
 import AiMentorPage from "./pages/AiMentorPage";
+import StudyPlanPage from "./pages/StudyPlanPage";
 
+/**
+ * BottomNav component renders a simple bottom navigation bar for the mobile view.
+ * It highlights the active page based on the current location and provides
+ * navigation shortcuts to Home, Trends, Predict (predictive papers), and Dashboard.
+ */
 function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const current = location.pathname;
-
   const go = (path: string) => navigate(path);
 
+  // Determine which nav item is active
   const isHome = current === "/";
   const isTrends =
     current.startsWith("/trends") || current.startsWith("/topics/");
@@ -105,11 +110,14 @@ function BottomNav() {
   );
 }
 
+/**
+ * App component defines the top-level routes for the LazyTopper application.
+ * It wires all pages together and exposes the AI mentor via /mentor and /ai-mentor.
+ */
 export default function App() {
   return (
     <>
       <div className="navbar">LazyTopper</div>
-
       <div style={{ paddingBottom: "60px" }}>
         <Routes>
           {/* Core Routes */}
@@ -117,8 +125,9 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/study-plan" element={<StudyPlanPage />} />
 
-          {/* Old Chapters Overview (Maths-only view, still accessible if needed) */}
+          {/* Old Chapters Overview (Maths-only view) */}
           <Route path="/chapters" element={<Chapters />} />
 
           {/* Topic content hub – maths topics via :topicKey param */}
@@ -141,8 +150,7 @@ export default function App() {
           {/* Auto-mock paper view (legacy + predictive) */}
           <Route path="/mock-paper/:slug" element={<MockPaper />} />
 
-
-          {/* New Mock Builder v1 (80-mark paper from HPQ bank) */}
+          {/* New Mock Builder v1 (80‑mark paper from HPQ bank) */}
           <Route path="/mock-builder" element={<MockBuilder />} />
 
           {/* Highly Probable Questions */}
@@ -157,10 +165,12 @@ export default function App() {
             element={<PredictivePapersPage />}
           />
 
+          {/* AI Mentor / Planner routes */}
           <Route path="/ai-mentor" element={<AiMentorPage />} />
+          {/* Provide both /mentor and /ai-mentor so links remain backwards compatible */}
+          <Route path="/mentor" element={<AiMentorPage />} />
         </Routes>
       </div>
-
       <BottomNav />
     </>
   );

@@ -1,4 +1,3 @@
-// src/pages/StudyPlanPage.tsx
 import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -10,6 +9,9 @@ import {
   type ScienceTopicTrend,
 } from "../data/class10ScienceTopicTrends";
 
+// Import shared styles for mentor and study plan pages
+import "./aiMentorStyles.css";
+
 interface StudyPlanState {
   daysLeft?: number;
   mathTargetPercent?: number;
@@ -18,7 +20,6 @@ interface StudyPlanState {
   scienceHoursPerDay?: number;
   weakMathChapters?: string[];
   weakScienceChapters?: string[];
-  // planText?: string | null; // fallback – optional now
 }
 
 const StudyPlanPage: React.FC = () => {
@@ -51,18 +52,13 @@ const StudyPlanPage: React.FC = () => {
       (sum, t) => sum + t.weightagePercent,
       0
     );
-
     const rows = class10TopicTrendList.map((topic) => {
       const weightShare = topic.weightagePercent / totalWeight;
-
       const tier = topic.tier ?? "good-to-do";
       const baseHours = totalMathHours * weightShare;
-
       const tierBoost = tierMultiplier[tier];
       const weakBoost = weakMathChapters.includes(topic.topicKey) ? 1.15 : 1;
-
       const hours = baseHours * tierBoost * weakBoost;
-
       return {
         name: topic.topicKey,
         tier,
@@ -70,36 +66,25 @@ const StudyPlanPage: React.FC = () => {
         hours,
       };
     });
-
     const totalRaw = rows.reduce((s, r) => s + r.hours, 0);
     const normalised = rows.map((r) => ({
       ...r,
       hours: (r.hours / totalRaw) * totalMathHours,
     }));
-
-    return normalised.sort((a, b) => (b.tier === "must-crack" ? 1 : 0) - (a.tier === "must-crack" ? 1 : 0));
+    return normalised;
   }, [totalMathHours, weakMathChapters]);
 
   // Science distribution
   const scienceRoadmap = useMemo(() => {
     const topics = class10ScienceTopicTrendList;
-    const totalWeight = topics.reduce(
-      (sum, t) => sum + t.weightagePercent,
-      0
-    );
-
+    const totalWeight = topics.reduce((sum, t) => sum + t.weightagePercent, 0);
     const rows = topics.map((topic: ScienceTopicTrend) => {
       const weightShare = topic.weightagePercent / totalWeight;
       const tier = topic.tier;
       const baseHours = totalScienceHours * weightShare;
-
       const tierBoost = tierMultiplier[tier];
-      const weakBoost = weakScienceChapters.includes(topic.topicName)
-        ? 1.15
-        : 1;
-
+      const weakBoost = weakScienceChapters.includes(topic.topicName) ? 1.15 : 1;
       const hours = baseHours * tierBoost * weakBoost;
-
       return {
         name: topic.topicName,
         tier,
@@ -107,13 +92,11 @@ const StudyPlanPage: React.FC = () => {
         hours,
       };
     });
-
     const totalRaw = rows.reduce((s, r) => s + r.hours, 0);
     const normalised = rows.map((r) => ({
       ...r,
       hours: (r.hours / totalRaw) * totalScienceHours,
     }));
-
     return normalised;
   }, [totalScienceHours, weakScienceChapters]);
 
@@ -121,24 +104,12 @@ const StudyPlanPage: React.FC = () => {
 
   const tierPill = (tier: TopicTier) => {
     if (tier === "must-crack") {
-      return (
-        <span className="tier-pill tier-pill--must">
-          🔥 Must-crack
-        </span>
-      );
+      return <span className="tier-chip must-crack">🔥 Must‑crack</span>;
     }
     if (tier === "high-roi") {
-      return (
-        <span className="tier-pill tier-pill--high">
-          💎 High-ROI
-        </span>
-      );
+      return <span className="tier-chip high-roi">💎 High‑ROI</span>;
     }
-    return (
-      <span className="tier-pill tier-pill--good">
-        🌈 Good-to-do
-      </span>
-    );
+    return <span className="tier-chip good-to-do">🌈 Good‑to‑do</span>;
   };
 
   const handleBack = () => navigate(-1);
@@ -169,35 +140,25 @@ const StudyPlanPage: React.FC = () => {
         <button className="study-plan-back" onClick={handleBack}>
           ← Back to AI Mentor
         </button>
-
         <h1 className="title">Your personalised study plan</h1>
         <p className="subtitle">
-          Snapshot based on your current inputs. Later you&apos;ll be able to
-          save, download and edit this plan – and push it into a day-wise
-          calendar.
+          Snapshot based on your current inputs. Later you’ll be able to save, download and edit this plan – and push it into a day‑wise calendar.
         </p>
-
-        {/* meta line */}
-        <div className="plan-meta">
-          <span>{daysLeft} days left to boards</span>
-          <span>Maths target: {mathTargetPercent}%</span>
-          <span>Science target: {scienceTargetPercent}%</span>
-          <span>
+        {/* Summary tags */}
+        <div className="summary-tags">
+          <span className="summary-tag">{daysLeft} days left to boards</span>
+          <span className="summary-tag">Maths target: {mathTargetPercent}%</span>
+          <span className="summary-tag">Science target: {scienceTargetPercent}%</span>
+          <span className="summary-tag">
             Hours/day → Maths: {mathHoursPerDay}, Science: {scienceHoursPerDay}
           </span>
         </div>
-
-        {/* MATHS TABLE */}
+        {/* Maths table */}
         <div className="plan-block">
-          <h2 className="plan-heading">
-            Maths roadmap {mathTargetPercent}% target
-          </h2>
+          <h2 className="plan-heading">Maths roadmap {mathTargetPercent}% target</h2>
           <p className="plan-subline">
-            Roughly <strong>{daysLeft} days × {mathHoursPerDay} hr/day</strong>{" "}
-            ≈ <strong>{totalMathHours.toFixed(0)} focussed hours</strong> that
-            we want to distribute by board weightage.
+            Roughly <strong>{daysLeft} days × {mathHoursPerDay} hr/day</strong> ≈ <strong>{totalMathHours.toFixed(0)} focussed hours</strong> that we want to distribute by board weightage.
           </p>
-
           <div className="plan-table">
             <div className="plan-table-header">
               <span>Chapter</span>
@@ -205,57 +166,34 @@ const StudyPlanPage: React.FC = () => {
               <span>Board wt.</span>
               <span>Recommended hours &amp; actions</span>
             </div>
-
             {mathRoadmap.map((row) => (
               <div key={row.name} className="plan-table-row">
                 <span className="plan-chapter">{row.name}</span>
                 <span>{tierPill(row.tier as TopicTier)}</span>
                 <span>~{row.weightagePercent}% of paper</span>
                 <span className="plan-actions">
-                  <span className="plan-hours">
-                    {formatHours(row.hours)} hrs
-                  </span>
-                  <button
-                    className="chip-link"
-                    onClick={() => openTopicHub("Maths", row.name)}
-                  >
-                    Study in TopicHub →
+                  <span className="plan-hours">{formatHours(row.hours)} hrs</span>
+                  <button className="chip-link" onClick={() => openTopicHub("Maths", row.name)}>
+                    Study in TopicHub
                   </button>
-                  <button
-                    className="chip-link chip-link--alt"
-                    onClick={() => openHPQ("Maths", row.name)}
-                  >
-                    Practice HPQs →
+                  <button className="chip-link chip-link--alt" onClick={() => openHPQ("Maths", row.name)}>
+                    Practice HPQs
                   </button>
-                  <button
-                    className="chip-link chip-link--alt2"
-                    onClick={() => openMockBuilder("Maths")}
-                  >
-                    Quick mock →
-                  </button>
+                  <button className="chip-link chip-link--alt2" onClick={() => openMockBuilder("Maths")}>Quick mock</button>
                 </span>
               </div>
             ))}
           </div>
-
           <p className="plan-note">
-            As a starting point, cover the 🔥 must-crack chapters first, then 💎
-            high-ROI, and only then 🌈 good-to-do. We’ll later break this into a
-            day-by-day calendar with revision slots.
+            As a starting point, cover the 🔥 must‑crack chapters first, then 💎 high‑ROI, and only then 🌈 good‑to‑do. We’ll later break this into a day‑by‑day calendar with revision slots.
           </p>
         </div>
-
-        {/* SCIENCE TABLE */}
+        {/* Science table */}
         <div className="plan-block plan-block--science">
-          <h2 className="plan-heading">
-            Science roadmap {scienceTargetPercent}% target
-          </h2>
+          <h2 className="plan-heading">Science roadmap {scienceTargetPercent}% target</h2>
           <p className="plan-subline">
-            Roughly <strong>{daysLeft} days × {scienceHoursPerDay} hr/day</strong>{" "}
-            ≈ <strong>{totalScienceHours.toFixed(0)} focussed hours</strong>{" "}
-            that we want to distribute by board weightage.
+            Roughly <strong>{daysLeft} days × {scienceHoursPerDay} hr/day</strong> ≈ <strong>{totalScienceHours.toFixed(0)} focussed hours</strong> that we want to distribute by board weightage.
           </p>
-
           <div className="plan-table">
             <div className="plan-table-header">
               <span>Chapter</span>
@@ -263,43 +201,26 @@ const StudyPlanPage: React.FC = () => {
               <span>Board wt.</span>
               <span>Recommended hours &amp; actions</span>
             </div>
-
             {scienceRoadmap.map((row) => (
               <div key={row.name} className="plan-table-row">
                 <span className="plan-chapter">{row.name}</span>
                 <span>{tierPill(row.tier)}</span>
                 <span>~{row.weightagePercent}% of paper</span>
                 <span className="plan-actions">
-                  <span className="plan-hours">
-                    {formatHours(row.hours)} hrs
-                  </span>
-                  <button
-                    className="chip-link"
-                    onClick={() => openTopicHub("Science", row.name)}
-                  >
-                    Study in TopicHub →
+                  <span className="plan-hours">{formatHours(row.hours)} hrs</span>
+                  <button className="chip-link" onClick={() => openTopicHub("Science", row.name)}>
+                    Study in TopicHub
                   </button>
-                  <button
-                    className="chip-link chip-link--alt"
-                    onClick={() => openHPQ("Science", row.name)}
-                  >
-                    Practice HPQs →
+                  <button className="chip-link chip-link--alt" onClick={() => openHPQ("Science", row.name)}>
+                    Practice HPQs
                   </button>
-                  <button
-                    className="chip-link chip-link--alt2"
-                    onClick={() => openMockBuilder("Science")}
-                  >
-                    Quick mock →
-                  </button>
+                  <button className="chip-link chip-link--alt2" onClick={() => openMockBuilder("Science")}>Quick mock</button>
                 </span>
               </div>
             ))}
           </div>
-
           <p className="plan-note">
-            Same logic here: 🔥 must-crack first (Life Processes, Light,
-            Electricity…), then 💎 high-ROI and finally 🌈 good-to-do once your
-            core is strong.
+            Same logic here: 🔥 must‑crack first, then 💎 high‑ROI and finally 🌈 good‑to‑do once your core is strong.
           </p>
         </div>
       </section>

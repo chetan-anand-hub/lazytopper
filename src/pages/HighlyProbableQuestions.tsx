@@ -4,13 +4,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
-  highlyProbableQuestions,
   type HPQTopicBucket,
   type HPQQuestion,
   type HPQSubject,
   type HPQStream,
   type HPQTier,
   type HPQDifficulty,
+  getHighlyProbableQuestions,
 } from "../data/highlyProbableQuestions";
 
 // ---------- Local types / helpers ----------
@@ -126,12 +126,9 @@ const HighlyProbableQuestions: React.FC = () => {
     }
   };
 
-  // Subject-level buckets (Maths vs Science)
+  // Subject-level buckets (Maths vs Science) using engine helper
   const subjectBuckets = useMemo(
-    () =>
-      highlyProbableQuestions.filter(
-        (bucket) => (bucket.subject ?? "Maths") === subjectKey
-      ),
+    () => getHighlyProbableQuestions(subjectKey),
     [subjectKey]
   );
 
@@ -165,7 +162,10 @@ const HighlyProbableQuestions: React.FC = () => {
 
   const handleOpenMockBuilder = () => {
     persistBasket(basket);
-    navigate("/mock-builder");
+    navigate("/mock-builder", {
+      replace: false,
+      state: undefined,
+    });
   };
 
   const handleAddToBasket = (bucket: HPQTopicBucket, q: HPQQuestion) => {
@@ -212,6 +212,18 @@ const HighlyProbableQuestions: React.FC = () => {
     [basket]
   );
 
+  // 🔄 Clear all filters helper
+  const handleClearAllFilters = () => {
+    setTierFilter("all");
+    setDifficultyFilter("all");
+    setActiveStream("all");
+    setTopicFilter("all");
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("topic");
+    setSearchParams(nextParams);
+  };
+
   // Core filtered data
   const filteredBuckets: HPQTopicBucket[] = useMemo(() => {
     let buckets = subjectBuckets;
@@ -219,9 +231,7 @@ const HighlyProbableQuestions: React.FC = () => {
     // Topic filter (dropdown or deep link)
     if (topicFilter !== "all") {
       const topicLower = topicFilter.toLowerCase();
-      buckets = buckets.filter(
-        (b) => b.topic.toLowerCase() === topicLower
-      );
+      buckets = buckets.filter((b) => b.topic.toLowerCase() === topicLower);
     }
 
     // Stream filter – only for Science
@@ -555,6 +565,30 @@ const HighlyProbableQuestions: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Clear all filters inline action */}
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: "0.78rem",
+                color: "#e5e7eb",
+              }}
+            >
+              <button
+                onClick={handleClearAllFilters}
+                style={{
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  border: "1px dashed rgba(248,250,252,0.7)",
+                  background: "rgba(15,23,42,0.25)",
+                  color: "#e5e7eb",
+                  cursor: "pointer",
+                  fontSize: "0.78rem",
+                }}
+              >
+                ⭯ Clear all filters
+              </button>
+            </div>
           </div>
 
           {/* Subject + stream toggles + basket summary */}
@@ -803,8 +837,25 @@ const HighlyProbableQuestions: React.FC = () => {
               padding: "8px 4px",
             }}
           >
-            Nothing visible with the current filters. Try toggling back “All
-            tiers / All levels / All streams / All topics”.
+            Nothing visible with the current filters. Try switching back to{" "}
+            <strong>All tiers / All levels / All streams / All topics</strong>{" "}
+            or just click{" "}
+            <button
+              type="button"
+              onClick={handleClearAllFilters}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#1d4ed8",
+                textDecoration: "underline",
+                cursor: "pointer",
+                fontSize: "0.82rem",
+                padding: 0,
+              }}
+            >
+              Clear all filters
+            </button>
+            .
           </p>
         ) : (
           <section>
