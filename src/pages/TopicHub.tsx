@@ -1,5 +1,4 @@
 // src/pages/TopicHub.tsx
-
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -8,13 +7,13 @@ import type {
   TopicContentConfig,
   TopicSectionConfig,
 } from "../data/class10ContentConfig";
+
 import {
   getTopicContent,
   buildGenericTopicConfig,
 } from "../data/class10ContentConfig";
 
-// --- Helpers -----------------------------------------------------
-
+// ----------------- Tier Meta -------------------
 type TopicTier = "must-crack" | "high-roi" | "good-to-do";
 
 const tierMeta: Record<
@@ -53,23 +52,20 @@ const tierMeta: Record<
   },
 };
 
+// ----------------- Helpers -------------------
 function normaliseSubject(raw?: string | null): Class10SubjectKey {
   const v = (raw || "").toLowerCase();
   if (v === "science" || v === "sci") return "Science";
   return "Maths";
 }
 
-// Little safe helpers to cope with partial / generic configs
 function getSafeTier(config: TopicContentConfig | undefined): TopicTier {
   const t = (config as any)?.tier;
   if (t === "must-crack" || t === "high-roi" || t === "good-to-do") return t;
   return "high-roi";
 }
 
-function getDisplayTitle(
-  topicParam: string,
-  config: TopicContentConfig
-): string {
+function getDisplayTitle(topicParam: string, config: TopicContentConfig): string {
   return (
     (config as any).displayName ||
     (config as any).title ||
@@ -78,8 +74,7 @@ function getDisplayTitle(
   );
 }
 
-// --- Component ---------------------------------------------------
-
+// ----------------- Component -------------------
 const TopicHub: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -90,6 +85,7 @@ const TopicHub: React.FC = () => {
   const topicParam = search.get("topic") || "Generic";
 
   const rawConfig = getTopicContent(subjectKey, topicParam);
+
   const config: TopicContentConfig =
     (rawConfig as TopicContentConfig) ??
     buildGenericTopicConfig({
@@ -100,13 +96,23 @@ const TopicHub: React.FC = () => {
 
   const tier = getSafeTier(config);
   const tierInfo = tierMeta[tier];
-
   const title = getDisplayTitle(topicParam, config);
+
   const weightage =
-    (config as any).weightagePercent ?? (config as any).approxWeightage ?? 0;
+    (config as any).weightagePercent ??
+    (config as any).approxWeightage ??
+    0;
 
-  // ---- content coming from config ------------------------------
+  // track where we came from (study-plan / trends / elsewhere)
+  const fromState = (location.state as any)?.from as string | undefined;
+  const backLabel =
+    fromState && fromState.includes("/study-plan")
+      ? "Back to study plan"
+      : fromState
+      ? "Back"
+      : "Back to trends";
 
+  // ---------------- Hero Text ------------------
   const heroTagline: string =
     (config as any).heroTagline ??
     "Fast-track your prep for this topic with a single scroll-friendly page. Start with NCERT + PYQs, then use LazyTopper’s HPQ bank and AI Mentor to lock the patterns.";
@@ -118,9 +124,7 @@ const TopicHub: React.FC = () => {
   const rawExamSections: TopicSectionConfig[] =
     (config as any).examSections ?? [];
 
-  const examSections:
-    | { id: string; label: string; blurb?: string }[]
-    | undefined =
+  const examSections =
     rawExamSections.length > 0
       ? rawExamSections.map((sec) => ({
           id: sec.id,
@@ -131,7 +135,8 @@ const TopicHub: React.FC = () => {
 
   const quickRoadmap: string[] =
     (config as any).quickRevisionRoadmap ??
-    (config as any).roadmap ?? [
+    (config as any).roadmap ??
+    [
       "First, revise all NCERT solved examples for this chapter.",
       "Next, solve the last 3–5 years of PYQs for this topic.",
       "Finally, attempt 1–2 full section-wise mocks and analyse mistakes.",
@@ -139,7 +144,8 @@ const TopicHub: React.FC = () => {
 
   const howToUse: string[] =
     (config as any).howToUseSteps ??
-    (config as any).howToUse ?? [
+    (config as any).howToUse ??
+    [
       "Skim this page once before starting PYQs / mocks for this topic.",
       "After every mock, come back and match your mistakes with the ‘Common mistakes’ list.",
       "Turn repeated mistakes into small flashcards and revise them 2–3 times before boards.",
@@ -157,27 +163,25 @@ const TopicHub: React.FC = () => {
     (config as any).recommendedVideoSummary ??
     "We’re shortlisting the best one-shot video for this topic. For now, search on YouTube by the topic name plus “one-shot”.";
 
-  const recommendedVideoUrl: string | undefined = (config as any)
-    .recommendedVideoUrl;
+  const recommendedVideoUrl: string | undefined =
+    (config as any).recommendedVideoUrl;
+
   const recommendedVideo: any = (config as any).recommendedVideo;
 
-  // For richer cards
-  const concepts: Array<any> = (config as any).conceptNotes ?? [];
-  const boardExamples: Array<any> = (config as any).boardExamples ?? [];
+  const concepts: any[] = (config as any).conceptNotes ?? [];
+  const boardExamples: any[] = (config as any).boardExamples ?? [];
+  const mistakes: any[] = (config as any).commonMistakes ?? [];
 
-  const mistakes: Array<string | any> =
-    (config as any).commonMistakes ?? [];
-
-  // --- navigation handlers --------------------------------------
-
-  const handleBackToTrends = () => {
-    navigate(`/trends/${grade}/${subjectKey}`);
+  // -------------- Navigation handlers -----------------
+  const handleBack = () => {
+    if (fromState) {
+      navigate(fromState);
+    } else {
+      navigate(`/trends/${grade}/${subjectKey}`);
+    }
   };
 
-  const handleAskMentor = (
-    conceptId?: string,
-    extra?: Record<string, any>
-  ) => {
+  const handleAskMentor = (conceptId?: string, extra?: Record<string, any>) => {
     navigate("/ai-mentor", {
       state: {
         grade,
@@ -185,17 +189,19 @@ const TopicHub: React.FC = () => {
         topic: title,
         topicKey: (config as any).topicKey || topicParam,
         conceptId,
+        from: location.pathname,
+        mode: "explain",
         ...extra,
       },
     });
   };
 
-  // Clicking exam section chips -> open HPQ pre-filtered by section
   const handleExamSectionClick = (sectionId: string) => {
     navigate(
       `/highly-probable?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
         title
-      )}&section=${sectionId}`
+      )}&section=${sectionId}`,
+      { state: { from: location.pathname } }
     );
   };
 
@@ -217,7 +223,7 @@ const TopicHub: React.FC = () => {
       >
         {/* Back link */}
         <button
-          onClick={handleBackToTrends}
+          onClick={handleBack}
           style={{
             background: "none",
             border: "none",
@@ -231,10 +237,10 @@ const TopicHub: React.FC = () => {
           }}
         >
           <span style={{ fontSize: "1rem" }}>←</span>
-          <span>Back to trends</span>
+          <span>{backLabel}</span>
         </button>
 
-        {/* Hero */}
+        {/* ---------------- HERO ---------------- */}
         <section
           style={{
             borderRadius: 32,
@@ -310,7 +316,7 @@ const TopicHub: React.FC = () => {
                 <span>{tierInfo.label}</span>
               </span>
 
-              {/* Weightage pill */}
+              {/* Weightage */}
               <span
                 style={{
                   display: "inline-flex",
@@ -323,10 +329,10 @@ const TopicHub: React.FC = () => {
                   fontSize: "0.8rem",
                 }}
               >
-                <span>≈ {weightage || "?"}% exam weightage</span>
+                ≈ {weightage || "?"}% exam weightage
               </span>
 
-              {/* Quick revision / board-style practice tags */}
+              {/* Quick revision */}
               <span
                 style={{
                   display: "inline-flex",
@@ -341,6 +347,8 @@ const TopicHub: React.FC = () => {
               >
                 ⚡ Quick revision
               </span>
+
+              {/* Board practice */}
               <span
                 style={{
                   display: "inline-flex",
@@ -358,7 +366,7 @@ const TopicHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Small right column – generic tips */}
+          {/* Right-side tips */}
           <div
             style={{
               alignSelf: "stretch",
@@ -398,7 +406,7 @@ const TopicHub: React.FC = () => {
           </div>
         </section>
 
-        {/* Main content grid */}
+        {/* ------------ Main GRID SECTION ------------- */}
         <section style={{ marginTop: 24 }}>
           <div
             style={{
@@ -429,11 +437,9 @@ const TopicHub: React.FC = () => {
                   gap: 8,
                 }}
               >
-                <span role="img" aria-label="paperclip">
-                  📎
-                </span>
-                Exam link
+                📎 Exam link
               </div>
+
               <p
                 style={{
                   fontSize: "0.83rem",
@@ -455,30 +461,15 @@ const TopicHub: React.FC = () => {
                 {(examSections && examSections.length > 0
                   ? examSections
                   : [
-                      {
-                        id: "A",
-                        label: "MCQs / Objective · 1 mark",
-                      },
-                      {
-                        id: "B",
-                        label: "Very short answer · 2 marks",
-                      },
-                      {
-                        id: "C",
-                        label: "Short answer · 3 marks",
-                      },
-                      {
-                        id: "D",
-                        label: "Long answer · 4–5 marks",
-                      },
-                      {
-                        id: "E",
-                        label: "Case-based · 4 marks",
-                      },
+                      { id: "A", label: "MCQs / Objective · 1 mark" },
+                      { id: "B", label: "Very short answer · 2 marks" },
+                      { id: "C", label: "Short answer · 3 marks" },
+                      { id: "D", label: "Long answer · 4–5 marks" },
+                      { id: "E", label: "Case-based · 4 marks" },
                     ]
                 ).map((sec) => (
                   <button
-                    key={sec.id + sec.label}
+                    key={sec.id}
                     onClick={() => handleExamSectionClick(sec.id)}
                     style={{
                       display: "inline-flex",
@@ -501,7 +492,7 @@ const TopicHub: React.FC = () => {
                         backgroundColor: "#4f46e5",
                       }}
                     />
-                    <span>{sec.label}</span>
+                    {sec.label}
                   </button>
                 ))}
               </div>
@@ -527,6 +518,7 @@ const TopicHub: React.FC = () => {
               >
                 How to use this page
               </div>
+
               <ol
                 style={{
                   fontSize: "0.83rem",
@@ -542,7 +534,7 @@ const TopicHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Second row – Quick revision + Recommended video */}
+          {/* Quick revision + recommended video row */}
           <div
             style={{
               display: "grid",
@@ -572,11 +564,9 @@ const TopicHub: React.FC = () => {
                   gap: 6,
                 }}
               >
-                <span role="img" aria-label="lightning">
-                  ⚡
-                </span>
-                Quick revision roadmap
+                ⚡ Quick revision roadmap
               </div>
+
               <ul
                 style={{
                   fontSize: "0.83rem",
@@ -591,7 +581,7 @@ const TopicHub: React.FC = () => {
               </ul>
             </div>
 
-            {/* Recommended board video */}
+            {/* Recommended video card */}
             <div
               style={{
                 borderRadius: 24,
@@ -612,11 +602,9 @@ const TopicHub: React.FC = () => {
                   gap: 6,
                 }}
               >
-                <span role="img" aria-label="headphones">
-                  🎧
-                </span>
-                Recommended board video
+                🎧 Recommended board video
               </div>
+
               {recommendedVideoUrl ? (
                 <>
                   {recommendedVideo && (
@@ -640,8 +628,7 @@ const TopicHub: React.FC = () => {
                       >
                         {recommendedVideo.channel && (
                           <>
-                            {recommendedVideo.channel}
-                            {" · "}
+                            {recommendedVideo.channel} ·{" "}
                           </>
                         )}
                         {recommendedVideo.meta}
@@ -723,7 +710,7 @@ const TopicHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Concepts + mistakes / board examples */}
+          {/* Concepts + mistakes + board examples */}
           <div
             style={{
               display: "grid",
@@ -759,10 +746,7 @@ const TopicHub: React.FC = () => {
                     gap: 6,
                   }}
                 >
-                  <span role="img" aria-label="brain">
-                    🧠
-                  </span>
-                  Key concepts & ideas
+                  🧠 Key concepts & ideas
                 </div>
 
                 <button
@@ -781,6 +765,7 @@ const TopicHub: React.FC = () => {
                 </button>
               </div>
 
+              {/* Concept list */}
               {concepts.length === 0 ? (
                 <p
                   style={{
@@ -794,7 +779,7 @@ const TopicHub: React.FC = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
                     gap: 10,
                     marginTop: 4,
                   }}
@@ -821,6 +806,7 @@ const TopicHub: React.FC = () => {
                       >
                         {c.title}
                       </div>
+
                       {c.summary && (
                         <div
                           style={{
@@ -831,6 +817,7 @@ const TopicHub: React.FC = () => {
                           {c.summary}
                         </div>
                       )}
+
                       {c.examTip && (
                         <div
                           style={{
@@ -865,7 +852,7 @@ const TopicHub: React.FC = () => {
               )}
             </div>
 
-            {/* Right column – mistakes + board examples */}
+            {/* Mistakes + board examples column */}
             <div
               style={{
                 display: "flex",
@@ -873,7 +860,7 @@ const TopicHub: React.FC = () => {
                 gap: 16,
               }}
             >
-              {/* Common mistakes */}
+              {/* Mistakes */}
               <div
                 style={{
                   borderRadius: 24,
@@ -894,11 +881,9 @@ const TopicHub: React.FC = () => {
                     gap: 6,
                   }}
                 >
-                  <span role="img" aria-label="party">
-                    🎉
-                  </span>
-                  Common mistakes to avoid
+                  🎉 Common mistakes to avoid
                 </div>
+
                 {mistakes.length === 0 ? (
                   <ul
                     style={{
@@ -908,12 +893,10 @@ const TopicHub: React.FC = () => {
                       lineHeight: 1.6,
                     }}
                   >
+                    <li>Skipping NCERT examples and jumping straight to tests.</li>
                     <li>
-                      Skipping NCERT examples and jumping straight to tests.
-                    </li>
-                    <li>
-                      Not analysing mistakes from PYQs / mocks and repeating the
-                      same pattern.
+                      Not analysing mistakes from PYQs / mocks and repeating the same
+                      pattern.
                     </li>
                   </ul>
                 ) : (
@@ -940,7 +923,7 @@ const TopicHub: React.FC = () => {
                 )}
               </div>
 
-              {/* Board-flavoured examples */}
+              {/* Board examples */}
               <div
                 style={{
                   borderRadius: 24,
@@ -961,10 +944,7 @@ const TopicHub: React.FC = () => {
                     gap: 6,
                   }}
                 >
-                  <span role="img" aria-label="target">
-                    🎯
-                  </span>
-                  Board-flavoured examples
+                  🎯 Board-flavoured examples
                 </div>
 
                 {boardExamples.length === 0 ? (

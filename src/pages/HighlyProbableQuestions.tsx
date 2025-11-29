@@ -1,7 +1,7 @@
 // src/pages/HighlyProbableQuestions.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 
 import {
   type HPQTopicBucket,
@@ -75,11 +75,12 @@ function normaliseSubject(raw: string | null): HPQSubject {
   if (val === "science" || val === "sci") return "Science";
   return "Maths";
 }
-
 // ---------- Component ----------
 
 const HighlyProbableQuestions: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const grade = searchParams.get("grade") || "10";
@@ -87,6 +88,15 @@ const HighlyProbableQuestions: React.FC = () => {
   const topicParam = searchParams.get("topic");
 
   const subjectKey: HPQSubject = normaliseSubject(subjectParam);
+
+  // 👇 NEW: track where we came from (e.g. /study-plan, /trends, etc.)
+  const fromState = (location.state as any)?.from as string | undefined;
+  const backLabel =
+    fromState && fromState.includes("/study-plan")
+      ? "Back to study plan"
+      : fromState
+      ? "Back"
+      : "Back to trends";
 
   const [activeStream, setActiveStream] = useState<StreamFilterKey>("all");
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
@@ -157,15 +167,34 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   const handleBackToTrends = () => {
-    navigate(`/trends/${grade}/${subjectKey}`);
+    // 👇 NEW: first go back where we came from (e.g. /study-plan),
+    // otherwise fallback to the trends page.
+    if (fromState) {
+      navigate(fromState);
+    } else {
+      navigate(`/trends/${grade}/${subjectKey}`);
+    }
   };
 
   const handleOpenMockBuilder = () => {
+    // keep basket in localStorage
     persistBasket(basket);
-    navigate("/mock-builder", {
-      replace: false,
-      state: undefined,
-    });
+
+    // open mock builder with same grade + subject
+    const params = new URLSearchParams();
+    params.set("grade", grade);
+    params.set("subject", subjectKey);
+
+    navigate(
+      {
+        pathname: "/mock-builder",
+        search: `?${params.toString()}`,
+      },
+      {
+        // so MockBuilder can also come back here if needed
+        state: { from: location.pathname },
+      }
+    );
   };
 
   const handleAddToBasket = (bucket: HPQTopicBucket, q: HPQQuestion) => {
@@ -193,12 +222,16 @@ const HighlyProbableQuestions: React.FC = () => {
   const handleAskAiMentor = (bucket: HPQTopicBucket, q: HPQQuestion) => {
     navigate("/ai-mentor", {
       state: {
-        from: "hpq",
+        // preserve the origin path for back navigation
+        from: location.pathname,
+
         grade,
         subject: subjectKey,
         topic: bucket.topic,
         hpqQuestionId: q.id,
         hpqQuestion: q.question,
+        // set solve mode for HPQ question
+        mode: "solve",
         gpt_directive:
           "Think like an expert CBSE Class 10 " +
           (subjectKey === "Maths" ? "Mathematics" : "Science") +
@@ -218,7 +251,6 @@ const HighlyProbableQuestions: React.FC = () => {
     setDifficultyFilter("all");
     setActiveStream("all");
     setTopicFilter("all");
-
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete("topic");
     setSearchParams(nextParams);
@@ -420,7 +452,8 @@ const HighlyProbableQuestions: React.FC = () => {
           }}
         >
           <span style={{ fontSize: "1rem" }}>←</span>
-          <span>Back to trends</span>
+          {/* 👇 NEW: dynamic label based on origin */}
+          <span>{backLabel}</span>
         </button>
 
         {/* Hero: HPQ hub */}
@@ -472,8 +505,8 @@ const HighlyProbableQuestions: React.FC = () => {
               <strong style={{ fontWeight: 700 }}>last-week weapon</strong>:
               topic-wise questions that keep coming back. Flip between{" "}
               <strong>Maths</strong> and{" "}
-              <strong>Science + Physics/Chem/Bio filters</strong>, then send
-              any juicy Q straight to your mock paper.
+              <strong>Science + Physics/Chem/Bio filters</strong>, then send any
+              juicy Q straight to your mock paper.
             </p>
 
             {/* Tier filter row */}
@@ -504,9 +537,7 @@ const HighlyProbableQuestions: React.FC = () => {
                       border: active
                         ? "1px solid rgba(15,23,42,0.2)"
                         : "1px solid rgba(241,245,249,0.3)",
-                      background: active
-                        ? "#f9fafb"
-                        : "rgba(15,23,42,0.35)",
+                      background: active ? "#f9fafb" : "rgba(15,23,42,0.35)",
                       color: active ? "#020617" : "#e5e7eb",
                       fontSize: "0.75rem",
                       fontWeight: active ? 600 : 500,
@@ -869,13 +900,11 @@ const HighlyProbableQuestions: React.FC = () => {
               {filteredBuckets.map((bucket) => {
                 const tier = getBucketTier(bucket);
                 const tMeta = tierMeta[tier];
-
                 const totalQuestions = bucket.questions.length;
                 const totalMarks = bucket.questions.reduce(
                   (sum, q) => sum + (q.marks ?? 0),
                   0
                 );
-
                 const isScience =
                   (bucket.subject ?? subjectKey) === "Science";
                 const streamLabel =
@@ -1036,8 +1065,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             borderRadius: 16,
                             padding: "8px 10px",
                             backgroundColor: "rgba(248,250,252,0.96)",
-                            border:
-                              "1px solid rgba(203,213,225,0.8)",
+                            border: "1px solid rgba(203,213,225,0.8)",
                           }}
                         >
                           {renderQuestionMetaChips(q)}
@@ -1050,6 +1078,7 @@ const HighlyProbableQuestions: React.FC = () => {
                           >
                             {q.question}
                           </div>
+
                           {q.answer && (
                             <div
                               style={{
@@ -1058,12 +1087,11 @@ const HighlyProbableQuestions: React.FC = () => {
                                 marginTop: 2,
                               }}
                             >
-                              <span style={{ fontWeight: 500 }}>
-                                Ans:
-                              </span>{" "}
+                              <span style={{ fontWeight: 500 }}>Ans:</span>{" "}
                               {q.answer}
                             </div>
                           )}
+
                           {q.pastBoardYear && (
                             <div
                               style={{
@@ -1076,6 +1104,7 @@ const HighlyProbableQuestions: React.FC = () => {
                               <strong>{q.pastBoardYear}</strong>
                             </div>
                           )}
+
                           <div
                             style={{
                               marginTop: 6,
@@ -1086,9 +1115,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             }}
                           >
                             <button
-                              onClick={() =>
-                                handleAskAiMentor(bucket, q)
-                              }
+                              onClick={() => handleAskAiMentor(bucket, q)}
                               style={{
                                 borderRadius: 999,
                                 border:

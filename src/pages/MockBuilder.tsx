@@ -1,7 +1,11 @@
 // src/pages/MockBuilder.tsx
 
 import React, { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  useNavigate,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import {
   predictedQuestions,
   type PredictedQuestion,
@@ -122,11 +126,24 @@ function normaliseSubject(raw: string | null): SubjectKey {
 
 const MockBuilder: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const grade = searchParams.get("grade") || "10";
   const subjectParam = searchParams.get("subject");
   const subjectKey: SubjectKey = normaliseSubject(subjectParam);
+
+  // optional tag in query, like "study-plan", "hpq"
+  const fromParam = searchParams.get("from") || undefined;
+
+  // navigation state from HPQ / StudyPlan / elsewhere
+  const navState =
+    (location.state as {
+      from?: string;       // full path, e.g. "/study-plan" or "/highly-probable?..."
+      backTo?: string;     // explicit override path
+      backToState?: any;   // optional state for back target
+      backLabel?: string;  // explicit label override
+    } | null) ?? {};
 
   const [openSectionId, setOpenSectionId] = useState<PaperSectionId | null>(
     "A"
@@ -141,6 +158,7 @@ const MockBuilder: React.FC = () => {
     const params = new URLSearchParams(searchParams);
     params.set("grade", grade);
     params.set("subject", next);
+    if (fromParam) params.set("from", fromParam);
     navigate({
       pathname: "/mock-builder",
       search: `?${params.toString()}`,
@@ -206,9 +224,62 @@ const MockBuilder: React.FC = () => {
     setOpenSolutions((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // 🔙 Back button logic (mirrors HPQ-style behaviour):
+  // Priority:
+  // 1. If navState.backTo is provided -> go there.
+  // 2. Else if navState.from is a full path -> go there.
+  // 3. Else fall back to fromParam tags ("study-plan", "hpq").
+  // 4. Finally default to Trends page.
+  const fromPath =
+    typeof navState.from === "string" && navState.from.length > 0
+      ? navState.from
+      : undefined;
+  const fromTag = fromParam?.toLowerCase();
+
+  const computeBackTarget = () => {
+    // explicit override wins
+    if (navState.backTo) return navState.backTo;
+
+    // if we have a real path (e.g. "/study-plan", "/highly-probable?..."),
+    // just go straight back there
+    if (fromPath) return fromPath;
+
+    // older tag-style query usage
+    if (fromTag === "study-plan") {
+      return "/study-plan";
+    }
+    if (fromTag === "hpq" || fromTag === "highly-probable") {
+      return `/highly-probable?grade=${grade}&subject=${subjectKey}`;
+    }
+
+    // default: go to chapter trends
+    return `/trends/${grade}/${subjectKey}`;
+  };
+
+  const backTarget = computeBackTarget();
+
+  // Human-friendly label matching the target
+  let backLabel: string;
+  if (navState.backLabel) {
+    backLabel = navState.backLabel;
+  } else if (fromPath && fromPath.includes("/study-plan")) {
+    backLabel = "Back to study plan";
+  } else if (fromPath && fromPath.includes("/highly-probable")) {
+    backLabel = "Back to HPQ hub";
+  } else if (fromTag === "study-plan") {
+    backLabel = "Back to study plan";
+  } else if (fromTag === "hpq" || fromTag === "highly-probable") {
+    backLabel = "Back to HPQ hub";
+  } else {
+    backLabel = "Back to chapter trends";
+  }
+
   const handleBack = () => {
-    // Go back to the same subject trends page
-    navigate(`/trends/${grade}/${subjectKey}`);
+    if (navState.backToState) {
+      navigate(backTarget, { state: navState.backToState });
+    } else {
+      navigate(backTarget);
+    }
   };
 
   const sectionLabel = (id: PaperSectionId) => {
@@ -248,7 +319,7 @@ const MockBuilder: React.FC = () => {
           marginBottom: 10,
         }}
       >
-        ← Back to chapter trends
+        ← {backLabel}
       </button>
 
       {/* 🌗 Subject toggle pill */}

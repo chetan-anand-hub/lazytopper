@@ -1,16 +1,16 @@
-import React, { useMemo } from "react";
+// src/pages/StudyPlanPage.tsx
+import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+
 import {
   class10TopicTrendList,
   type TopicTier,
 } from "../data/class10MathTopicTrends";
 import {
   class10ScienceTopicTrendList,
-  type ScienceTopicTrend,
 } from "../data/class10ScienceTopicTrends";
 
-// Import shared styles for mentor and study plan pages
-import "./aiMentorStyles.css";
+type SubjectKey = "Maths" | "Science";
 
 interface StudyPlanState {
   daysLeft?: number;
@@ -22,208 +22,536 @@ interface StudyPlanState {
   weakScienceChapters?: string[];
 }
 
+type UITier = "must-crack" | "high-roi" | "good-to-do";
+
+interface PlanRow {
+  topicKey: string;
+  topicLabel: string;
+  tier: UITier;
+  weightagePercent: number;
+  hours: number;
+}
+
+const tierOrder: Record<UITier, number> = {
+  "must-crack": 1,
+  "high-roi": 2,
+  "good-to-do": 3,
+};
+
+const tierMeta: Record<
+  UITier,
+  { label: string; emoji: string; chipBg: string; chipText: string }
+> = {
+  "must-crack": {
+    label: "Must-crack",
+    emoji: "🔥",
+    chipBg: "#fee2e2",
+    chipText: "#b91c1c",
+  },
+  "high-roi": {
+    label: "High-ROI",
+    emoji: "💎",
+    chipBg: "#e0e7ff",
+    chipText: "#3730a3",
+  },
+  "good-to-do": {
+    label: "Good-to-do",
+    emoji: "🌈",
+    chipBg: "#e0f2fe",
+    chipText: "#0369a1",
+  },
+};
+
+const coerceTier = (t: any): UITier => {
+  if (t === "must-crack" || t === "high-roi" || t === "good-to-do") return t;
+  return "high-roi";
+};
+
+function buildSubjectPlan(
+  subject: SubjectKey,
+  totalHours: number
+): PlanRow[] {
+  const rawList =
+    subject === "Maths"
+      ? class10TopicTrendList
+      : class10ScienceTopicTrendList;
+
+  if (!totalHours || totalHours <= 0) return [];
+
+  const rows = rawList.map((entry: any) => {
+    const tier = coerceTier(entry.tier as TopicTier);
+    const weight = Number(entry.weightagePercent ?? 0);
+    const tierBoost =
+      tier === "must-crack" ? 1.3 : tier === "high-roi" ? 1.1 : 0.9;
+
+    return {
+      topicKey: entry.topicKey ?? entry.topicName ?? "",
+      topicLabel:
+        subject === "Maths"
+          ? entry.topicKey
+          : entry.topicName ?? entry.topicKey,
+      tier,
+      weightagePercent: weight,
+      effectiveWeight: weight * tierBoost,
+    };
+  });
+
+  const positive = rows.filter((r) => r.effectiveWeight > 0);
+  const totalEffective =
+    positive.reduce((sum, r: any) => sum + r.effectiveWeight, 0) || 1;
+
+  return positive
+    .map((r: any) => ({
+      topicKey: r.topicKey,
+      topicLabel: r.topicLabel,
+      tier: r.tier as UITier,
+      weightagePercent: r.weightagePercent,
+      hours: (r.effectiveWeight / totalEffective) * totalHours,
+    }))
+    .sort((a, b) => {
+      const tierDiff = tierOrder[a.tier] - tierOrder[b.tier];
+      if (tierDiff !== 0) return tierDiff;
+      return (b.weightagePercent || 0) - (a.weightagePercent || 0);
+    });
+}
+
 const StudyPlanPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const state = (location.state || {}) as StudyPlanState;
 
-  const {
-    daysLeft = 90,
-    mathTargetPercent = 80,
-    scienceTargetPercent = 80,
-    mathHoursPerDay = 1,
-    scienceHoursPerDay = 1,
-    weakMathChapters = [],
-    weakScienceChapters = [],
-  } = state;
+  const grade = "10";
+  const daysLeft = state.daysLeft ?? 90;
+  const mathTargetPercent = state.mathTargetPercent ?? 80;
+  const scienceTargetPercent = state.scienceTargetPercent ?? 80;
+  const mathHoursPerDay = state.mathHoursPerDay ?? 1;
+  const scienceHoursPerDay = state.scienceHoursPerDay ?? 1;
 
   const totalMathHours = daysLeft * mathHoursPerDay;
   const totalScienceHours = daysLeft * scienceHoursPerDay;
 
-  const tierMultiplier: Record<TopicTier, number> = {
-    "must-crack": 1.2,
-    "high-roi": 1.0,
-    "good-to-do": 0.7,
+  const [activeSubject, setActiveSubject] = useState<SubjectKey>("Maths");
+
+  const mathsPlan = useMemo(
+    () => buildSubjectPlan("Maths", totalMathHours),
+    [totalMathHours]
+  );
+  const sciencePlan = useMemo(
+    () => buildSubjectPlan("Science", totalScienceHours),
+    [totalScienceHours]
+  );
+
+  const handleBackToMentor = () => {
+    navigate("/ai-mentor");
   };
 
-  // Maths distribution
-  const mathRoadmap = useMemo(() => {
-    const totalWeight = class10TopicTrendList.reduce(
-      (sum, t) => sum + t.weightagePercent,
-      0
-    );
-    const rows = class10TopicTrendList.map((topic) => {
-      const weightShare = topic.weightagePercent / totalWeight;
-      const tier = topic.tier ?? "good-to-do";
-      const baseHours = totalMathHours * weightShare;
-      const tierBoost = tierMultiplier[tier];
-      const weakBoost = weakMathChapters.includes(topic.topicKey) ? 1.15 : 1;
-      const hours = baseHours * tierBoost * weakBoost;
-      return {
-        name: topic.topicKey,
-        tier,
-        weightagePercent: topic.weightagePercent,
-        hours,
-      };
-    });
-    const totalRaw = rows.reduce((s, r) => s + r.hours, 0);
-    const normalised = rows.map((r) => ({
-      ...r,
-      hours: (r.hours / totalRaw) * totalMathHours,
-    }));
-    return normalised;
-  }, [totalMathHours, weakMathChapters]);
-
-  // Science distribution
-  const scienceRoadmap = useMemo(() => {
-    const topics = class10ScienceTopicTrendList;
-    const totalWeight = topics.reduce((sum, t) => sum + t.weightagePercent, 0);
-    const rows = topics.map((topic: ScienceTopicTrend) => {
-      const weightShare = topic.weightagePercent / totalWeight;
-      const tier = topic.tier;
-      const baseHours = totalScienceHours * weightShare;
-      const tierBoost = tierMultiplier[tier];
-      const weakBoost = weakScienceChapters.includes(topic.topicName) ? 1.15 : 1;
-      const hours = baseHours * tierBoost * weakBoost;
-      return {
-        name: topic.topicName,
-        tier,
-        weightagePercent: topic.weightagePercent,
-        hours,
-      };
-    });
-    const totalRaw = rows.reduce((s, r) => s + r.hours, 0);
-    const normalised = rows.map((r) => ({
-      ...r,
-      hours: (r.hours / totalRaw) * totalScienceHours,
-    }));
-    return normalised;
-  }, [totalScienceHours, weakScienceChapters]);
-
-  const formatHours = (h: number) => h.toFixed(1);
-
-  const tierPill = (tier: TopicTier) => {
-    if (tier === "must-crack") {
-      return <span className="tier-chip must-crack">🔥 Must‑crack</span>;
-    }
-    if (tier === "high-roi") {
-      return <span className="tier-chip high-roi">💎 High‑ROI</span>;
-    }
-    return <span className="tier-chip good-to-do">🌈 Good‑to‑do</span>;
-  };
-
-  const handleBack = () => navigate(-1);
-
-  const openTopicHub = (subject: "Maths" | "Science", topicName: string) => {
+  const handleOpenTopicHub = (subject: SubjectKey, topicLabel: string) => {
+    const topicParam = encodeURIComponent(topicLabel);
     navigate(
-      `/topic-hub?grade=10&subject=${subject}&topic=${encodeURIComponent(
-        topicName
-      )}`
+      `/topic-hub?grade=${grade}&subject=${subject}&topic=${topicParam}`,
+      {
+        state: { from: location.pathname },
+      }
     );
   };
 
-  const openHPQ = (subject: "Maths" | "Science", topicName: string) => {
+  const handleOpenHPQ = (subject: SubjectKey, topicLabel: string) => {
+    const topicParam = encodeURIComponent(topicLabel);
     navigate(
-      `/highly-probable?grade=10&subject=${subject}&topic=${encodeURIComponent(
-        topicName
-      )}`
+      `/highly-probable?grade=${grade}&subject=${subject}&topic=${topicParam}`,
+      {
+        state: { from: location.pathname },
+      }
     );
   };
 
-  const openMockBuilder = (subject: "Maths" | "Science") => {
-    navigate(`/mock-builder?grade=10&subject=${subject}`);
+  const handleOpenMockBuilder = (subject: SubjectKey) => {
+    const params = new URLSearchParams();
+    params.set("grade", grade);
+    params.set("subject", subject);
+    navigate(`/mock-builder?${params.toString()}`, {
+      state: { from: location.pathname },
+    });
+  };
+
+  const renderPlanTable = (subject: SubjectKey, rows: PlanRow[]) => {
+    const targetPercent =
+      subject === "Maths" ? mathTargetPercent : scienceTargetPercent;
+    const hoursPerDay =
+      subject === "Maths" ? mathHoursPerDay : scienceHoursPerDay;
+    const totalHours =
+      subject === "Maths" ? totalMathHours : totalScienceHours;
+
+    if (!rows.length || totalHours <= 0) {
+      return (
+        <div
+          style={{
+            borderRadius: 24,
+            backgroundColor: "rgba(248,250,252,0.98)",
+            border: "1px solid rgba(148,163,184,0.35)",
+            padding: "18px 20px",
+            marginTop: 16,
+          }}
+        >
+          <p
+            style={{
+              fontSize: "0.85rem",
+              color: "#475569",
+            }}
+          >
+            To generate a roadmap, go back to <strong>AI Mentor</strong> and
+            fill in <strong>days left</strong> + <strong>target %</strong> +
+            <strong> hours/day</strong> for this subject.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <section
+        style={{
+          marginTop: 18,
+          borderRadius: 24,
+          backgroundColor: "rgba(248,250,252,0.98)",
+          border: "1px solid rgba(148,163,184,0.35)",
+          boxShadow: "0 22px 50px rgba(148,163,184,0.32)",
+          padding: "20px 22px 18px",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "1.4rem",
+            fontWeight: 650,
+            color: "#020617",
+            marginBottom: 4,
+          }}
+        >
+          {subject} roadmap {targetPercent}% target
+        </h2>
+        <p
+          style={{
+            fontSize: "0.9rem",
+            color: "#475569",
+            marginBottom: 14,
+          }}
+        >
+          Roughly{" "}
+          <strong>
+            {daysLeft} days × {hoursPerDay.toFixed(1)} hr/day
+          </strong>{" "}
+          ≈{" "}
+          <strong>{totalHours.toFixed(0)} focussed hours</strong> that we want
+          to distribute by board weightage and topic tier.
+        </p>
+
+        {/* Header row */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
+            fontSize: "0.78rem",
+            fontWeight: 600,
+            color: "#64748b",
+            padding: "6px 10px",
+            borderRadius: 14,
+            backgroundColor: "#e5edff",
+            marginBottom: 8,
+          }}
+        >
+          <div>Chapter</div>
+          <div>Tier</div>
+          <div>Board wt.</div>
+          <div style={{ textAlign: "right" }}>
+            Recommended hours & actions
+          </div>
+        </div>
+
+        {/* Rows */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {rows.map((row) => {
+            const tMeta = tierMeta[row.tier];
+
+            return (
+              <div
+                key={row.topicKey}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
+                  padding: "10px 10px",
+                  borderRadius: 14,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(226,232,240,0.9)",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    color: "#020617",
+                  }}
+                >
+                  {row.topicLabel}
+                </div>
+
+                {/* Tier chip */}
+                <div>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      backgroundColor: tMeta.chipBg,
+                      color: tMeta.chipText,
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>{tMeta.emoji}</span>
+                    <span>{tMeta.label}</span>
+                  </span>
+                </div>
+
+                {/* Weightage */}
+                <div
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#475569",
+                  }}
+                >
+                  ≈ {row.weightagePercent || "?"}% of paper
+                </div>
+
+                {/* Hours + actions */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      fontWeight: 600,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {row.hours.toFixed(1)} hrs
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleOpenTopicHub(subject, row.topicLabel)
+                    }
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      fontSize: "0.78rem",
+                      border: "1px solid rgba(59,130,246,0.8)",
+                      backgroundColor: "#eef2ff",
+                      color: "#1d4ed8",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Study in TopicHub
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenHPQ(subject, row.topicLabel)}
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      fontSize: "0.78rem",
+                      border: "1px solid rgba(147,51,234,0.7)",
+                      backgroundColor: "#f5f3ff",
+                      color: "#6d28d9",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Practice HPQs
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMockBuilder(subject)}
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      fontSize: "0.78rem",
+                      border: "1px solid rgba(34,197,94,0.7)",
+                      backgroundColor: "#ecfdf3",
+                      color: "#15803d",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Quick mock
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
+  const chipsRowStyle: React.CSSProperties = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 16,
+  };
+
+  const chipStyle: React.CSSProperties = {
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: "0.78rem",
+    backgroundColor: "#eef2ff",
+    color: "#4338ca",
   };
 
   return (
-    <div className="page study-plan-page">
-      <section className="card study-plan-card">
-        <button className="study-plan-back" onClick={handleBack}>
-          ← Back to AI Mentor
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at top, #e0f2ff 0, #dde7ff 30%, #e5edff 60%, #f1f5f9 100%)",
+        paddingBottom: "80px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "1120px",
+          margin: "0 auto",
+          padding: "16px 16px 32px",
+        }}
+      >
+        {/* Back to AI Mentor */}
+        <button
+          onClick={handleBackToMentor}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#4b5563",
+            fontSize: "0.85rem",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            cursor: "pointer",
+            marginBottom: 12,
+          }}
+        >
+          <span style={{ fontSize: "1rem" }}>←</span>
+          <span>Back to AI Mentor</span>
         </button>
-        <h1 className="title">Your personalised study plan</h1>
-        <p className="subtitle">
-          Snapshot based on your current inputs. Later you’ll be able to save, download and edit this plan – and push it into a day‑wise calendar.
-        </p>
-        {/* Summary tags */}
-        <div className="summary-tags">
-          <span className="summary-tag">{daysLeft} days left to boards</span>
-          <span className="summary-tag">Maths target: {mathTargetPercent}%</span>
-          <span className="summary-tag">Science target: {scienceTargetPercent}%</span>
-          <span className="summary-tag">
-            Hours/day → Maths: {mathHoursPerDay}, Science: {scienceHoursPerDay}
-          </span>
-        </div>
-        {/* Maths table */}
-        <div className="plan-block">
-          <h2 className="plan-heading">Maths roadmap {mathTargetPercent}% target</h2>
-          <p className="plan-subline">
-            Roughly <strong>{daysLeft} days × {mathHoursPerDay} hr/day</strong> ≈ <strong>{totalMathHours.toFixed(0)} focussed hours</strong> that we want to distribute by board weightage.
+
+        {/* Hero */}
+        <section
+          style={{
+            borderRadius: 32,
+            padding: "24px 24px 24px 28px",
+            backgroundColor: "#ffffff",
+            boxShadow: "0 24px 60px rgba(148,163,184,0.35)",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "2.1rem",
+              lineHeight: 1.15,
+              fontWeight: 650,
+              color: "#020617",
+              marginBottom: 6,
+            }}
+          >
+            Your personalised study plan
+          </h1>
+          <p
+            style={{
+              fontSize: "0.95rem",
+              color: "#475569",
+              lineHeight: 1.6,
+            }}
+          >
+            Snapshot based on your current inputs. Later you’ll be able to save,
+            download and edit this plan – and push it into a day-wise calendar.
           </p>
-          <div className="plan-table">
-            <div className="plan-table-header">
-              <span>Chapter</span>
-              <span>Tier</span>
-              <span>Board wt.</span>
-              <span>Recommended hours &amp; actions</span>
-            </div>
-            {mathRoadmap.map((row) => (
-              <div key={row.name} className="plan-table-row">
-                <span className="plan-chapter">{row.name}</span>
-                <span>{tierPill(row.tier as TopicTier)}</span>
-                <span>~{row.weightagePercent}% of paper</span>
-                <span className="plan-actions">
-                  <span className="plan-hours">{formatHours(row.hours)} hrs</span>
-                  <button className="chip-link" onClick={() => openTopicHub("Maths", row.name)}>
-                    Study in TopicHub
-                  </button>
-                  <button className="chip-link chip-link--alt" onClick={() => openHPQ("Maths", row.name)}>
-                    Practice HPQs
-                  </button>
-                  <button className="chip-link chip-link--alt2" onClick={() => openMockBuilder("Maths")}>Quick mock</button>
-                </span>
-              </div>
-            ))}
+
+          {/* Chips row */}
+          <div style={chipsRowStyle}>
+            <span style={chipStyle}>
+              {daysLeft} days left to boards
+            </span>
+            <span style={chipStyle}>
+              Maths target: {mathTargetPercent}%
+            </span>
+            <span style={chipStyle}>
+              Science target: {scienceTargetPercent}%
+            </span>
+            <span style={chipStyle}>
+              Hours/day → Maths: {mathHoursPerDay}, Science:{" "}
+              {scienceHoursPerDay}
+            </span>
           </div>
-          <p className="plan-note">
-            As a starting point, cover the 🔥 must‑crack chapters first, then 💎 high‑ROI, and only then 🌈 good‑to‑do. We’ll later break this into a day‑by‑day calendar with revision slots.
-          </p>
-        </div>
-        {/* Science table */}
-        <div className="plan-block plan-block--science">
-          <h2 className="plan-heading">Science roadmap {scienceTargetPercent}% target</h2>
-          <p className="plan-subline">
-            Roughly <strong>{daysLeft} days × {scienceHoursPerDay} hr/day</strong> ≈ <strong>{totalScienceHours.toFixed(0)} focussed hours</strong> that we want to distribute by board weightage.
-          </p>
-          <div className="plan-table">
-            <div className="plan-table-header">
-              <span>Chapter</span>
-              <span>Tier</span>
-              <span>Board wt.</span>
-              <span>Recommended hours &amp; actions</span>
-            </div>
-            {scienceRoadmap.map((row) => (
-              <div key={row.name} className="plan-table-row">
-                <span className="plan-chapter">{row.name}</span>
-                <span>{tierPill(row.tier)}</span>
-                <span>~{row.weightagePercent}% of paper</span>
-                <span className="plan-actions">
-                  <span className="plan-hours">{formatHours(row.hours)} hrs</span>
-                  <button className="chip-link" onClick={() => openTopicHub("Science", row.name)}>
-                    Study in TopicHub
-                  </button>
-                  <button className="chip-link chip-link--alt" onClick={() => openHPQ("Science", row.name)}>
-                    Practice HPQs
-                  </button>
-                  <button className="chip-link chip-link--alt2" onClick={() => openMockBuilder("Science")}>Quick mock</button>
-                </span>
-              </div>
-            ))}
+
+          {/* Subject tabs */}
+          <div
+            style={{
+              marginTop: 22,
+              borderRadius: 999,
+              backgroundColor: "#eef2ff",
+              display: "flex",
+            }}
+          >
+            {(["Maths", "Science"] as SubjectKey[]).map((subj) => {
+              const active = subj === activeSubject;
+              return (
+                <button
+                  key={subj}
+                  type="button"
+                  onClick={() => setActiveSubject(subj)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 0",
+                    borderRadius: 999,
+                    border: "none",
+                    fontSize: "0.95rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    backgroundColor: active ? "#4f46e5" : "transparent",
+                    color: active ? "#f9fafb" : "#1e293b",
+                    boxShadow: active
+                      ? "0 10px 25px rgba(79,70,229,0.45)"
+                      : "none",
+                    transition: "all 0.15s ease-out",
+                  }}
+                >
+                  {subj}
+                </button>
+              );
+            })}
           </div>
-          <p className="plan-note">
-            Same logic here: 🔥 must‑crack first, then 💎 high‑ROI and finally 🌈 good‑to‑do once your core is strong.
-          </p>
-        </div>
-      </section>
+
+          {/* Subject-specific content */}
+          {activeSubject === "Maths"
+            ? renderPlanTable("Maths", mathsPlan)
+            : renderPlanTable("Science", sciencePlan)}
+        </section>
+      </div>
     </div>
   );
 };
