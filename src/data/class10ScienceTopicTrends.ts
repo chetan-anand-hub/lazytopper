@@ -33,6 +33,15 @@ export type Class10ScienceTopicKey =
   | "MagneticEffects"
   | "OurEnvironment";
 
+/**
+ * Parameter type for science topics.  While most modules should use
+ * Class10ScienceTopicKey to refer to canonical slugs, some
+ * transitional modules (e.g. predicted question banks) still use
+ * human-readable keys.  This alias allows those modules to type
+ * topicKey as a string while remaining compatible with this file.
+ */
+export type Class10ScienceTopicParam = Class10ScienceTopicKey | string;
+
 export type Class10ScienceTopicTrendsData = Record<
   Class10ScienceTopicKey,
   ScienceTopicTrend

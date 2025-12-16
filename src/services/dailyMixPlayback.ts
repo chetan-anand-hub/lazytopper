@@ -11,7 +11,11 @@
 
 import { useState } from 'react';
 
-export type DailyMixItemType = 'video' | 'question' | 'revision';
+// Extend the union to include 'card' for recap items.  This keeps
+// compatibility with existing types while allowing DailyMixGenerator
+// to return a card payload (e.g. recap notes).  Without this the
+// generator will produce an invalid type error at compile time.
+export type DailyMixItemType = 'video' | 'question' | 'revision' | 'card';
 
 /**
  * Union describing a single Daily Mix item. Extend the properties as

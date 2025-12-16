@@ -5,7 +5,7 @@ import type {
   TopicTier,
 } from "./class10MathTopicTrends";
 import type {
-  Class10ScienceTopicKey,
+  Class10ScienceTopicParam,
 } from "./class10ScienceTopicTrends";
 
 /**
@@ -24,7 +24,8 @@ export interface SciencePredictedQuestion {
   subject: "Science";
   stream: ScienceStream;
 
-  topicKey: Class10ScienceTopicKey;
+  /** Canonical slug or human-readable topic key. */
+  topicKey: Class10ScienceTopicParam;
   topicName: string;
   concept: string;
 

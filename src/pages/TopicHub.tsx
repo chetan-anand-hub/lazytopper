@@ -9,11 +9,11 @@
 // practice and view trends, and respects the back‑navigation state
 // passed from previous pages.
 
-import React, { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 
 import getTopicV2Content, { type TopicHubV2Content } from '../utils/getTopicV2Content';
-import { resolveTopicKey, resolveTopicDisplayName } from '../utils/topicResolver';
+import { resolveTopicDisplayName } from '../utils/topicResolver';
 import { buildTrendsUrl, buildAiMentorUrl } from '../utils/buildUrl';
 import { navigateToPractice } from '../navigation/practiceNavigation';
 
@@ -215,7 +215,7 @@ export default function TopicHub() {
       {activeTab === 'overview' && (
         <div className="topic-tabpanel">
           {content.overview && content.overview.length > 0 ? (
-            content.overview.map((line, idx) => (
+            content.overview.map((line: string, idx: number) => (
               <p key={idx} style={{ marginBottom: '8px' }}>{line}</p>
             ))
           ) : (
@@ -229,7 +229,7 @@ export default function TopicHub() {
           <h3>Definitions & Concepts</h3>
           {content.definitions && content.definitions.length > 0 ? (
             <ul style={{ paddingLeft: '16px' }}>
-              {content.definitions.map((def, idx) => (
+              {content.definitions.map((def: any, idx: number) => (
                 <li key={idx} style={{ marginBottom: '8px' }}>
                   <strong>{def.title}:</strong> {def.description}
                 </li>
@@ -246,7 +246,7 @@ export default function TopicHub() {
           <h3>Exam Patterns & Marking Tips</h3>
           {content.examPatterns && content.examPatterns.length > 0 ? (
             <ul style={{ paddingLeft: '16px' }}>
-              {content.examPatterns.map((pat, idx) => (
+              {content.examPatterns.map((pat: string, idx: number) => (
                 <li key={idx} style={{ marginBottom: '6px' }}>{pat}</li>
               ))}
             </ul>
@@ -257,7 +257,7 @@ export default function TopicHub() {
             <>
               <h4 style={{ marginTop: '16px' }}>Marking Tips</h4>
               <ul style={{ paddingLeft: '16px' }}>
-                {content.markingTips.map((tip, idx) => (
+                {content.markingTips.map((tip: string, idx: number) => (
                   <li key={idx} style={{ marginBottom: '6px' }}>{tip}</li>
                 ))}
               </ul>
@@ -271,7 +271,7 @@ export default function TopicHub() {
           <h3>Practice Recommendations</h3>
           {content.scoreTips && content.scoreTips.length > 0 ? (
             <ul style={{ paddingLeft: '16px' }}>
-              {content.scoreTips.map((tip, idx) => (
+              {content.scoreTips.map((tip: string, idx: number) => (
                 <li key={idx} style={{ marginBottom: '6px' }}>{tip}</li>
               ))}
             </ul>

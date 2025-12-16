@@ -42,6 +42,33 @@ export interface PracticeInsights {
   attempts: PracticeAttempt[];
 }
 
+/**
+ * Snapshot summarising a student's weak concepts and common mistakes.
+ *
+ * The insight snapshot is intended for consumption by the Daily Mix
+ * generator and other recommendation engines.  It aggregates recent
+ * practice attempts to highlight the concepts where the student
+ * consistently answers incorrectly (weak concepts) and the types of
+ * mistakes they frequently make (common mistakes).  When no
+ * sufficient history is available the arrays may be empty.
+ */
+export interface PracticeWeakConcept {
+  concept: string;
+  /** How many times this concept was answered incorrectly. */
+  count: number;
+}
+
+export interface PracticeCommonMistake {
+  mistake: string;
+  /** How many times this mistake was recorded. */
+  count: number;
+}
+
+export interface PracticeInsightSnapshot {
+  weakConcepts: PracticeWeakConcept[];
+  commonMistakes: PracticeCommonMistake[];
+}
+
 const STORAGE_KEY = 'lazyTopper_practice_insights';
 
 /**
@@ -132,4 +159,45 @@ export function clearInsights(): void {
   } catch (err) {
     console.warn('Failed to clear practice insights:', err);
   }
+}
+
+/**
+ * Compute a snapshot of practice insights for a given grade/subject/topic.
+ *
+ * This helper aggregates the student's practice attempts to identify
+ * weak concepts and common mistakes.  It accepts a filter object
+ * allowing callers to scope the analysis to a particular subject or
+ * topic (grade is unused in this simple implementation but retained
+ * for future extension).  Currently the algorithm simply counts
+ * incorrect answers by topic and returns the top few as weak
+ * concepts.  Common mistakes are not yet tracked in PracticeAttempt,
+ * so the function returns an empty list for mistakes.  When no
+ * attempts are recorded the returned arrays are empty.
+ */
+export function computePracticeInsights(options: {
+  grade: number;
+  subject: string;
+  topic: string;
+}): PracticeInsightSnapshot {
+  // Load all attempts and filter by subject/topic.  At the moment
+  // grade is not used because the PracticeAttempt model does not
+  // include grade; this is reserved for future use.
+  const attempts = getAttempts();
+  const weakCounts: Record<string, number> = {};
+  for (const a of attempts) {
+    if (options.subject && a.subject !== options.subject.toLowerCase()) continue;
+    if (options.topic && a.topicKey !== options.topic) continue;
+    if (!a.correct) {
+      const key = a.topicKey;
+      weakCounts[key] = (weakCounts[key] ?? 0) + 1;
+    }
+  }
+  const weakConcepts: PracticeWeakConcept[] = Object.entries(weakCounts)
+    .map(([concept, count]) => ({ concept, count }))
+    // Sort descending by count and take top 6 for brevity
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  // Common mistakes are not stored in PracticeAttempt; return empty list.
+  const commonMistakes: PracticeCommonMistake[] = [];
+  return { weakConcepts, commonMistakes };
 }

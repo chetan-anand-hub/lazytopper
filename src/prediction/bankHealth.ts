@@ -14,6 +14,10 @@ export interface TopicKeySourceLike {
   [key: string]: any;
 }
 
+// Maintain backwards compatibility: some modules still import TopicKeySource
+// from this file.  Export an alias so imports continue to type-check.
+export type TopicKeySource = TopicKeySourceLike;
+
 export interface DifficultyCounts {
   easy: number;
   medium: number;
