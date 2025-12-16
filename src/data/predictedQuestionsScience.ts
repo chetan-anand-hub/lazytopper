@@ -6,6 +6,11 @@ export type QuestionKind = "MCQ" | "Short" | "Assertion-Reasoning" | "Case-Based
 
 export type SectionKey = "A" | "B" | "C" | "D" | "E";
 
+// Back-compat aliases expected by some utilities
+export type SciSectionKey = SectionKey;
+export type SciDifficultyKey = DifficultyKey;
+
+
 export type BloomSkill =
   | "Remembering"
   | "Understanding"
@@ -2157,6 +2162,8 @@ Food chains usually have 3–4 levels because a lot of energy is lost (about 90%
   },
 ];
 export type PredictedQuestionScience = SciencePredictedQuestion;
+// Back-compat alias expected by older mock builders
+export type PredictedScienceQuestion = SciencePredictedQuestion;
 
 /**
  * Alias: some components (like MockPaper) expect `predictedQuestionsScience`

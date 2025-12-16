@@ -65,12 +65,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Check if the system 2x + 3y = 5, 4x + 6y = 10 has unique, no, or infinite solutions.",
-        "hint": "Compare a₁/a₂, b₁/b₂, c₁/c₂."
+        "title": "Check if the system 2x + 3y = 5, 4x + 6y = 10 has unique, no, or infinite solutions.",
+        "question": "Check if the system 2x + 3y = 5, 4x + 6y = 10 has unique, no, or infinite solutions."
       },
       {
-        "question": "A sum of ₹50 is in 5 and 10 rupee notes, total 7 notes. Find the number of each.",
-        "hint": "Let x = 5-rupee notes, y = 10-rupee notes, form two equations from notes + total value."
+        "title": "A sum of ₹50 is in 5 and 10 rupee notes, total 7 notes. Find the number of each.",
+        "question": "A sum of ₹50 is in 5 and 10 rupee notes, total 7 notes. Find the number of each."
       }
     ]
   },
@@ -129,12 +129,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "For marks 10, 20, 20, 30, 40, find the mean.",
-        "hint": "Sum the data and divide by number of observations."
+        "title": "For marks 10, 20, 20, 30, 40, find the mean.",
+        "question": "For marks 10, 20, 20, 30, 40, find the mean."
       },
       {
-        "question": "In grouped data, how do you identify the median class?",
-        "hint": "Use N/2 and find the class where CF just crosses this value."
+        "title": "In grouped data, how do you identify the median class?",
+        "question": "In grouped data, how do you identify the median class?"
       }
     ]
   },
@@ -197,12 +197,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Evaluate sin 30° + cos 60°.",
-        "hint": "Both are 1/2, so just add."
+        "title": "Evaluate sin 30° + cos 60°.",
+        "question": "Evaluate sin 30° + cos 60°."
       },
       {
-        "question": "If sin θ = 3/5 and θ is acute, find cos θ.",
-        "hint": "Use sin²θ + cos²θ = 1."
+        "title": "If sin θ = 3/5 and θ is acute, find cos θ.",
+        "question": "If sin θ = 3/5 and θ is acute, find cos θ."
       }
     ]
   },
@@ -265,12 +265,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "A 10 Ω resistor is connected across 5 V. Find current.",
-        "hint": "Use I = V/R."
+        "title": "A 10 Ω resistor is connected across 5 V. Find current.",
+        "question": "A 10 Ω resistor is connected across 5 V. Find current."
       },
       {
-        "question": "Which combination gives more brightness: two identical bulbs in series or parallel?",
-        "hint": "In parallel, each gets full voltage."
+        "title": "Which combination gives more brightness: two identical bulbs in series or parallel?",
+        "question": "Which combination gives more brightness: two identical bulbs in series or parallel?"
       }
     ]
   },
@@ -329,12 +329,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Why is double circulation important in humans?",
-        "hint": "Ensures separation of oxygenated and deoxygenated blood; efficient supply."
+        "title": "Why is double circulation important in humans?",
+        "question": "Why is double circulation important in humans?"
       },
       {
-        "question": "Name the blood vessel that brings deoxygenated blood to the lungs.",
-        "hint": "Pulmonary artery."
+        "title": "Name the blood vessel that brings deoxygenated blood to the lungs.",
+        "question": "Name the blood vessel that brings deoxygenated blood to the lungs."
       }
     ]
   },
@@ -393,12 +393,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "If triangles are similar with side ratio 2:3, what is area ratio?",
-        "hint": "Square the ratio → 4:9."
+        "title": "If triangles are similar with side ratio 2:3, what is area ratio?",
+        "question": "If triangles are similar with side ratio 2:3, what is area ratio?"
       },
       {
-        "question": "State the basic proportionality theorem.",
-        "hint": "A line parallel to one side of a triangle divides the other two sides proportionally."
+        "title": "State the basic proportionality theorem.",
+        "question": "State the basic proportionality theorem."
       }
     ]
   },
@@ -457,12 +457,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Find the probability of getting a prime number on a dice.",
-        "hint": "Favourable outcomes = {2,3,5}."
+        "title": "Find the probability of getting a prime number on a dice.",
+        "question": "Find the probability of getting a prime number on a dice."
       },
       {
-        "question": "If P(E) = 0.7, find P(not E).",
-        "hint": "1 – 0.7."
+        "title": "If P(E) = 0.7, find P(not E).",
+        "question": "If P(E) = 0.7, find P(not E)."
       }
     ]
   },
@@ -521,12 +521,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "What is the functional group in ethanol?",
-        "hint": "–OH (alcohol group)."
+        "title": "What is the functional group in ethanol?",
+        "question": "What is the functional group in ethanol?"
       },
       {
-        "question": "Name the first three members of the alkane series.",
-        "hint": "Methane, ethane, propane."
+        "title": "Name the first three members of the alkane series.",
+        "question": "Name the first three members of the alkane series."
       }
     ]
   },
@@ -585,12 +585,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Balance: Fe + H₂O → Fe₃O₄ + H₂.",
-        "hint": "Start by balancing Fe and O first."
+        "title": "Balance: Fe + H₂O → Fe₃O₄ + H₂.",
+        "question": "Balance: Fe + H₂O → Fe₃O₄ + H₂."
       },
       {
-        "question": "Identify the type of reaction: CaO + H₂O → Ca(OH)₂.",
-        "hint": "Two substances combining to form one."
+        "title": "Identify the type of reaction: CaO + H₂O → Ca(OH)₂.",
+        "question": "Identify the type of reaction: CaO + H₂O → Ca(OH)₂."
       }
     ]
   },
@@ -648,12 +648,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "State one property of magnetic field lines.",
-        "hint": "They never intersect and go from N to S outside the magnet."
+        "title": "State one property of magnetic field lines.",
+        "question": "State one property of magnetic field lines."
       },
       {
-        "question": "When is the force on a current-carrying conductor in a magnetic field maximum?",
-        "hint": "When conductor is perpendicular to the field."
+        "title": "When is the force on a current-carrying conductor in a magnetic field maximum?",
+        "question": "When is the force on a current-carrying conductor in a magnetic field maximum?"
       }
     ]
   },
@@ -716,12 +716,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "For x² − 5x + 6 = 0, find roots by factorisation.",
-        "hint": "Factor as (x − 2)(x − 3) = 0."
+        "title": "For x² − 5x + 6 = 0, find roots by factorisation.",
+        "question": "For x² − 5x + 6 = 0, find roots by factorisation."
       },
       {
-        "question": "For 2x² + 3x + 5 = 0, what is the nature of roots?",
-        "hint": "Check sign of discriminant."
+        "title": "For 2x² + 3x + 5 = 0, what is the nature of roots?",
+        "question": "For 2x² + 3x + 5 = 0, what is the nature of roots?"
       }
     ]
   },
@@ -776,12 +776,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Is 7/40 terminating or non-terminating?",
-        "hint": "Factor 40 = 2³ × 5 → only 2 and 5 → terminating."
+        "title": "Is 7/40 terminating or non-terminating?",
+        "question": "Is 7/40 terminating or non-terminating?"
       },
       {
-        "question": "Write HCF(42, 70) using Euclid’s division algorithm.",
-        "hint": "Keep dividing until remainder is 0; last non-zero remainder is the HCF."
+        "title": "Write HCF(42, 70) using Euclid’s division algorithm.",
+        "question": "Write HCF(42, 70) using Euclid’s division algorithm."
       }
     ]
   },
@@ -835,12 +835,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Find degree of 7x³ − 4x² + x − 9.",
-        "hint": "Highest power of x is 3."
+        "title": "Find degree of 7x³ − 4x² + x − 9.",
+        "question": "Find degree of 7x³ − 4x² + x − 9."
       },
       {
-        "question": "If α, β are zeroes of x² − 3x + 2, find α + β and αβ.",
-        "hint": "α + β = 3, αβ = 2."
+        "title": "If α, β are zeroes of x² − 3x + 2, find α + β and αβ.",
+        "question": "If α, β are zeroes of x² − 3x + 2, find α + β and αβ."
       }
     ]
   },
@@ -895,12 +895,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "In AP 2, 5, 8, … find the 15th term.",
-        "hint": "a = 2, d = 3, a₁₅ = a + 14d."
+        "title": "In AP 2, 5, 8, … find the 15th term.",
+        "question": "In AP 2, 5, 8, … find the 15th term."
       },
       {
-        "question": "Sum of first 10 natural numbers?",
-        "hint": "AP with a = 1, d = 1, use Sₙ formula."
+        "title": "Sum of first 10 natural numbers?",
+        "question": "Sum of first 10 natural numbers?"
       }
     ]
   },
@@ -954,12 +954,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Distance between (0, 0) and (6, 8)?",
-        "hint": "Use distance formula → 10."
+        "title": "Distance between (0, 0) and (6, 8)?",
+        "question": "Distance between (0, 0) and (6, 8)?"
       },
       {
-        "question": "Mid-point of (1, 4) and (5, 6)?",
-        "hint": "((1+5)/2, (4+6)/2)."
+        "title": "Mid-point of (1, 4) and (5, 6)?",
+        "question": "Mid-point of (1, 4) and (5, 6)?"
       }
     ]
   },
@@ -1014,12 +1014,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Evaluate sin 30° + cos 60°.",
-        "hint": "Both are 1/2."
+        "title": "Evaluate sin 30° + cos 60°.",
+        "question": "Evaluate sin 30° + cos 60°."
       },
       {
-        "question": "If cos θ = 4/5 and θ is acute, find sin θ.",
-        "hint": "Use sin²θ + cos²θ = 1."
+        "title": "If cos θ = 4/5 and θ is acute, find sin θ.",
+        "question": "If cos θ = 4/5 and θ is acute, find sin θ."
       }
     ]
   },
@@ -1069,12 +1069,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "From foot of a tower, angle of elevation of top is 60°. Height is 10√3 m. Find distance from tower.",
-        "hint": "Use tan 60° = height/distance."
+        "title": "From foot of a tower, angle of elevation of top is 60°. Height is 10√3 m. Find distance from tower.",
+        "question": "From foot of a tower, angle of elevation of top is 60°. Height is 10√3 m. Find distance from tower."
       },
       {
-        "question": "A student stands 50 m away from a tree, angle of elevation is 30°. Find height of tree.",
-        "hint": "tan 30° = opposite/adjacent."
+        "title": "A student stands 50 m away from a tree, angle of elevation is 30°. Find height of tree.",
+        "question": "A student stands 50 m away from a tree, angle of elevation is 30°. Find height of tree."
       }
     ]
   },
@@ -1123,12 +1123,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "What is angle between radius and tangent at point of contact?",
-        "hint": "90°."
+        "title": "What is angle between radius and tangent at point of contact?",
+        "question": "What is angle between radius and tangent at point of contact?"
       },
       {
-        "question": "From point P outside circle, tangents touch at A and B. What can you say about PA, PB?",
-        "hint": "PA = PB."
+        "title": "From point P outside circle, tangents touch at A and B. What can you say about PA, PB?",
+        "question": "From point P outside circle, tangents touch at A and B. What can you say about PA, PB?"
       }
     ]
   },
@@ -1172,12 +1172,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Construct a triangle similar to ΔABC with scale factor 3/2.",
-        "hint": "Draw ray from one vertex, mark equal intervals, join and draw parallel line."
+        "title": "Construct a triangle similar to ΔABC with scale factor 3/2.",
+        "question": "Construct a triangle similar to ΔABC with scale factor 3/2."
       },
       {
-        "question": "Divide segment AB in ratio 2:3.",
-        "hint": "Use ray method and parallel line through second division point."
+        "title": "Divide segment AB in ratio 2:3.",
+        "question": "Divide segment AB in ratio 2:3."
       }
     ]
   },
@@ -1230,12 +1230,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Find area of a sector of circle radius 7 cm, angle 90°.",
-        "hint": "Use (90/360) × πr²."
+        "title": "Find area of a sector of circle radius 7 cm, angle 90°.",
+        "question": "Find area of a sector of circle radius 7 cm, angle 90°."
       },
       {
-        "question": "A circular path surrounds a garden of radius 10 m; outside radius is 11 m. Find path area.",
-        "hint": "Area difference of two circles."
+        "title": "A circular path surrounds a garden of radius 10 m; outside radius is 11 m. Find path area.",
+        "question": "A circular path surrounds a garden of radius 10 m; outside radius is 11 m. Find path area."
       }
     ]
   },
@@ -1289,12 +1289,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Volume of cylinder with radius 3 cm and height 7 cm?",
-        "hint": "πr²h."
+        "title": "Volume of cylinder with radius 3 cm and height 7 cm?",
+        "question": "Volume of cylinder with radius 3 cm and height 7 cm?"
       },
       {
-        "question": "A solid sphere is melted and recast into 8 smaller equal spheres. If original radius is R, what about new radius?",
-        "hint": "Volume ratio gives r = R/2."
+        "title": "A solid sphere is melted and recast into 8 smaller equal spheres. If original radius is R, what about new radius?",
+        "question": "A solid sphere is melted and recast into 8 smaller equal spheres. If original radius is R, what about new radius?"
       }
     ]
   },
@@ -1348,12 +1348,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Name the acid present in gastric juice.",
-        "hint": "Hydrochloric acid."
+        "title": "Name the acid present in gastric juice.",
+        "question": "Name the acid present in gastric juice."
       },
       {
-        "question": "Why does tooth decay start when pH of mouth falls below 5.5?",
-        "hint": "Enamel starts dissolving in more acidic conditions."
+        "title": "Why does tooth decay start when pH of mouth falls below 5.5?",
+        "question": "Why does tooth decay start when pH of mouth falls below 5.5?"
       }
     ]
   },
@@ -1407,12 +1407,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Why is aluminium used to make aircraft bodies?",
-        "hint": "Light, strong, and corrosion resistant."
+        "title": "Why is aluminium used to make aircraft bodies?",
+        "question": "Why is aluminium used to make aircraft bodies?"
       },
       {
-        "question": "Why is sodium stored in kerosene?",
-        "hint": "Reacts vigorously with air and moisture."
+        "title": "Why is sodium stored in kerosene?",
+        "question": "Why is sodium stored in kerosene?"
       }
     ]
   },
@@ -1461,12 +1461,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "In a period, how does atomic radius change left to right?",
-        "hint": "Decreases."
+        "title": "In a period, how does atomic radius change left to right?",
+        "question": "In a period, how does atomic radius change left to right?"
       },
       {
-        "question": "In a group, how does metallic character change top to bottom?",
-        "hint": "Increases."
+        "title": "In a group, how does metallic character change top to bottom?",
+        "question": "In a group, how does metallic character change top to bottom?"
       }
     ]
   },
@@ -1519,12 +1519,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Name the master gland.",
-        "hint": "Pituitary."
+        "title": "Name the master gland.",
+        "question": "Name the master gland."
       },
       {
-        "question": "What is a reflex action?",
-        "hint": "Quick, automatic response to a stimulus."
+        "title": "What is a reflex action?",
+        "question": "What is a reflex action?"
       }
     ]
   },
@@ -1573,12 +1573,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Which organism reproduces by binary fission?",
-        "hint": "Amoeba."
+        "title": "Which organism reproduces by binary fission?",
+        "question": "Which organism reproduces by binary fission?"
       },
       {
-        "question": "Name female reproductive cell in humans.",
-        "hint": "Ovum (egg cell)."
+        "title": "Name female reproductive cell in humans.",
+        "question": "Name female reproductive cell in humans."
       }
     ]
   },
@@ -1627,12 +1627,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "What is phenotype ratio in monohybrid cross of Tt × Tt?",
-        "hint": "3 tall : 1 dwarf."
+        "title": "What is phenotype ratio in monohybrid cross of Tt × Tt?",
+        "question": "What is phenotype ratio in monohybrid cross of Tt × Tt?"
       },
       {
-        "question": "Which chromosomes determine sex in humans?",
-        "hint": "X and Y."
+        "title": "Which chromosomes determine sex in humans?",
+        "question": "Which chromosomes determine sex in humans?"
       }
     ]
   },
@@ -1686,12 +1686,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Write lens formula.",
-        "hint": "1/f = 1/v − 1/u."
+        "title": "Write lens formula.",
+        "question": "Write lens formula."
       },
       {
-        "question": "Where is the image formed when object is at 2F in front of convex lens?",
-        "hint": "At 2F on other side, same size."
+        "title": "Where is the image formed when object is at 2F in front of convex lens?",
+        "question": "Where is the image formed when object is at 2F in front of convex lens?"
       }
     ]
   },
@@ -1740,12 +1740,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Which lens corrects myopia?",
-        "hint": "Concave lens."
+        "title": "Which lens corrects myopia?",
+        "question": "Which lens corrects myopia?"
       },
       {
-        "question": "Why do stars twinkle but planets don’t?",
-        "hint": "Stars appear point-like and their light is strongly affected by atmospheric refraction; planets have apparent disc."
+        "title": "Why do stars twinkle but planets don’t?",
+        "question": "Why do stars twinkle but planets don’t?"
       }
     ]
   },
@@ -1798,12 +1798,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "Define food chain.",
-        "hint": "Sequence of organisms where one is eaten by the next."
+        "title": "Define food chain.",
+        "question": "Define food chain."
       },
       {
-        "question": "Why is energy flow in ecosystem unidirectional?",
-        "hint": "Energy is lost as heat and cannot be reused."
+        "title": "Why is energy flow in ecosystem unidirectional?",
+        "question": "Why is energy flow in ecosystem unidirectional?"
       }
     ]
   },
@@ -1852,12 +1852,12 @@ export const topicHubV2Content: Record<string, TopicHubV2Content> = {
     "workedExamples": [],
     "quickQuiz": [
       {
-        "question": "What is meant by ‘Reduce’ in 3 R’s?",
-        "hint": "Use less; avoid unnecessary consumption."
+        "title": "What is meant by ‘Reduce’ in 3 R’s?",
+        "question": "What is meant by ‘Reduce’ in 3 R’s?"
       },
       {
-        "question": "Name one traditional method of water conservation in India.",
-        "hint": "Tanks, stepwells, johads (any valid example)."
+        "title": "Name one traditional method of water conservation in India.",
+        "question": "Name one traditional method of water conservation in India."
       }
     ]
   }
