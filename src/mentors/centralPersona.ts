@@ -1,4 +1,4 @@
-import type { MentorPersona, MentorModeConfig } from "../types/MentorRequest";
+import type { MentorPersona } from "../types/MentorRequest";
 
 /*
  * Central mentor persona for LazyTopper.

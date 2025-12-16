@@ -254,9 +254,18 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
         const _gradeNum = String(
           (effectivePageContext.grade || "Class 10").replace(/\D/g, "")
         ) || "10";
-        // Plan persistence moved to the planner flow.  Previously the
-        // MentorPanel would save raw plan text here, but the Strategy
-        // Engine v1 now generates and saves structured plans elsewhere.
+        // Persist a deep link to the study plan page so the dashboard can
+        // later load the plan.  We compute a route of the form
+        // `/study-plan/{gradeNum}/{subject}` where subject is lower-case.
+        // The actual plan text is saved via the strategy engine in the
+        // dedicated planner flow; this call only stores the link.
+        const subjectKey = (effectivePageContext.subject || "Maths").toLowerCase();
+        const planDeepLink = `/study-plan/${_gradeNum}/${subjectKey}`;
+        try {
+          window.localStorage.setItem('lazytopper.lastPlanDeepLink', planDeepLink);
+        } catch {
+          // Ignore localStorage errors (e.g. quota exceeded)
+        }
       } catch (err) {
         console.warn("Failed to persist strategy plan", err);
       }

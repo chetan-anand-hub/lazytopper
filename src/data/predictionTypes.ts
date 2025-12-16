@@ -58,4 +58,56 @@ export interface CanonicalQuestion {
   // Future predictive metadata (optional)
   predictionScore?: number;
   predictionStrength?: string;
+
+  /**
+   * Blueprint slot identifier mapping this question to a specific slot in
+   * the exam blueprint.  Optional because Phase 0 does not tag all
+   * questions.
+   */
+  blueprintSlotId?: string;
+  /**
+   * CBSE/board year tag used for recency scoring (e.g. "2023", "2022").
+   */
+  pastBoardYear?: string;
+  /**
+   * Policy tag indicating the priority of this question (e.g. must‑crack,
+   * high‑roi).  Used by the prediction engine to boost scores.
+   */
+  policyTag?: string;
+}
+
+// -----------------------------------------------------------------------------
+// Additional blueprint and difficulty aliases
+//
+// A SectionKey groups questions into exam sections A–E.  DifficultyKey is
+// exported for compatibility with legacy prediction types.  BlueprintSection
+// enumerates the major sections used in the blueprint configuration, and
+// BlueprintSlot describes a single slot in the exam blueprint.  These
+// definitions live here so that consumers across the prediction and
+// blueprint modules can import from a single location.
+
+/** Exam paper section identifiers (A through E). */
+export type SectionKey = "A" | "B" | "C" | "D" | "E";
+
+/** Alias for DifficultyLevel used in older prediction modules. */
+export type DifficultyKey = DifficultyLevel;
+
+/** High-level section definitions used in blueprint configuration. */
+export type BlueprintSection = SectionKey;
+
+/**
+ * A slot in the exam blueprint representing a specific question slot.  Slots
+   * may be associated with topics/concepts in later phases but are empty in
+   * Phase 0.
+ */
+export interface BlueprintSlot {
+  id: string;
+  /** Associated section (A–E) of the paper. */
+  section: BlueprintSection;
+  /** Marks assigned to this slot. */
+  marks: number;
+  /** Optional Bloom level for this slot. */
+  bloomLevel?: BloomLevel;
+  /** Optional difficulty expectation for this slot. */
+  difficulty?: DifficultyLevel;
 }

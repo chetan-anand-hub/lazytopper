@@ -16,3 +16,4 @@ desktop.ini
 
 # Editor
 .vscode
+src/lazytopper_patch.diff

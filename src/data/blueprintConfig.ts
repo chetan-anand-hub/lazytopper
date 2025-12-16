@@ -7,8 +7,6 @@ import type {
   LTSubjectKey,
   BlueprintSection,
   QuestionFormat,
-  BloomLevel,
-  DifficultyLevel,
   BlueprintSlot,
 } from "./predictionTypes.ts";
 

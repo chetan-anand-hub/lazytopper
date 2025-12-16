@@ -44,7 +44,7 @@ function policyBoost(tag?: string): number {
 // (Phase 0 stub – can be wired to topic trends later)
 // -------------------------
 
-function baseTopicWeight(topicKey: string): number {
+function baseTopicWeight(_topicKey: string): number {
   // For now, give all topics equal base weight = 1.
   // In Phase 1 we will read from class10MathTopicTrends / ScienceTopicTrends.
   return 1.0;

@@ -41,6 +41,12 @@ export interface DailyMix {
   items: DailyMixItem[];
 }
 
+// Re-export the generic generator from the dailyMixGenerator module.  This
+// allows consumers (e.g. DailyMixWidget) to import from a single
+// service entry point while keeping the generator implementation in its
+// own file.  See src/services/dailyMixGenerator.ts for details.
+export { generateDailyMix } from './dailyMixGenerator';
+
 /**
  * Select a TopicHub block to serve as the anchor for today’s mix. In
  * production this would rank topics based on exam weight, trending

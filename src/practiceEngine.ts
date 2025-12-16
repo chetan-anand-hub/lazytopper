@@ -104,14 +104,15 @@ function buildPracticeSessionQuestions(
   // towards harder questions.
   const baseMix = modeConfig[mode].difficultyMix;
   let adjustedMix: Record<DifficultyLevel, number> = { ...baseMix };
-  if (vibeMode === 'Low') {
+  const _vibe = String(vibeMode ?? '');
+  if (_vibe === 'Low' || _vibe === 'Zombie') {
     // Increase easy questions by 2, decrease hard by 2 if possible.
     adjustedMix = {
       Easy: baseMix.Easy + 2,
       Medium: baseMix.Medium,
       Hard: Math.max(0, baseMix.Hard - 2),
     };
-  } else if (vibeMode === 'High') {
+  } else if (_vibe === 'High' || _vibe === 'Beast') {
     // Increase hard questions by 1, decrease easy by 1 if possible.
     adjustedMix = {
       Easy: Math.max(0, baseMix.Easy - 1),
