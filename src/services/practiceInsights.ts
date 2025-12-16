@@ -1,0 +1,135 @@
+/*
+ * Practice Insights Service
+ *
+ * This module provides helper functions for recording and retrieving
+ * practice activity. Each time a student attempts a question, you can
+ * call `recordAttempt` with the relevant metadata (topic, difficulty,
+ * correctness, etc.). Data is persisted to localStorage under a
+ * consistent key. Aggregation helpers allow callers to query
+ * attempts within a date range for later analysis (e.g. Weekly Wrapped).
+ */
+
+// Note: We avoid importing from other app modules here to keep the
+// service decoupled. Re‑declare simple types as needed. If additional
+// metadata (e.g. Bloom skill enums) become available, extend the
+// interfaces below accordingly.
+
+export type LTSubject = 'maths' | 'science';
+export type DifficultyLevel = 'Easy' | 'Medium' | 'Hard';
+
+export interface PracticeAttempt {
+  /** Unique identifier for this attempt (e.g. `${questionId}-${timestamp}`) */
+  id: string;
+  /** Original question identifier (canonical or AI variant) */
+  questionId: string;
+  /** Canonical practice pack key, e.g. "real_numbers" */
+  topicKey: string;
+  /** Human‑readable topic name, e.g. "Real Numbers" */
+  topicName?: string;
+  /** Subject of the question, lower case. */
+  subject: LTSubject;
+  /** Difficulty level selected when the question was asked. */
+  difficulty: DifficultyLevel;
+  /** Optional Bloom skill tag (remember, apply, analyse, etc.) */
+  bloomSkill?: string;
+  /** Whether the student answered correctly. */
+  correct: boolean;
+  /** Unix timestamp (milliseconds) when the attempt occurred. */
+  timestamp: number;
+}
+
+export interface PracticeInsights {
+  attempts: PracticeAttempt[];
+}
+
+const STORAGE_KEY = 'lazyTopper_practice_insights';
+
+/**
+ * Load all recorded practice attempts from localStorage. If no data is
+ * present, returns an empty structure. This function gracefully
+ * handles JSON parse errors by clearing corrupt data.
+ */
+export function loadInsights(): PracticeInsights {
+  if (typeof window === 'undefined') {
+    // In non‑browser environments (e.g. SSR), return empty state.
+    return { attempts: [] };
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return { attempts: [] };
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.attempts)) {
+      return { attempts: parsed.attempts as PracticeAttempt[] };
+    }
+  } catch (err) {
+    console.warn('Failed to parse practice insights from localStorage:', err);
+  }
+  // Corrupt or missing data: reset storage
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  return { attempts: [] };
+}
+
+/**
+ * Persist the given practice insights to localStorage. This overwrites
+ * any existing record. For batch writes, modify the object via
+ * `loadInsights()` then call saveInsights().
+ */
+export function saveInsights(data: PracticeInsights): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn('Failed to save practice insights:', err);
+  }
+}
+
+/**
+ * Record a single practice attempt. Generates a unique id if none is
+ * provided. The attempt is appended to the existing list and stored.
+ */
+export function recordAttempt(attempt: Omit<PracticeAttempt, 'id'> & { id?: string }): void {
+  const data = loadInsights();
+  const id =
+    attempt.id ?? `${attempt.questionId}-${attempt.topicKey}-${Date.now().toString(36)}`;
+  data.attempts.push({ ...attempt, id });
+  saveInsights(data);
+}
+
+/**
+ * Retrieve attempts within a given time range. If neither start nor
+ * end is provided, returns all attempts. Timestamps are compared in
+ * milliseconds since epoch.
+ */
+export function getAttempts(options: {
+  start?: number;
+  end?: number;
+} = {}): PracticeAttempt[] {
+  const { start, end } = options;
+  const data = loadInsights();
+  return data.attempts.filter((attempt) => {
+    const ts = attempt.timestamp;
+    if (start !== undefined && ts < start) return false;
+    if (end !== undefined && ts > end) return false;
+    return true;
+  });
+}
+
+/**
+ * Clear all recorded practice insights. Useful for debugging or when
+ * resetting the user’s progress. Note: consider adding a confirmation
+ * step in the UI when calling this function.
+ */
+export function clearInsights(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn('Failed to clear practice insights:', err);
+  }
+}
