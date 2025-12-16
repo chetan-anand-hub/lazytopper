@@ -16,10 +16,9 @@ import TopicHub from "./pages/TopicHub";
 import MockBuilder from "./pages/MockBuilder";
 import AiMentorPage from "./pages/AiMentorPage";
 import StudyPlanPage from "./pages/StudyPlanPage";
-import DebugPaperEngine from "./dev/DebugPaperEngine";
 import { StudyPlannerView } from "./components/planner/StudyPlannerView";
 import PracticePage from "./pages/PracticePage";
-import PredictionDebugView from "./dev/PredictionDebugView";
+
 
 // Import the new Vibe toggle and command palette components.
 import { VibeToggle } from './ui/components/VibeToggle';
@@ -291,11 +290,6 @@ export default function App() {
             element={<WeeklyWrappedPage />}
           />
 
-          {/* Paper engine debug route */}
-          <Route path="/debug/paper-engine" element={<DebugPaperEngine />} />
-
-          {/* Prediction engine debug route – DEV ONLY */}
-          <Route path="/debug/prediction" element={<PredictionDebugView />} />
 
           {/* Catch-all: redirect unknown routes to a sensible default */}
           <Route path="*" element={<Navigate to="/trends/10/Maths" replace />} />
