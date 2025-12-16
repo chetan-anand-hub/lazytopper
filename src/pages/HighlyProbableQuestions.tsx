@@ -1,8 +1,14 @@
 // src/pages/HighlyProbableQuestions.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import {
+  useNavigate,
+  useSearchParams,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 
+import { navigateToPractice } from "../navigation/practiceNavigation";
 import {
   type HPQTopicBucket,
   type HPQQuestion,
@@ -12,6 +18,32 @@ import {
   type HPQDifficulty,
   getHighlyProbableQuestions,
 } from "../data/highlyProbableQuestions";
+
+import {
+  // 🔹 NEW: to mirror TopicHub’s Mark Yield + topic metadata
+  type TopicContentConfig,
+  getTopicContent,
+  buildGenericTopicConfig,
+} from "../data/class10ContentConfig";
+
+import { useCurrentURL } from "../utils/useCurrentURL";
+import {
+  buildTrendsUrl,
+  buildMockBuilderUrl,
+  buildAiMentorUrl,
+  buildTopicHubUrl,
+} from "../utils/buildUrl";
+
+import { useSmartLearning } from "../engine/smartLearningStore";
+import type { ChapterId, ChapterMeta } from "../engine/smartLearningTypes";
+
+// Import AI helpers to generate HPQ variants.  MoreLikeThisVariant is the
+// return type for each AI-generated question variant.  We also pull in
+// generateMoreLikeThis so that the HPQ page can request variants on-demand.
+import { generateMoreLikeThis, type MoreLikeThisVariant } from "../ai/aiClient";
+
+// 🔹 NEW: same normalisation constant as TopicHub
+const MAX_BOARD_WEIGHTAGE_FOR_CLASS10 = 14;
 
 // ---------- Local types / helpers ----------
 
@@ -70,40 +102,73 @@ function getBucketTier(bucket: HPQTopicBucket): HPQTier {
   return "good-to-do";
 }
 
-function normaliseSubject(raw: string | null): HPQSubject {
+function normaliseSubject(raw: string | null | undefined): HPQSubject {
   const val = (raw || "").toLowerCase();
   if (val === "science" || val === "sci") return "Science";
   return "Maths";
 }
+
+/**
+ * Best-effort chapterId for this HPQ bucket.
+ * Prefer an explicit bucket.chapterId if present, otherwise derive from
+ * grade + subject + topic.
+ */
+function getChapterIdForBucket(
+  bucket: HPQTopicBucket,
+  grade: string,
+  subjectKey: HPQSubject
+): ChapterId {
+  const explicit = (bucket as any).chapterId as ChapterId | undefined;
+  if (explicit) return explicit;
+
+  const safeSubject = bucket.subject ?? subjectKey;
+  const topicKey =
+    (bucket as any).topicKey ||
+    bucket.topic?.replace(/\s+/g, "-").toLowerCase() ||
+    "generic";
+
+  return `${grade}-${safeSubject}-${topicKey}` as ChapterId;
+}
+
 // ---------- Component ----------
 
 const HighlyProbableQuestions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
   const [searchParams, setSearchParams] = useSearchParams();
+  const { grade: gradeParam, subject } = useParams<"grade" | "subject">();
 
-  const grade = searchParams.get("grade") || "10";
-  const subjectParam = searchParams.get("subject");
-  const topicParam = searchParams.get("topic");
-
+  // Read grade and subject from path; fall back to query params for backward compatibility.
+  const grade = gradeParam || searchParams.get("grade") || "10";
+  const subjectParam = subject || searchParams.get("subject");
   const subjectKey: HPQSubject = normaliseSubject(subjectParam);
 
-  // 👇 NEW: track where we came from (e.g. /study-plan, /trends, etc.)
-  const fromState = (location.state as any)?.from as string | undefined;
-  const backLabel =
-    fromState && fromState.includes("/study-plan")
-      ? "Back to study plan"
-      : fromState
-      ? "Back"
-      : "Back to trends";
+  // Smart Learning Engine
+  const {
+    recordHpqAttempt,
+    // 🔹 NEW: read stats + match score
+    getStatsForChapter,
+    getMatchScoreForChapter,
+  } = useSmartLearning();
 
+  // Capture current URL for back-navigation state.
+  const currentURL = useCurrentURL();
+  const navState = (location.state as any) || {};
+  const back: string | undefined = navState.back;
+  const backLabel: string =
+    navState.backLabel ||
+    (back && back.includes("/study-plan")
+      ? "Back to study plan"
+      : "Back to trends");
+
+  // State for stream, tier, difficulty filters
   const [activeStream, setActiveStream] = useState<StreamFilterKey>("all");
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [difficultyFilter, setDifficultyFilter] =
     useState<DifficultyFilter>("all");
 
-  // topic filter (dropdown + deep-link from Trends)
+  // Topic filter (dropdown + deep-link from Trends)
+  const topicParam = searchParams.get("topic");
   const initialTopic: TopicFilter = (topicParam as TopicFilter) || "all";
   const [topicFilter, setTopicFilter] = useState<TopicFilter>(initialTopic);
 
@@ -111,9 +176,30 @@ const HighlyProbableQuestions: React.FC = () => {
     setTopicFilter((topicParam as TopicFilter) || "all");
   }, [topicParam]);
 
+  // Basket state
   const [basket, setBasket] = useState<BasketItem[]>([]);
+  const [hpqFeedback, setHpqFeedback] = useState<
+    Record<string, "correct" | "incorrect">
+  >({});
+  // Per-chapter expand/collapse state: topic -> expanded?
+  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(
+    {}
+  );
 
-  // load basket once
+  // --- AI variant state ---
+  // When students request AI‑generated variants of an HPQ, we store
+  // loading/error flags and the resulting variants keyed by question ID.
+  // This ensures each question’s variant state is tracked independently.
+  const [aiVariants, setAiVariants] = useState<Record<string, MoreLikeThisVariant[]>>({});
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [aiError, setAiError] = useState<Record<string, string | undefined>>({});
+
+  const isInBasket = React.useCallback(
+    (id: string) => basket.some((item) => item.id === id),
+    [basket]
+  );
+
+  // Load basket from localStorage once
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -138,7 +224,10 @@ const HighlyProbableQuestions: React.FC = () => {
 
   // Subject-level buckets (Maths vs Science) using engine helper
   const subjectBuckets = useMemo(
-    () => getHighlyProbableQuestions(subjectKey),
+    () =>
+      getHighlyProbableQuestions(subjectKey).filter(
+        (bucket) => (bucket.subject ?? subjectKey) === subjectKey
+      ),
     [subjectKey]
   );
 
@@ -151,14 +240,151 @@ const HighlyProbableQuestions: React.FC = () => {
     [subjectBuckets]
   );
 
+  // 🔹 NEW: derive "current topic" & its bucket for stats snippet
+  const currentTopicKey: string | undefined =
+    (topicFilter !== "all" ? topicFilter : topicParam) || undefined;
+
+  const bucketForStats: HPQTopicBucket | undefined = useMemo(() => {
+    if (!currentTopicKey) return undefined;
+    const target = currentTopicKey.toLowerCase();
+    return subjectBuckets.find(
+      (b) => b.topic.toLowerCase() === target
+    );
+  }, [subjectBuckets, currentTopicKey]);
+
+  // Build ChapterMeta + stats only if we have a matching bucket
+  const {
+    chapterMetaForStats,
+    totalAttemptsForStats,
+    accuracyPercentForStats,
+    matchScoreForStats,
+    matchLabelForStats,
+  } = useMemo(() => {
+    if (!bucketForStats) {
+      return {
+        chapterMetaForStats: undefined,
+        totalAttemptsForStats: 0,
+        accuracyPercentForStats: undefined as number | undefined,
+        matchScoreForStats: undefined as number | undefined,
+        matchLabelForStats: undefined as string | undefined,
+      };
+    }
+
+    const chapterIdForTopic = getChapterIdForBucket(
+      bucketForStats,
+      grade,
+      subjectKey
+    );
+
+    const stats = getStatsForChapter(chapterIdForTopic);
+    const totalAttempts = stats?.totalQuestionsAttempted ?? 0;
+
+    if (!stats || totalAttempts === 0) {
+      return {
+        chapterMetaForStats: undefined,
+        totalAttemptsForStats: 0,
+        accuracyPercentForStats: undefined,
+        matchScoreForStats: undefined,
+        matchLabelForStats: undefined,
+      };
+    }
+
+    const accuracyPercent = Math.round(
+      (stats.totalQuestionsCorrect / totalAttempts) * 100
+    );
+
+    // Use content config to enrich ChapterMeta
+    const rawTopicKey =
+      currentTopicKey || (bucketForStats as any).topicKey || bucketForStats.topic;
+
+    const rawConfig =
+      (getTopicContent(subjectKey as any, rawTopicKey) as
+        | TopicContentConfig
+        | undefined) ?? undefined;
+
+    const topicConfig: TopicContentConfig =
+      rawConfig ??
+      buildGenericTopicConfig({
+        subjectKey: subjectKey as any,
+        topicKey: rawTopicKey,
+        topicName: bucketForStats.topic,
+      });
+
+    const displayName: string =
+      (topicConfig as any).displayName ||
+      (topicConfig as any).title ||
+      bucketForStats.topic;
+
+    const boardWeightage: number =
+      (topicConfig as any).weightagePercent ??
+      (topicConfig as any).approxWeightage ??
+      0;
+
+    const chapterMeta: ChapterMeta = {
+      id: chapterIdForTopic,
+      grade,
+      subject: subjectKey as any,
+      topicKey:
+        (topicConfig as any).topicKey ||
+        rawTopicKey,
+      name: displayName,
+      boardWeightage,
+      tier:
+        ((topicConfig as any).tier as
+          | "must-crack"
+          | "high-roi"
+          | "good-to-do") || "high-roi",
+      difficultyMix: (topicConfig as any).difficultyMix,
+      relatedChapterIds: (topicConfig as any).relatedChapterIds,
+    };
+
+    const matchScore = getMatchScoreForChapter(
+      chapterMeta,
+      MAX_BOARD_WEIGHTAGE_FOR_CLASS10
+    );
+
+    let matchLabel: string | undefined;
+    if (matchScore !== undefined) {
+      if (matchScore >= 75) {
+        matchLabel = "🔥 high match score";
+      } else if (matchScore >= 40) {
+        matchLabel = "🟡 medium match score";
+      } else {
+        matchLabel = "🧊 low match score";
+      }
+    }
+
+    return {
+      chapterMetaForStats: chapterMeta,
+      totalAttemptsForStats: totalAttempts,
+      accuracyPercentForStats: accuracyPercent,
+      matchScoreForStats: matchScore,
+      matchLabelForStats: matchLabel,
+    };
+  }, [
+    bucketForStats,
+    currentTopicKey,
+    grade,
+    subjectKey,
+    getStatsForChapter,
+    getMatchScoreForChapter,
+  ]);
+
+  // Handlers
+
   const handleSubjectToggle = (next: HPQSubject) => {
+    // When toggling subject, drop topic filter and change the path.
     const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("subject", next);
-    // keep grade; reset topic for new subject
     nextParams.delete("topic");
-    setSearchParams(nextParams);
+    const searchStr = nextParams.toString();
+    navigate(
+      `/highly-probable/${grade}/${next}${searchStr ? `?${searchStr}` : ""}`,
+      {
+        state: { back: currentURL, backLabel: "Back to HPQ" },
+      }
+    );
     if (next === "Maths") {
-      setActiveStream("all"); // no stream for maths
+      setActiveStream("all"); // reset stream for Maths
     }
   };
 
@@ -167,35 +393,62 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   const handleBackToTrends = () => {
-    // 👇 NEW: first go back where we came from (e.g. /study-plan),
-    // otherwise fallback to the trends page.
-    if (fromState) {
-      navigate(fromState);
+    if (back) {
+      navigate(back);
     } else {
-      navigate(`/trends/${grade}/${subjectKey}`);
+      navigate(buildTrendsUrl(grade, subjectKey));
     }
   };
 
   const handleOpenMockBuilder = () => {
-    // keep basket in localStorage
+    // save basket and open mock builder with grade & subject in path
     persistBasket(basket);
-
-    // open mock builder with same grade + subject
-    const params = new URLSearchParams();
-    params.set("grade", grade);
-    params.set("subject", subjectKey);
-
-    navigate(
-      {
-        pathname: "/mock-builder",
-        search: `?${params.toString()}`,
+    navigate(buildMockBuilderUrl(grade, subjectKey), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to HPQ",
       },
+    });
+  };
+
+  const handleOpenTopicHubFromBucket = (bucket: HPQTopicBucket) => {
+    navigate(
+      buildTopicHubUrl(grade, subjectKey, bucket.topic),
       {
-        // so MockBuilder can also come back here if needed
-        state: { from: location.pathname },
+        state: {
+          back: currentURL,
+          backLabel: "Back to HPQ",
+        },
       }
     );
   };
+
+  const handleAddTopicStackToBasket = (bucket: HPQTopicBucket) => {
+    setBasket((prev) => {
+      const existingIds = new Set(prev.map((item) => item.id));
+      const additions: BasketItem[] = bucket.questions
+        .filter((q) => !existingIds.has(q.id))
+        .map((q) => ({
+          id: q.id,
+          subject: bucket.subject ?? subjectKey,
+          topic: bucket.topic,
+          stream: bucket.stream,
+          marks: q.marks ?? 0,
+          difficulty: q.difficulty,
+          section: q.section,
+          question: q.question,
+        }));
+
+      if (additions.length === 0) {
+        return prev;
+      }
+
+      const next = [...prev, ...additions];
+      persistBasket(next);
+      return next;
+    });
+  };
+
 
   const handleAddToBasket = (bucket: HPQTopicBucket, q: HPQQuestion) => {
     setBasket((prev) => {
@@ -220,16 +473,15 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   const handleAskAiMentor = (bucket: HPQTopicBucket, q: HPQQuestion) => {
-    navigate("/ai-mentor", {
+    navigate(buildAiMentorUrl(grade, subjectKey), {
       state: {
-        // preserve the origin path for back navigation
-        from: location.pathname,
-
-        grade,
-        subject: subjectKey,
-        topic: bucket.topic,
-        hpqQuestionId: q.id,
-        hpqQuestion: q.question,
+        back: currentURL,
+        backLabel: "Back to HPQ",
+        payload: {
+          topic: bucket.topic,
+          hpqQuestionId: q.id,
+          hpqQuestion: q.question,
+        },
         // set solve mode for HPQ question
         mode: "solve",
         gpt_directive:
@@ -238,6 +490,132 @@ const HighlyProbableQuestions: React.FC = () => {
           " tutor. Explain this question step by step, show working, common mistakes, and give exam-friendly presentation.",
       },
     });
+  };
+
+  const handleMoreLikeThisPractice = (bucket: HPQTopicBucket, q: HPQQuestion) => {
+    const topicKey = bucket.topic;
+    const topicName = bucket.topic;
+    const backPath = currentURL;
+    const recommendedCount = 10;
+
+    navigateToPractice(navigate, {
+      grade,
+      subject: subjectKey as any,
+      topicKey,
+      topicName,
+      backPath,
+      backLabel: "Back to HPQ",
+      subtopicHint: bucket.topic,
+      focusBankIds: q.id ? [q.id] : undefined,
+      recommendedCount,
+      difficultyPreset: (q.difficulty as any) || "All",
+    });
+  };
+
+  /**
+   * Ask the AI mentor to explain a given HPQ.  This navigates to the
+   * unified mentor page with `explain` mode and passes along the
+   * question context so the backend can generate a concise concept
+   * explanation.  We include a GPT directive to nudge the assistant
+   * towards CBSE‑friendly language and highlight key concepts.
+   */
+  const handleExplainAiMentor = (
+    bucket: HPQTopicBucket,
+    q: HPQQuestion
+  ) => {
+    navigate(buildAiMentorUrl(grade, subjectKey), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to HPQ",
+        payload: {
+          topic: bucket.topic,
+          hpqQuestionId: q.id,
+          hpqQuestion: q.question,
+        },
+        mode: "explain",
+        gpt_directive:
+          "Think like an expert CBSE Class 10 " +
+          (subjectKey === "Maths" ? "Mathematics" : "Science") +
+          " tutor. Provide a clear explanation of this question including key concepts, formulas and common pitfalls.",
+      },
+    });
+  };
+
+  /**
+   * Generate AI variants for a given HPQ.  We call the more‑like‑this
+   * endpoint with the question text, marks and difficulty to request
+   * several alternative versions.  Loading and error state are tracked
+   * per question so that multiple requests can be made in parallel.
+   */
+  const handleGenerateAiVariants = async (
+    bucket: HPQTopicBucket,
+    q: HPQQuestion
+  ) => {
+    const qId = q.id;
+    // Clear previous error and mark this question as loading
+    setAiError((prev) => ({ ...prev, [qId]: undefined }));
+    setAiLoading((prev) => ({ ...prev, [qId]: true }));
+    try {
+      const numVariants = 3;
+      // Build the request for the AI gateway.  We cast types liberally
+      // because HPQDifficulty may contain additional values; the backend
+      // will handle unknown difficulties gracefully.
+      const payload: any = {
+        subject: subjectKey,
+        topicKey: bucket.topic,
+        seedQuestion: {
+          text: q.question,
+          marks: q.marks,
+          difficulty: (q as any).difficulty,
+          bloomSkill: (q as any).bloomSkill,
+        },
+        numVariants,
+      };
+      const resp = await generateMoreLikeThis(payload);
+      setAiVariants((prev) => ({ ...prev, [qId]: resp.variants }));
+    } catch (err: any) {
+      const msg = err?.message || "Failed to generate variants";
+      setAiError((prev) => ({ ...prev, [qId]: msg }));
+    } finally {
+      setAiLoading((prev) => ({ ...prev, [qId]: false }));
+    }
+  };
+
+  // 🔁 Smart Learning: log HPQ attempts (correct / incorrect)
+  const handleMarkHpqAttempt = (
+    bucket: HPQTopicBucket,
+    q: HPQQuestion,
+    wasCorrect: boolean
+  ) => {
+    try {
+      const chapterId = getChapterIdForBucket(bucket, grade, subjectKey);
+      const marks = q.marks ?? 0;
+
+      recordHpqAttempt({
+        chapterId,
+        questionId: q.id,
+        isCorrect: wasCorrect,
+        marks,
+        difficulty: q.difficulty,
+        section: q.section,
+        source: "hpq-quick-mark",
+        userId: "local-demo-user", // until we wire real auth/profile
+        grade, // e.g. "10"
+        subject: subjectKey, // "Maths" | "Science"
+        timeTakenSeconds: 30, // rough default; we can improve later
+        attemptedAt: new Date().toISOString(),
+      });
+      // (Optional micro-feedback in future: small toast / chip)
+      setHpqFeedback((prev) => ({
+        ...prev,
+        [q.id]: wasCorrect ? "correct" : "incorrect",
+      }));
+      // (Optional micro-feedback in future: small toast / chip)
+    } catch (err) {
+      // Fail silently for now – Smart Learning is a bonus layer, not critical path.
+      // eslint-disable-next-line no-console
+      console.error("Failed to record HPQ attempt", err);
+    }
   };
 
   const totalBasketMarks = useMemo(
@@ -272,7 +650,7 @@ const HighlyProbableQuestions: React.FC = () => {
         if (bucket.stream && bucket.stream !== "General") {
           return bucket.stream === activeStream;
         }
-        // fallback: check question-level stream (in case)
+        // fallback: check question-level stream
         return bucket.questions.some((q) => {
           if (!q.stream || q.stream === "General") {
             return activeStream === "General";
@@ -284,9 +662,7 @@ const HighlyProbableQuestions: React.FC = () => {
 
     // Tier filter
     if (tierFilter !== "all") {
-      buckets = buckets.filter(
-        (bucket) => getBucketTier(bucket) === tierFilter
-      );
+      buckets = buckets.filter((bucket) => getBucketTier(bucket) === tierFilter);
     }
 
     // Difficulty filter – keep only questions of that difficulty
@@ -311,6 +687,24 @@ const HighlyProbableQuestions: React.FC = () => {
     topicFilter,
   ]);
 
+
+  // Keep expandedTopics in sync with filtered buckets:
+  // - When a specific topic is chosen, expand that chapter by default.
+  // - When showing all topics, keep prior expand state but default-open the first card.
+  useEffect(() => {
+    setExpandedTopics((prev) => {
+      const next: Record<string, boolean> = {};
+      filteredBuckets.forEach((bucket, index) => {
+        const key = bucket.topic;
+        if (topicFilter !== "all") {
+          next[key] = true;
+        } else {
+          next[key] = prev[key] ?? index === 0;
+        }
+      });
+      return next;
+    });
+  }, [filteredBuckets, topicFilter]);
   // ---------- Render helpers ----------
 
   const renderQuestionMetaChips = (q: HPQQuestion) => {
@@ -452,7 +846,6 @@ const HighlyProbableQuestions: React.FC = () => {
           }}
         >
           <span style={{ fontSize: "1rem" }}>←</span>
-          {/* 👇 NEW: dynamic label based on origin */}
           <span>{backLabel}</span>
         </button>
 
@@ -537,7 +930,9 @@ const HighlyProbableQuestions: React.FC = () => {
                       border: active
                         ? "1px solid rgba(15,23,42,0.2)"
                         : "1px solid rgba(241,245,249,0.3)",
-                      background: active ? "#f9fafb" : "rgba(15,23,42,0.35)",
+                      background: active
+                        ? "#f9fafb"
+                        : "rgba(15,23,42,0.35)",
                       color: active ? "#020617" : "#e5e7eb",
                       fontSize: "0.75rem",
                       fontWeight: active ? 600 : 500,
@@ -812,6 +1207,47 @@ const HighlyProbableQuestions: React.FC = () => {
                 <strong>HPQ stack</strong>: quick MCQs, ARs, short/long,
                 case-based – exactly the pattern that keeps repeating in boards.
               </p>
+
+              {/* 🔹 NEW: mirrored mini stats snippet (TopicHub-style) */}
+              {chapterMetaForStats &&
+                totalAttemptsForStats > 0 && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      borderRadius: 16,
+                      padding: "8px 12px",
+                      background:
+                        "linear-gradient(90deg, rgba(15,23,42,0.94), rgba(37,99,235,0.9))",
+                      color: "#e5e7eb",
+                      fontSize: "0.8rem",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 600,
+                      }}
+                    >
+                      Your {chapterMetaForStats.name} stats:
+                    </span>
+
+                    <span>📚 {totalAttemptsForStats} Q attempted</span>
+
+                    {typeof accuracyPercentForStats === "number" && (
+                      <span>🎯 {accuracyPercentForStats}% correct</span>
+                    )}
+
+                    {typeof matchScoreForStats === "number" &&
+                      matchLabelForStats && (
+                        <span>
+                          {matchLabelForStats} ({matchScoreForStats}%)
+                        </span>
+                      )}
+                  </div>
+                )}
             </div>
 
             <div style={{ minWidth: 260 }}>
@@ -897,7 +1333,7 @@ const HighlyProbableQuestions: React.FC = () => {
                 gap: 14,
               }}
             >
-              {filteredBuckets.map((bucket) => {
+              {filteredBuckets.map((bucket, index) => {
                 const tier = getBucketTier(bucket);
                 const tMeta = tierMeta[tier];
                 const totalQuestions = bucket.questions.length;
@@ -909,6 +1345,9 @@ const HighlyProbableQuestions: React.FC = () => {
                   (bucket.subject ?? subjectKey) === "Science";
                 const streamLabel =
                   bucket.stream || (isScience ? "General" : undefined);
+                const expanded =
+                  expandedTopics[bucket.topic] ??
+                  (topicFilter !== "all" ? true : index === 0);
 
                 return (
                   <div
@@ -983,6 +1422,29 @@ const HighlyProbableQuestions: React.FC = () => {
                             <span>{tMeta.emoji}</span>
                             <span>{tMeta.label}</span>
                           </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedTopics((prev) => ({
+                                ...prev,
+                                [bucket.topic]: !expanded,
+                              }))
+                            }
+                            style={{
+                              marginLeft: 8,
+                              borderRadius: 999,
+                              border: "none",
+                              padding: "2px 8px",
+                              fontSize: "0.75rem",
+                              cursor: "pointer",
+                              backgroundColor: "rgba(15,23,42,0.04)",
+                              color: "#0f172a",
+                            }}
+                            aria-label={expanded ? "Collapse chapter" : "Expand chapter"}
+                          >
+                            {expanded ? "▾ Hide stack" : "▸ Show stack"}
+                          </button>
                           {isScience && streamLabel && (
                             <span
                               style={{
@@ -1011,6 +1473,53 @@ const HighlyProbableQuestions: React.FC = () => {
                           {totalMarks} marks) in board-style formats
                           (MCQs/AR/short/case-based).
                         </p>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginTop: 6,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleAddTopicStackToBasket(bucket)
+                            }
+                            style={{
+                              borderRadius: 999,
+                              padding: "4px 10px",
+                              border:
+                                "1px solid rgba(34,197,94,0.6)",
+                              background: "rgba(220,252,231,0.95)",
+                              fontSize: "0.75rem",
+                              color: "#15803d",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Add full stack to mock 🧺
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleOpenTopicHubFromBucket(bucket)
+                            }
+                            style={{
+                              borderRadius: 999,
+                              padding: "4px 10px",
+                              border:
+                                "1px solid rgba(148,163,184,0.6)",
+                              background: "rgba(248,250,252,0.95)",
+                              fontSize: "0.75rem",
+                              color: "#475569",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Revise full topic in TopicHub →
+                          </button>
+                        </div>
+
                       </div>
 
                       <div
@@ -1048,24 +1557,29 @@ const HighlyProbableQuestions: React.FC = () => {
                     </div>
 
                     {/* Question list */}
-                    <div
-                      style={{
-                        marginTop: 10,
-                        paddingTop: 8,
-                        borderTop: "1px dashed rgba(148,163,184,0.6)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                      }}
-                    >
-                      {bucket.questions.map((q) => (
+                    {expanded && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          paddingTop: 8,
+                          borderTop: "1px dashed rgba(148,163,184,0.6)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        {bucket.questions.map((q) => {
+                        const feedback = hpqFeedback[q.id];
+                        return (
                         <div
                           key={q.id}
                           style={{
                             borderRadius: 16,
                             padding: "8px 10px",
-                            backgroundColor: "rgba(248,250,252,0.96)",
-                            border: "1px solid rgba(203,213,225,0.8)",
+                            backgroundColor:
+                              "rgba(248,250,252,0.96)",
+                            border:
+                              "1px solid rgba(203,213,225,0.8)",
                           }}
                         >
                           {renderQuestionMetaChips(q)}
@@ -1105,48 +1619,222 @@ const HighlyProbableQuestions: React.FC = () => {
                             </div>
                           )}
 
+                          {/* Smart Learning quick-feedback row */}
                           <div
                             style={{
                               marginTop: 6,
                               display: "flex",
-                              justifyContent: "flex-end",
-                              gap: 6,
                               flexWrap: "wrap",
+                              gap: 6,
+                              alignItems: "center",
+                              justifyContent: "space-between",
                             }}
                           >
-                            <button
-                              onClick={() => handleAskAiMentor(bucket, q)}
+                            <div
                               style={{
-                                borderRadius: 999,
-                                border:
-                                  "1px solid rgba(59,130,246,0.8)",
-                                padding: "4px 10px",
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: 6,
                                 fontSize: "0.75rem",
-                                background: "#eff6ff",
-                                color: "#1d4ed8",
-                                cursor: "pointer",
+                                color: "#64748b",
                               }}
                             >
-                              🤖 AI mentor solution
-                            </button>
-                            <button
-                              onClick={() => handleAddToBasket(bucket, q)}
+                              <span>How did this feel?</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleMarkHpqAttempt(bucket, q, true)
+                                }
+                                style={{
+                                  borderRadius: 999,
+                                  padding: "3px 9px",
+                                  border:
+                                    feedback === "correct"
+                                      ? "1px solid #16a34a"
+                                      : "1px solid rgba(22,163,74,0.6)",
+                                  backgroundColor:
+                                    feedback === "correct"
+                                      ? "#16a34a"
+                                      : "#ecfdf3",
+                                  fontSize: "0.75rem",
+                                  color:
+                                    feedback === "correct"
+                                      ? "#ecfdf3"
+                                      : "#166534",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                ✅ I got this right
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleMarkHpqAttempt(bucket, q, false)
+                                }
+                                style={{
+                                  borderRadius: 999,
+                                  padding: "3px 9px",
+                                  border:
+                                    feedback === "incorrect"
+                                      ? "1px solid #ea580c"
+                                      : "1px solid rgba(234,179,8,0.7)",
+                                  backgroundColor:
+                                    feedback === "incorrect"
+                                      ? "#ea580c"
+                                      : "#fffbeb",
+                                  fontSize: "0.75rem",
+                                  color:
+                                    feedback === "incorrect"
+                                      ? "#fef3c7"
+                                      : "#92400e",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🧩 I need more practice
+                              </button>
+                            </div>
+
+                            <div
                               style={{
-                                borderRadius: 999,
-                                border:
-                                  "1px solid rgba(148,163,184,0.8)",
-                                padding: "4px 10px",
-                                fontSize: "0.75rem",
-                                background: "#ffffff",
-                                cursor: "pointer",
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 6,
+                                flexWrap: "wrap",
                               }}
                             >
-                              ➕ Add to mock
-                            </button>
+                              {/* Mentor & practice actions */}
+                              <button
+                                onClick={() => handleAskAiMentor(bucket, q)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(59,130,246,0.8)",
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  background: "#eff6ff",
+                                  color: "#1d4ed8",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🧠 Solve
+                              </button>
+                              <button
+                                onClick={() => handleExplainAiMentor(bucket, q)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: "1px dashed rgba(59,130,246,0.8)",
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  background: "rgba(219,234,254,0.8)",
+                                  color: "#1d4ed8",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🧑‍🏫 Explain
+                              </button>
+                              <button
+                                onClick={() => handleGenerateAiVariants(bucket, q)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: "1px dotted rgba(59,130,246,0.8)",
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  background: "rgba(239,246,255,0.8)",
+                                  color: "#1d4ed8",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🌀 AI variants
+                              </button>
+                              <button
+                                onClick={() => handleMoreLikeThisPractice(bucket, q)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(59,130,246,0.7)",
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  background: "rgba(239,246,255,0.6)",
+                                  color: "#1d4ed8",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                📚 Bank practice
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!isInBasket(q.id)) {
+                                    handleAddToBasket(bucket, q);
+                                  }
+                                }}
+                                disabled={isInBasket(q.id)}
+                                style={{
+                                  borderRadius: 999,
+                                  border: isInBasket(q.id)
+                                    ? "1px solid rgba(79,70,229,0.85)"
+                                    : "1px solid rgba(148,163,184,0.8)",
+                                  padding: "4px 10px",
+                                  fontSize: "0.75rem",
+                                  background: isInBasket(q.id)
+                                    ? "rgba(79,70,229,0.08)"
+                                    : "#ffffff",
+                                  color: isInBasket(q.id) ? "#3730a3" : "#0f172a",
+                                  cursor: isInBasket(q.id) ? "default" : "pointer",
+                                  opacity: isInBasket(q.id) ? 0.95 : 1,
+                                }}
+                              >
+                                {isInBasket(q.id) ? "✅ Added to mock" : "➕ Add to mock"}
+                              </button>
+
+                              {/* AI variant display: loading, error and generated variants */}
+                              {aiLoading[q.id] && (
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    fontSize: "0.8rem",
+                                    color: "#1d4ed8",
+                                  }}
+                                >
+                                  Generating AI variants…
+                                </div>
+                              )}
+                              {aiError[q.id] && (
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    fontSize: "0.8rem",
+                                    color: "#b91c1c",
+                                  }}
+                                >
+                                  {aiError[q.id]}
+                                </div>
+                              )}
+                              {aiVariants[q.id] && aiVariants[q.id].length > 0 && (
+                                <div
+                                  style={{
+                                    marginTop: 8,
+                                    padding: "8px 12px",
+                                    border: "1px dashed rgba(59,130,246,0.4)",
+                                    borderRadius: 8,
+                                    background: "rgba(239,246,255,0.6)",
+                                  }}
+                                >
+                                  {aiVariants[q.id].map((v: MoreLikeThisVariant, i: number) => (
+                                    <div
+                                      key={String(v.index ?? i)}
+                                      style={{ marginBottom: 6 }}
+                                    >
+                                      <strong>Variant {i + 1}:</strong> {v.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
+                    )}
+
                   </div>
                 );
               })}

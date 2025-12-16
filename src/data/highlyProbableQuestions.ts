@@ -1,4 +1,5 @@
 // src/data/highlyProbableQuestions.ts
+import type { PredictedQuestionId } from "./predictedQuestions";
 
 // ---------------- Shared types for the HPQ engine ----------------
 
@@ -76,6 +77,13 @@ export interface HPQTopicBucket {
   subject?: HPQSubject; // default "Maths"
   stream?: HPQStream; // mainly for Science
   defaultTier?: HPQTier;
+
+  /**
+   * Optional link from this topic bucket to the global PredictedQuestions bank.
+   * Each ID must exist in predictedQuestions.ts as a PredictedQuestionId.
+   * Used for building 80-mark HPQ sets / mock papers on the HPQ page.
+   */
+  questionIds?: PredictedQuestionId[];
 
   questions: HPQQuestion[];
 }
@@ -360,6 +368,11 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
     topic: "Trigonometry",
     subject: "Maths",
     defaultTier: "high-roi",
+
+    // Link this HPQ Trigonometry bucket to the predictive engine
+    // (you can expand this list later as you add more trig predicted questions)
+    questionIds: ["2026-TRIG-SA-01", "2026-TRIG-LA-02"],
+
     questions: [
       {
         id: "trig-hpq-1",
@@ -1360,13 +1373,6 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
     ],
   },
 
-  // (Keeping all remaining Maths topics exactly as you supplied)
-  // Arithmetic Progressions, Triangles, Coordinate Geometry, Applications of Trigonometry,
-  // Circles, Areas Related to Circles, Surface Areas & Volumes, Statistics, Probability,
-  // and remaining Science topics (Periodic Classification, Control & Coordination,
-  // Heredity & Evolution, Sources of Energy, Our Environment, Management of Natural Resources)
-  // — all retained below unchanged.
-
   // -------------------- Maths: Arithmetic Progressions --------------------
   {
     topic: "Arithmetic Progressions",
@@ -1447,8 +1453,6 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
     ],
   },
 
-  // (… the rest of your data exactly as provided …)
-
   // -------------------- Maths: Triangles --------------------
   {
     topic: "Triangles",
@@ -1528,9 +1532,6 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
       },
     ],
   },
-
-  // ... (Coordinate Geometry, Applications of Trigonometry, Circles, Areas, SAV,
-  // Statistics, Probability, and the remaining Science sections as in your message) ...
 
   // -------------------- Science: Periodic Classification of Elements --------------------
   {

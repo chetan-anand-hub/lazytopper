@@ -5,6 +5,7 @@ import {
   useNavigate,
   useSearchParams,
   useLocation,
+  useParams,
 } from "react-router-dom";
 import {
   predictedQuestions,
@@ -14,8 +15,13 @@ import {
 } from "../data/predictedQuestions";
 import {
   predictedQuestionsScience,
-  type PredictedScienceQuestion,
 } from "../data/predictedQuestionsScience";
+
+import {
+  buildTrendsUrl,
+  buildHPQUrl,
+  buildStudyPlanUrl,
+} from "../utils/buildUrl";
 
 // ----- Shared/local types -----
 
@@ -35,11 +41,10 @@ interface SectionConfig {
   description: string;
 }
 
-// Allow builder questions to carry Socratic fields
-type PredictedQuestionWithSteps = (
-  | PredictedQuestion
-  | PredictedScienceQuestion
-) & {
+// Allow builder questions to carry Socratic fields. We treat both Maths
+// and Science questions as PredictedQuestion shape here; Science-specific
+// fields (like stream) are preserved via structural typing.
+type PredictedQuestionWithSteps = PredictedQuestion & {
   solutionSteps?: string[];
   finalAnswer?: string;
 };
@@ -118,7 +123,7 @@ const difficultyChipStyle: Record<
   },
 };
 
-function normaliseSubject(raw: string | null): SubjectKey {
+function normaliseSubject(raw: string | null | undefined): SubjectKey {
   const val = (raw || "").toLowerCase();
   if (val === "science" || val === "sci") return "Science";
   return "Maths";
@@ -128,22 +133,92 @@ const MockBuilder: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { grade: gradeParam, subject: subjectParam } = useParams<"grade" | "subject">();
 
-  const grade = searchParams.get("grade") || "10";
-  const subjectParam = searchParams.get("subject");
-  const subjectKey: SubjectKey = normaliseSubject(subjectParam);
+  // Read grade and subject from path; fall back to query params for backward compatibility.
+  const grade = gradeParam || searchParams.get("grade") || "10";
+  const subjectRaw = subjectParam || searchParams.get("subject");
+  const subjectKey: SubjectKey = normaliseSubject(subjectRaw);
+
+  // Capture current URL (for back-navigation when needed)
 
   // optional tag in query, like "study-plan", "hpq"
   const fromParam = searchParams.get("from") || undefined;
 
+  // Optional filters coming from Trends / TopicHub / HPQ
+  const chapterKeyParam = searchParams.get("chapterKey") || undefined;
+  const topicKeyParam = searchParams.get("topicKey") || undefined;
+  // Backward-compat: older flows may still send ?topic=<topicKey>
+  const topicParam = searchParams.get("topic") || undefined;
+
   // navigation state from HPQ / StudyPlan / elsewhere
   const navState =
     (location.state as {
-      from?: string;       // full path, e.g. "/study-plan" or "/highly-probable?..."
-      backTo?: string;     // explicit override path
-      backToState?: any;   // optional state for back target
-      backLabel?: string;  // explicit label override
+      from?: string;
+      backTo?: string;
+      backToState?: any;
+      backLabel?: string;
+      back?: string;
     } | null) ?? {};
+
+  // Determine back label using multiple hints
+  const fromPath =
+    typeof navState.from === "string" && navState.from.length > 0
+      ? navState.from
+      : undefined;
+  const fromTag = fromParam?.toLowerCase();
+
+  let backLabel: string;
+  if (navState.backLabel) {
+    backLabel = navState.backLabel;
+  } else if (navState.back && navState.back.includes("/study-plan")) {
+    backLabel = "Back to study plan";
+  } else if (navState.back && navState.back.includes("/highly-probable")) {
+    backLabel = "Back to HPQ hub";
+  } else if (fromPath && fromPath.includes("/study-plan")) {
+    backLabel = "Back to study plan";
+  } else if (fromPath && fromPath.includes("/highly-probable")) {
+    backLabel = "Back to HPQ hub";
+  } else if (fromTag === "study-plan") {
+    backLabel = "Back to study plan";
+  } else if (fromTag === "hpq" || fromTag === "highly-probable") {
+    backLabel = "Back to HPQ hub";
+  } else {
+    backLabel = "Back to chapter trends";
+  }
+
+  // Back button: use explicit back/backTo/from; otherwise fallback based on tag
+  const handleBack = () => {
+    // New navigation scheme: use back if provided
+    if (navState.back) {
+      navigate(navState.back);
+      return;
+    }
+    // Legacy explicit overrides
+    if (navState.backTo) {
+      if (navState.backToState) {
+        navigate(navState.backTo, { state: navState.backToState });
+      } else {
+        navigate(navState.backTo);
+      }
+      return;
+    }
+    if (fromPath) {
+      navigate(fromPath);
+      return;
+    }
+    // Tag-based fallback
+    if (fromTag === "study-plan") {
+      navigate(buildStudyPlanUrl(grade, subjectKey));
+      return;
+    }
+    if (fromTag === "hpq" || fromTag === "highly-probable") {
+      navigate(buildHPQUrl(grade, subjectKey));
+      return;
+    }
+    // Default: trends page
+    navigate(buildTrendsUrl(grade, subjectKey));
+  };
 
   const [openSectionId, setOpenSectionId] = useState<PaperSectionId | null>(
     "A"
@@ -155,23 +230,150 @@ const MockBuilder: React.FC = () => {
   // 🔁 Switch Maths/Science via URL param
   const handleSubjectChange = (next: SubjectKey) => {
     if (next === subjectKey) return;
-    const params = new URLSearchParams(searchParams);
-    params.set("grade", grade);
-    params.set("subject", next);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("subject");
+    // Preserve any 'from' tag
     if (fromParam) params.set("from", fromParam);
-    navigate({
-      pathname: "/mock-builder",
-      search: `?${params.toString()}`,
-    });
+    const searchStr = params.toString();
+    navigate(
+      `/mock-builder/${grade}/${next}${searchStr ? `?${searchStr}` : ""}`,
+      {
+        // keep current state if needed
+        state: location.state,
+      }
+    );
   };
 
   // Pick the correct prediction bank based on subject
   const questionBank: PredictedQuestionWithSteps[] = useMemo(() => {
-    if (subjectKey === "Science") {
-      return predictedQuestionsScience as PredictedQuestionWithSteps[];
+    // Start from full bank for the chosen subject
+    const fullBank =
+      subjectKey === "Science"
+        ? (predictedQuestionsScience as unknown as PredictedQuestionWithSteps[])
+        : (predictedQuestions as unknown as PredictedQuestionWithSteps[]);
+
+    // Derive active filters from URL (chapter + topic/subtopic)
+    const activeChapterKey = chapterKeyParam || undefined;
+    const activeTopicKey = topicKeyParam || topicParam || undefined;
+    const isScience = subjectKey === "Science";
+
+    // Helper to normalise strings for fuzzy matching
+    const normalise = (value: string | undefined | null): string =>
+      (value || "")
+        .toString()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+    // === SCIENCE PATH: topicKey is the main handle ===
+    if (isScience) {
+      // For Science, topics are chapter-sized. We treat either chapterKey or topicKey
+      // from the URL as the canonical topicKey-ish hint to match against the bank.
+      const rawHint = (activeTopicKey || activeChapterKey) as string | undefined;
+
+      // No specific filter => keep existing behaviour (full bank)
+      if (!rawHint) {
+        return fullBank;
+      }
+
+      const normHint = normalise(rawHint);
+
+      // First pass: direct topicKey equality
+      let filtered = fullBank.filter((q: any) => q.topicKey === rawHint);
+
+      // Second pass: fuzzy match against known Science topic keys
+      if (filtered.length === 0) {
+        const scienceTopicKeys: string[] = [
+          "ChemicalReactions",
+          "AcidsBasesSalts",
+          "MetalsNonMetals",
+          "CarbonCompounds",
+          "LifeProcesses",
+          "ControlAndCoordination",
+          "Reproduction",
+          "HeredityEvolution",
+          "Light",
+          "HumanEyeAndColourfulWorld",
+          "Electricity",
+          "MagneticEffects",
+          "OurEnvironment",
+        ];
+
+        // First try generic fuzzy matching
+        let matchedCanonical =
+          scienceTopicKeys.find((key) => {
+            const nk = normalise(key);
+            return nk === normHint || normHint.includes(nk) || nk.includes(normHint);
+          }) || undefined;
+
+        // Special-case mapping for Human Eye, where slugs often drop the "And" or words:
+        // e.g. "human-eye-colourful-world", "human-eye", "eye-and-colourful-world".
+        if (!matchedCanonical) {
+          if (
+            normHint.includes("humaneye") ||
+            normHint.includes("colourfulworld") ||
+            normHint.includes("coloufulworld")
+          ) {
+            matchedCanonical = "HumanEyeAndColourfulWorld";
+          }
+        }
+
+        if (matchedCanonical) {
+          filtered = fullBank.filter((q: any) => q.topicKey === matchedCanonical);
+        }
+      }
+
+      // If nothing matched (e.g. early bank or key mismatch), fall back gracefully.
+      if (filtered.length === 0) {
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn("[MockBuilder] No Science questions matched topic filter", {
+            rawHint,
+            normHint,
+            activeChapterKey,
+            activeTopicKey,
+          });
+        }
+        return fullBank;
+      }
+
+      return filtered;
     }
-    return predictedQuestions as PredictedQuestionWithSteps[];
-  }, [subjectKey]);
+
+    // === MATHS (default) PATH: chapterKey + topicKey, as before ===
+
+    // If no filters, keep existing behaviour
+    if (!activeChapterKey && !activeTopicKey) {
+      return fullBank;
+    }
+
+    // Use `any` inside the filter so we don't fight the PredictedQuestionWithSteps type
+    const filtered = fullBank.filter((q: any) => {
+      // If chapter filter is present, require match on chapterKey
+      if (activeChapterKey && q.chapterKey !== activeChapterKey) {
+        return false;
+      }
+      // If topic filter is present, require match on topicKey
+      if (activeTopicKey && q.topicKey !== activeTopicKey) {
+        return false;
+      }
+      return true;
+    });
+
+    // If filters were applied but nothing matched,
+    // gracefully fall back to the full bank so the mock is still usable.
+    if ((activeChapterKey || activeTopicKey) && filtered.length === 0) {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[MockBuilder] No predicted questions matched filters",
+          { activeChapterKey, activeTopicKey }
+        );
+      }
+      return fullBank;
+    }
+
+    return filtered;
+  }, [subjectKey, chapterKeyParam, topicKeyParam, topicParam]);
 
   // Build sectioned paper from prediction bank
   const builtSections: BuiltSection[] = useMemo(() => {
@@ -222,64 +424,6 @@ const MockBuilder: React.FC = () => {
 
   const toggleSolution = (id: string) => {
     setOpenSolutions((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // 🔙 Back button logic (mirrors HPQ-style behaviour):
-  // Priority:
-  // 1. If navState.backTo is provided -> go there.
-  // 2. Else if navState.from is a full path -> go there.
-  // 3. Else fall back to fromParam tags ("study-plan", "hpq").
-  // 4. Finally default to Trends page.
-  const fromPath =
-    typeof navState.from === "string" && navState.from.length > 0
-      ? navState.from
-      : undefined;
-  const fromTag = fromParam?.toLowerCase();
-
-  const computeBackTarget = () => {
-    // explicit override wins
-    if (navState.backTo) return navState.backTo;
-
-    // if we have a real path (e.g. "/study-plan", "/highly-probable?..."),
-    // just go straight back there
-    if (fromPath) return fromPath;
-
-    // older tag-style query usage
-    if (fromTag === "study-plan") {
-      return "/study-plan";
-    }
-    if (fromTag === "hpq" || fromTag === "highly-probable") {
-      return `/highly-probable?grade=${grade}&subject=${subjectKey}`;
-    }
-
-    // default: go to chapter trends
-    return `/trends/${grade}/${subjectKey}`;
-  };
-
-  const backTarget = computeBackTarget();
-
-  // Human-friendly label matching the target
-  let backLabel: string;
-  if (navState.backLabel) {
-    backLabel = navState.backLabel;
-  } else if (fromPath && fromPath.includes("/study-plan")) {
-    backLabel = "Back to study plan";
-  } else if (fromPath && fromPath.includes("/highly-probable")) {
-    backLabel = "Back to HPQ hub";
-  } else if (fromTag === "study-plan") {
-    backLabel = "Back to study plan";
-  } else if (fromTag === "hpq" || fromTag === "highly-probable") {
-    backLabel = "Back to HPQ hub";
-  } else {
-    backLabel = "Back to chapter trends";
-  }
-
-  const handleBack = () => {
-    if (navState.backToState) {
-      navigate(backTarget, { state: navState.backToState });
-    } else {
-      navigate(backTarget);
-    }
   };
 
   const sectionLabel = (id: PaperSectionId) => {
@@ -631,14 +775,12 @@ const MockBuilder: React.FC = () => {
                           >
                             {q.kind} · Sec {q.section}
                           </span>
-                          <span
+                            <span
                             style={{
                               borderRadius: 999,
                               padding: "4px 10px",
                               fontWeight: 500,
-                              ...difficultyChipStyle[
-                                q.difficulty as DifficultyKey
-                              ],
+                              ...difficultyChipStyle[q.difficulty as DifficultyKey],
                             }}
                           >
                             {q.difficulty}
@@ -718,7 +860,7 @@ const MockBuilder: React.FC = () => {
                                   marginBottom: q.finalAnswer ? 4 : 0,
                                 }}
                               >
-                                {q.solutionSteps.map((step, idx) => (
+                                {q.solutionSteps.map((step: string, idx: number) => (
                                   <li
                                     key={idx}
                                     style={{

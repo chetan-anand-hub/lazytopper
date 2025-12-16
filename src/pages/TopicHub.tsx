@@ -1,984 +1,305 @@
 // src/pages/TopicHub.tsx
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+//
+// TopicHub v2 – unified topic learning page.
+//
+// This component implements the revamped TopicHub experience.
+// It loads rich content for a given topic (from topicHubV2Content) and
+// organises it into tabs for overview, learning, exam prep, practice
+// and resources.  It also offers CTAs to ask the Mentor, start
+// practice and view trends, and respects the back‑navigation state
+// passed from previous pages.
 
-import type {
-  Class10SubjectKey,
-  TopicContentConfig,
-  TopicSectionConfig,
-} from "../data/class10ContentConfig";
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 
-import {
-  getTopicContent,
-  buildGenericTopicConfig,
-} from "../data/class10ContentConfig";
+import getTopicV2Content, { type TopicHubV2Content } from '../utils/getTopicV2Content';
+import { resolveTopicKey, resolveTopicDisplayName } from '../utils/topicResolver';
+import { buildTrendsUrl, buildAiMentorUrl } from '../utils/buildUrl';
+import { navigateToPractice } from '../navigation/practiceNavigation';
 
-// ----------------- Tier Meta -------------------
-type TopicTier = "must-crack" | "high-roi" | "good-to-do";
+import type { NavigationState } from '../types/navigation';
 
+// Tier metadata for hero styling.  Colours loosely follow TopicHub v1.
 const tierMeta: Record<
-  TopicTier,
+  string,
   {
     label: string;
     emoji: string;
-    chipBg: string;
-    chipText: string;
     gradient: string;
   }
 > = {
-  "must-crack": {
-    label: "Must-crack topic",
-    emoji: "🔥",
-    chipBg: "#fee2e2",
-    chipText: "#b91c1c",
+  'must-crack': {
+    label: 'Must‑crack topic',
+    emoji: '🔥',
     gradient:
-      "linear-gradient(135deg, #7f1d1d 0%, #b91c1c 25%, #f97316 65%, #facc15 100%)",
+      'linear-gradient(135deg, #7f1d1d 0%, #b91c1c 25%, #f97316 65%, #facc15 100%)',
   },
-  "high-roi": {
-    label: "High-ROI topic",
-    emoji: "💎",
-    chipBg: "#e0e7ff",
-    chipText: "#3730a3",
+  'high-roi': {
+    label: 'High‑ROI topic',
+    emoji: '🎯',
     gradient:
-      "linear-gradient(135deg, #020617 0%, #0f172a 15%, #1d4ed8 55%, #22c1c3 100%)",
+      'linear-gradient(135deg, #020617 0%, #0f172a 15%, #1d4ed8 55%, #22c1c3 100%)',
   },
-  "good-to-do": {
-    label: "Good-to-do topic",
-    emoji: "🌈",
-    chipBg: "#e0f2fe",
-    chipText: "#0369a1",
+  'good-to-do': {
+    label: 'Good‑to‑do topic',
+    emoji: '🌈',
     gradient:
-      "linear-gradient(135deg, #0f172a 0%, #0369a1 35%, #22c55e 80%, #a3e635 100%)",
+      'linear-gradient(135deg, #064e3b 0%, #10b981 25%, #22c55e 65%, #a7f3d0 100%)',
   },
 };
 
-// ----------------- Helpers -------------------
-function normaliseSubject(raw?: string | null): Class10SubjectKey {
-  const v = (raw || "").toLowerCase();
-  if (v === "science" || v === "sci") return "Science";
-  return "Maths";
-}
+// Tab keys used in the UI.  We support a fallback for unknown keys.
+type TabKey = 'overview' | 'learn' | 'exam' | 'practice' | 'resources';
 
-function getSafeTier(config: TopicContentConfig | undefined): TopicTier {
-  const t = (config as any)?.tier;
-  if (t === "must-crack" || t === "high-roi" || t === "good-to-do") return t;
-  return "high-roi";
-}
-
-function getDisplayTitle(topicParam: string, config: TopicContentConfig): string {
-  return (
-    (config as any).displayName ||
-    (config as any).title ||
-    topicParam ||
-    "Generic"
-  );
-}
-
-// ----------------- Component -------------------
-const TopicHub: React.FC = () => {
+export default function TopicHub() {
   const navigate = useNavigate();
   const location = useLocation();
+  const params = useParams();
+  const grade = (params as any).grade as string | undefined;
+  const subject = (params as any).subject as string | undefined;
+  // Accept either the path parameter (:topicKey) or the ?topic= query param
+  const pathKey = (params as any).topicKey as string | undefined;
+  const queryParams = new URLSearchParams(location.search);
+  const queryTopic = queryParams.get('topic') || undefined;
 
-  const search = new URLSearchParams(location.search);
-  const grade = search.get("grade") || "10";
-  const subjectKey = normaliseSubject(search.get("subject"));
-  const topicParam = search.get("topic") || "Generic";
+  // Determine the effective topic parameter.  Prefer the query param;
+  // otherwise use the path param.  Fallback to empty string if none.
+  const topicParam = queryTopic || pathKey || '';
 
-  const rawConfig = getTopicContent(subjectKey, topicParam);
-
-  const config: TopicContentConfig =
-    (rawConfig as TopicContentConfig) ??
-    buildGenericTopicConfig({
-      subjectKey,
-      topicKey: topicParam,
-      topicName: topicParam,
-    });
-
-  const tier = getSafeTier(config);
-  const tierInfo = tierMeta[tier];
-  const title = getDisplayTitle(topicParam, config);
-
-  const weightage =
-    (config as any).weightagePercent ??
-    (config as any).approxWeightage ??
-    0;
-
-  // track where we came from (study-plan / trends / elsewhere)
-  const fromState = (location.state as any)?.from as string | undefined;
-  const backLabel =
-    fromState && fromState.includes("/study-plan")
-      ? "Back to study plan"
-      : fromState
-      ? "Back"
-      : "Back to trends";
-
-  // ---------------- Hero Text ------------------
-  const heroTagline: string =
-    (config as any).heroTagline ??
-    "Fast-track your prep for this topic with a single scroll-friendly page. Start with NCERT + PYQs, then use LazyTopper’s HPQ bank and AI Mentor to lock the patterns.";
-
-  const examLinkCaption: string =
-    (config as any).examLinkCaption ??
-    "See how this topic shows up across CBSE sections. Tap a chip to jump straight to Highly Probable Questions for that section.";
-
-  const rawExamSections: TopicSectionConfig[] =
-    (config as any).examSections ?? [];
-
-  const examSections =
-    rawExamSections.length > 0
-      ? rawExamSections.map((sec) => ({
-          id: sec.id,
-          label: `${sec.label} · ${sec.marksLabel}`,
-          blurb: sec.blurb,
-        }))
-      : undefined;
-
-  const quickRoadmap: string[] =
-    (config as any).quickRevisionRoadmap ??
-    (config as any).roadmap ??
-    [
-      "First, revise all NCERT solved examples for this chapter.",
-      "Next, solve the last 3–5 years of PYQs for this topic.",
-      "Finally, attempt 1–2 full section-wise mocks and analyse mistakes.",
-    ];
-
-  const howToUse: string[] =
-    (config as any).howToUseSteps ??
-    (config as any).howToUse ??
-    [
-      "Skim this page once before starting PYQs / mocks for this topic.",
-      "After every mock, come back and match your mistakes with the ‘Common mistakes’ list.",
-      "Turn repeated mistakes into small flashcards and revise them 2–3 times before boards.",
-    ];
-
-  const keyConceptsSummary: string =
-    (config as any).keyConceptsSummary ??
-    "We’re still writing detailed concept cards for this topic. For now, maintain a tiny list in your notebook: (1) core definitions, (2) formulas / key results, (3) 2–3 most common PYQ patterns.";
-
-  const boardExamplesSummary: string =
-    (config as any).boardExamplesSummary ??
-    "Full board-style examples for this topic are coming soon. Till then, practise from the Highly Probable questions and use the AI Mentor to check your steps.";
-
-  const recommendedVideoSummary: string =
-    (config as any).recommendedVideoSummary ??
-    "We’re shortlisting the best one-shot video for this topic. For now, search on YouTube by the topic name plus “one-shot”.";
-
-  const recommendedVideoUrl: string | undefined =
-    (config as any).recommendedVideoUrl;
-
-  const recommendedVideo: any = (config as any).recommendedVideo;
-
-  const concepts: any[] = (config as any).conceptNotes ?? [];
-  const boardExamples: any[] = (config as any).boardExamples ?? [];
-  const mistakes: any[] = (config as any).commonMistakes ?? [];
-
-  // -------------- Navigation handlers -----------------
-  const handleBack = () => {
-    if (fromState) {
-      navigate(fromState);
-    } else {
-      navigate(`/trends/${grade}/${subjectKey}`);
+  // Look up the content record for this subject/topic.
+  const content: TopicHubV2Content = useMemo(() => {
+    if (!subject) {
+      return {
+        subject: '',
+        topicKey: '',
+        topicName: '',
+        tier: 'high-roi',
+        overview: [],
+        definitions: [],
+        examPatterns: [],
+        markingTips: [],
+        scoreTips: [],
+        workedExamples: [],
+        quickQuiz: [],
+      };
     }
+    return getTopicV2Content(subject, topicParam);
+  }, [subject, topicParam]);
+
+  // Determine the active tab.  Use ?tab= query parameter; default to
+  // overview.  Only allow known tab keys.
+  const tabParam = (queryParams.get('tab') || '').toLowerCase() as TabKey;
+  const activeTab: TabKey = ['learn', 'exam', 'practice', 'resources'].includes(tabParam)
+    ? tabParam
+    : 'overview';
+
+  // Compute the back link from state (if any).  The previous page can
+  // provide a back URL and label via react-router location.state.  If
+  // none is provided, default to the Trends page for this subject.
+  const navState = (location.state as NavigationState | null) || {};
+  const backUrl = navState.back ||
+    (grade && subject ? buildTrendsUrl(grade, subject) : undefined);
+  const backLabel = navState.backLabel ||
+    (backUrl && backUrl.startsWith('/study-plan') ? 'Back to study plan' : 'Back');
+
+  // Tab click handler – update the ?tab= query param.
+  const setTab = (tab: TabKey) => {
+    const params = new URLSearchParams(location.search);
+    if (tab === 'overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    navigate({
+      pathname: location.pathname,
+      search: params.toString(),
+    }, { replace: true });
   };
 
-  const handleAskMentor = (conceptId?: string, extra?: Record<string, any>) => {
-    navigate("/ai-mentor", {
+  // CTA handlers
+  const handlePractice = () => {
+    if (!grade || !subject) return;
+    const slug = content.topicKey;
+    // Provide backPath/backLabel so Practice page can return to this topic.
+    navigateToPractice(navigate, {
+      grade,
+      subject: subject as any,
+      topicKey: slug,
+      backPath: location.pathname + location.search,
+      backLabel: 'Back to topic',
+      topicName: content.topicName,
+    });
+  };
+  const handleMentorExplain = () => {
+    if (!grade || !subject) return;
+    navigate(buildAiMentorUrl(grade, subject), {
       state: {
-        grade,
-        subject: subjectKey,
-        topic: title,
-        topicKey: (config as any).topicKey || topicParam,
-        conceptId,
-        from: location.pathname,
-        mode: "explain",
-        ...extra,
+        mode: 'explain',
+        payload: { topic: content.topicKey },
+        back: location.pathname + location.search,
+        backLabel: 'Back to topic',
       },
     });
   };
 
-  const handleExamSectionClick = (sectionId: string) => {
-    navigate(
-      `/highly-probable?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
-        title
-      )}&section=${sectionId}`,
-      { state: { from: location.pathname } }
-    );
+  const handleBack = () => {
+    if (backUrl) navigate(backUrl);
   };
 
+  // Render nothing if subject is missing
+  if (!subject) {
+    return (
+      <div className="page">
+        <p>Error: subject not specified.</p>
+      </div>
+    );
+  }
+
+  const tier = tierMeta[content.tier] || tierMeta['high-roi'];
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #e0f2ff 0, #dde7ff 30%, #e5edff 60%, #f1f5f9 100%)",
-        paddingBottom: "80px",
-      }}
-    >
+    <div className="page" style={{ paddingBottom: '80px' }}>
+      {/* Back button */}
+      {backUrl && (
+        <button
+          type="button"
+          onClick={handleBack}
+          className="mentor-back-button"
+          style={{ marginBottom: '16px' }}
+        >
+          ← <span>{backLabel}</span>
+        </button>
+      )}
+
+      {/* Hero section */}
       <div
         style={{
-          maxWidth: "1120px",
-          margin: "0 auto",
-          padding: "16px 16px 32px",
+          background: tier.gradient,
+          padding: '24px',
+          borderRadius: '12px',
+          color: '#fff',
+          marginBottom: '24px',
         }}
       >
-        {/* Back link */}
-        <button
-          onClick={handleBack}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#4b5563",
-            fontSize: "0.85rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer",
-            marginBottom: 12,
-          }}
-        >
-          <span style={{ fontSize: "1rem" }}>←</span>
-          <span>{backLabel}</span>
-        </button>
+        <h2 style={{ margin: 0 }}>{content.topicName || resolveTopicDisplayName(subject, content.topicKey)}</h2>
+        <p style={{ margin: '4px 0 8px 0', opacity: 0.9 }}>
+          {tier.emoji} {tier.label}
+        </p>
+        {content.overview && content.overview.length > 0 && (
+          <p style={{ margin: 0 }}>{content.overview[0]}</p>
+        )}
+      </div>
 
-        {/* ---------------- HERO ---------------- */}
-        <section
-          style={{
-            borderRadius: 32,
-            padding: "24px 24px 24px 28px",
-            background: tierInfo.gradient,
-            color: "#f9fafb",
-            boxShadow: "0 24px 60px rgba(15,23,42,0.55)",
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "stretch",
-            justifyContent: "space-between",
-            gap: 24,
-          }}
-        >
-          <div style={{ maxWidth: 640 }}>
-            <div
-              style={{
-                fontSize: "0.7rem",
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                opacity: 0.85,
-                marginBottom: 8,
-              }}
-            >
-              Class {grade} · {subjectKey} · Topic
-            </div>
-
-            <h1
-              style={{
-                fontSize: "2.1rem",
-                lineHeight: 1.15,
-                fontWeight: 650,
-                marginBottom: 8,
-              }}
-            >
-              {title}
-            </h1>
-
-            <p
-              style={{
-                fontSize: "0.95rem",
-                lineHeight: 1.6,
-                opacity: 0.96,
-              }}
-            >
-              {heroTagline}
-            </p>
-
-            <div
-              style={{
-                marginTop: 16,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                alignItems: "center",
-              }}
-            >
-              {/* Tier pill */}
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  backgroundColor: tierInfo.chipBg,
-                  color: tierInfo.chipText,
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                }}
-              >
-                <span>{tierInfo.emoji}</span>
-                <span>{tierInfo.label}</span>
-              </span>
-
-              {/* Weightage */}
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  backgroundColor: "rgba(15,23,42,0.35)",
-                  color: "#e5e7eb",
-                  fontSize: "0.8rem",
-                }}
-              >
-                ≈ {weightage || "?"}% exam weightage
-              </span>
-
-              {/* Quick revision */}
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  backgroundColor: "rgba(15,23,42,0.35)",
-                  color: "#e5e7eb",
-                  fontSize: "0.8rem",
-                }}
-              >
-                ⚡ Quick revision
-              </span>
-
-              {/* Board practice */}
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  backgroundColor: "rgba(15,23,42,0.35)",
-                  color: "#e5e7eb",
-                  fontSize: "0.8rem",
-                }}
-              >
-                🎯 Board-style practice
-              </span>
-            </div>
-          </div>
-
-          {/* Right-side tips */}
-          <div
-            style={{
-              alignSelf: "stretch",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              gap: 12,
-              fontSize: "0.8rem",
-              maxWidth: 260,
-            }}
+      {/* Tab bar */}
+      <div className="topic-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {(['overview', 'learn', 'exam', 'practice', 'resources'] as TabKey[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setTab(tab)}
+            className={tab === activeTab ? 'topic-tab active' : 'topic-tab'}
+            style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: tab === activeTab ? '#e5e7eb' : '#f9fafb' }}
           >
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: 18,
-                background: "rgba(15,23,42,0.45)",
-                border: "1px solid rgba(248,250,252,0.3)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  marginBottom: 4,
-                  opacity: 0.9,
-                }}
-              >
-                Topic game-plan
-              </div>
-              <p style={{ lineHeight: 1.5, opacity: 0.95 }}>
-                1️⃣ Read this page once. 2️⃣ Do NCERT & PYQs. 3️⃣ Use{" "}
-                <strong>HPQ</strong> & <strong>AI Mentor</strong> to clean up
-                doubts.
-              </p>
-            </div>
-          </div>
-        </section>
+            {tab === 'overview'
+              ? 'Overview'
+              : tab === 'learn'
+              ? 'Learn'
+              : tab === 'exam'
+              ? 'Exam'
+              : tab === 'practice'
+              ? 'Practice'
+              : 'Resources'}
+          </button>
+        ))}
+      </div>
 
-        {/* ------------ Main GRID SECTION ------------- */}
-        <section style={{ marginTop: 24 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            {/* Exam link card */}
-            <div
-              style={{
-                borderRadius: 24,
-                backgroundColor: "rgba(248,250,252,0.98)",
-                border: "1px solid rgba(148,163,184,0.3)",
-                boxShadow: "0 18px 40px rgba(148,163,184,0.35)",
-                padding: "18px 20px 16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.9rem",
-                  fontWeight: 650,
-                  color: "#0f172a",
-                  marginBottom: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                📎 Exam link
-              </div>
+      {/* Tab panels */}
+      {activeTab === 'overview' && (
+        <div className="topic-tabpanel">
+          {content.overview && content.overview.length > 0 ? (
+            content.overview.map((line, idx) => (
+              <p key={idx} style={{ marginBottom: '8px' }}>{line}</p>
+            ))
+          ) : (
+            <p>No overview available.</p>
+          )}
+        </div>
+      )}
 
-              <p
-                style={{
-                  fontSize: "0.83rem",
-                  color: "#475569",
-                  marginBottom: 10,
-                }}
-              >
-                {examLinkCaption}
-              </p>
+      {activeTab === 'learn' && (
+        <div className="topic-tabpanel">
+          <h3>Definitions & Concepts</h3>
+          {content.definitions && content.definitions.length > 0 ? (
+            <ul style={{ paddingLeft: '16px' }}>
+              {content.definitions.map((def, idx) => (
+                <li key={idx} style={{ marginBottom: '8px' }}>
+                  <strong>{def.title}:</strong> {def.description}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No definitions available.</p>
+          )}
+        </div>
+      )}
 
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginTop: 4,
-                }}
-              >
-                {(examSections && examSections.length > 0
-                  ? examSections
-                  : [
-                      { id: "A", label: "MCQs / Objective · 1 mark" },
-                      { id: "B", label: "Very short answer · 2 marks" },
-                      { id: "C", label: "Short answer · 3 marks" },
-                      { id: "D", label: "Long answer · 4–5 marks" },
-                      { id: "E", label: "Case-based · 4 marks" },
-                    ]
-                ).map((sec) => (
-                  <button
-                    key={sec.id}
-                    onClick={() => handleExamSectionClick(sec.id)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      borderRadius: 999,
-                      padding: "6px 12px",
-                      backgroundColor: "#eef2ff",
-                      border: "1px solid rgba(129,140,248,0.55)",
-                      fontSize: "0.78rem",
-                      color: "#1e293b",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 999,
-                        backgroundColor: "#4f46e5",
-                      }}
-                    />
-                    {sec.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* How to use this page */}
-            <div
-              style={{
-                borderRadius: 24,
-                backgroundColor: "rgba(255,247,237,0.98)",
-                border: "1px solid rgba(251,146,60,0.5)",
-                boxShadow: "0 18px 40px rgba(251,146,60,0.35)",
-                padding: "18px 20px 16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.9rem",
-                  fontWeight: 650,
-                  color: "#7c2d12",
-                  marginBottom: 6,
-                }}
-              >
-                How to use this page
-              </div>
-
-              <ol
-                style={{
-                  fontSize: "0.83rem",
-                  color: "#7c2d12",
-                  paddingLeft: 18,
-                  lineHeight: 1.6,
-                }}
-              >
-                {howToUse.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ol>
-            </div>
-          </div>
-
-          {/* Quick revision + recommended video row */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            {/* Quick revision roadmap */}
-            <div
-              style={{
-                borderRadius: 24,
-                backgroundColor: "rgba(248,250,252,0.98)",
-                border: "1px solid rgba(148,163,184,0.3)",
-                boxShadow: "0 18px 40px rgba(148,163,184,0.28)",
-                padding: "18px 20px 16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.9rem",
-                  fontWeight: 650,
-                  color: "#0f172a",
-                  marginBottom: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                ⚡ Quick revision roadmap
-              </div>
-
-              <ul
-                style={{
-                  fontSize: "0.83rem",
-                  color: "#475569",
-                  paddingLeft: 18,
-                  lineHeight: 1.6,
-                }}
-              >
-                {quickRoadmap.map((step, idx) => (
-                  <li key={idx}>{step}</li>
+      {activeTab === 'exam' && (
+        <div className="topic-tabpanel">
+          <h3>Exam Patterns & Marking Tips</h3>
+          {content.examPatterns && content.examPatterns.length > 0 ? (
+            <ul style={{ paddingLeft: '16px' }}>
+              {content.examPatterns.map((pat, idx) => (
+                <li key={idx} style={{ marginBottom: '6px' }}>{pat}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No exam pattern information available.</p>
+          )}
+          {content.markingTips && content.markingTips.length > 0 && (
+            <>
+              <h4 style={{ marginTop: '16px' }}>Marking Tips</h4>
+              <ul style={{ paddingLeft: '16px' }}>
+                {content.markingTips.map((tip, idx) => (
+                  <li key={idx} style={{ marginBottom: '6px' }}>{tip}</li>
                 ))}
               </ul>
-            </div>
+            </>
+          )}
+        </div>
+      )}
 
-            {/* Recommended video card */}
-            <div
-              style={{
-                borderRadius: 24,
-                backgroundColor: "rgba(240,249,255,0.98)",
-                border: "1px solid rgba(56,189,248,0.5)",
-                boxShadow: "0 18px 40px rgba(59,130,246,0.32)",
-                padding: "18px 20px 16px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.9rem",
-                  fontWeight: 650,
-                  color: "#0f172a",
-                  marginBottom: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                🎧 Recommended board video
-              </div>
-
-              {recommendedVideoUrl ? (
-                <>
-                  {recommendedVideo && (
-                    <>
-                      <p
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "#0f172a",
-                          marginBottom: 4,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {recommendedVideo.title}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "#64748b",
-                          marginBottom: 6,
-                        }}
-                      >
-                        {recommendedVideo.channel && (
-                          <>
-                            {recommendedVideo.channel} ·{" "}
-                          </>
-                        )}
-                        {recommendedVideo.meta}
-                      </p>
-                    </>
-                  )}
-
-                  <p
-                    style={{
-                      fontSize: "0.85rem",
-                      color: "#475569",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {recommendedVideoSummary}
-                  </p>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      marginTop: 4,
-                    }}
-                  >
-                    <a
-                      href={recommendedVideoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        borderRadius: 999,
-                        padding: "6px 12px",
-                        fontSize: "0.8rem",
-                        backgroundColor: "#0f172a",
-                        color: "#f9fafb",
-                        textDecoration: "none",
-                      }}
-                    >
-                      ▶ Watch on YouTube
-                    </a>
-
-                    <button
-                      onClick={() =>
-                        handleAskMentor("summarise-video", {
-                          videoUrl: recommendedVideoUrl,
-                        })
-                      }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        borderRadius: 999,
-                        padding: "6px 12px",
-                        fontSize: "0.8rem",
-                        border: "1px solid rgba(37,99,235,0.6)",
-                        backgroundColor: "#eff6ff",
-                        color: "#1d4ed8",
-                        cursor: "pointer",
-                      }}
-                    >
-                      🤖 Summarise this video
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p
-                  style={{
-                    fontSize: "0.83rem",
-                    color: "#475569",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {recommendedVideoSummary}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Concepts + mistakes + board examples */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.4fr)",
-              gap: 16,
-            }}
+      {activeTab === 'practice' && (
+        <div className="topic-tabpanel">
+          <h3>Practice Recommendations</h3>
+          {content.scoreTips && content.scoreTips.length > 0 ? (
+            <ul style={{ paddingLeft: '16px' }}>
+              {content.scoreTips.map((tip, idx) => (
+                <li key={idx} style={{ marginBottom: '6px' }}>{tip}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No practice suggestions available.</p>
+          )}
+          <button
+            className="cta-btn"
+            style={{ marginTop: '16px' }}
+            onClick={handlePractice}
           >
-            {/* Key concepts */}
-            <div
-              style={{
-                borderRadius: 24,
-                backgroundColor: "rgba(248,250,252,0.98)",
-                border: "1px solid rgba(148,163,184,0.3)",
-                boxShadow: "0 18px 40px rgba(148,163,184,0.28)",
-                padding: "18px 20px 16px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "0.9rem",
-                    fontWeight: 650,
-                    color: "#0f172a",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  🧠 Key concepts & ideas
-                </div>
+            Start practice
+          </button>
+        </div>
+      )}
 
-                <button
-                  onClick={() => handleAskMentor(undefined)}
-                  style={{
-                    borderRadius: 999,
-                    padding: "6px 12px",
-                    border: "1px solid rgba(37,99,235,0.6)",
-                    backgroundColor: "#eff6ff",
-                    fontSize: "0.78rem",
-                    color: "#1d4ed8",
-                    cursor: "pointer",
-                  }}
-                >
-                  🤖 Ask AI Mentor about this topic
-                </button>
-              </div>
-
-              {/* Concept list */}
-              {concepts.length === 0 ? (
-                <p
-                  style={{
-                    fontSize: "0.83rem",
-                    color: "#475569",
-                  }}
-                >
-                  {keyConceptsSummary}
-                </p>
-              ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-                    gap: 10,
-                    marginTop: 4,
-                  }}
-                >
-                  {concepts.map((c: any) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        borderRadius: 16,
-                        padding: "10px 12px",
-                        backgroundColor: "#f9fafb",
-                        border: "1px solid rgba(226,232,240,0.9)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "0.83rem",
-                          fontWeight: 600,
-                          color: "#0f172a",
-                        }}
-                      >
-                        {c.title}
-                      </div>
-
-                      {c.summary && (
-                        <div
-                          style={{
-                            fontSize: "0.78rem",
-                            color: "#64748b",
-                          }}
-                        >
-                          {c.summary}
-                        </div>
-                      )}
-
-                      {c.examTip && (
-                        <div
-                          style={{
-                            fontSize: "0.78rem",
-                            color: "#0f172a",
-                            marginTop: 4,
-                          }}
-                        >
-                          <strong>Board tip:</strong> {c.examTip}
-                        </div>
-                      )}
-
-                      <button
-                        onClick={() => handleAskMentor(c.id)}
-                        style={{
-                          marginTop: 6,
-                          alignSelf: "flex-start",
-                          borderRadius: 999,
-                          padding: "4px 10px",
-                          border: "1px solid rgba(37,99,235,0.5)",
-                          backgroundColor: "#eff6ff",
-                          fontSize: "0.75rem",
-                          color: "#1d4ed8",
-                          cursor: "pointer",
-                        }}
-                      >
-                        🤖 Ask AI Mentor for this concept
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mistakes + board examples column */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
-              {/* Mistakes */}
-              <div
-                style={{
-                  borderRadius: 24,
-                  backgroundColor: "rgba(255,247,237,0.98)",
-                  border: "1px solid rgba(251,146,60,0.5)",
-                  boxShadow: "0 14px 30px rgba(251,146,60,0.32)",
-                  padding: "16px 18px 14px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "0.9rem",
-                    fontWeight: 650,
-                    color: "#7c2d12",
-                    marginBottom: 6,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  🎉 Common mistakes to avoid
-                </div>
-
-                {mistakes.length === 0 ? (
-                  <ul
-                    style={{
-                      fontSize: "0.82rem",
-                      color: "#7c2d12",
-                      paddingLeft: 18,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <li>Skipping NCERT examples and jumping straight to tests.</li>
-                    <li>
-                      Not analysing mistakes from PYQs / mocks and repeating the same
-                      pattern.
-                    </li>
-                  </ul>
-                ) : (
-                  <ul
-                    style={{
-                      fontSize: "0.82rem",
-                      color: "#7c2d12",
-                      paddingLeft: 18,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {mistakes.map((m: any, idx: number) => {
-                      if (typeof m === "string") {
-                        return <li key={idx}>{m}</li>;
-                      }
-                      return (
-                        <li key={m.id ?? idx}>
-                          <strong>{m.title}:</strong> {m.whatGoesWrong}{" "}
-                          {m.fix && <>→ {m.fix}</>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-
-              {/* Board examples */}
-              <div
-                style={{
-                  borderRadius: 24,
-                  backgroundColor: "rgba(248,250,252,0.98)",
-                  border: "1px solid rgba(148,163,184,0.3)",
-                  boxShadow: "0 14px 30px rgba(148,163,184,0.28)",
-                  padding: "16px 18px 14px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "0.9rem",
-                    fontWeight: 650,
-                    color: "#0f172a",
-                    marginBottom: 6,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  🎯 Board-flavoured examples
-                </div>
-
-                {boardExamples.length === 0 ? (
-                  <p
-                    style={{
-                      fontSize: "0.83rem",
-                      color: "#475569",
-                    }}
-                  >
-                    {boardExamplesSummary}
-                  </p>
-                ) : (
-                  <ul
-                    style={{
-                      fontSize: "0.82rem",
-                      color: "#475569",
-                      paddingLeft: 18,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {boardExamples.slice(0, 3).map((ex: any) => (
-                      <li key={ex.id}>
-                        <strong>{ex.title}:</strong> {ex.question}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+      {activeTab === 'resources' && (
+        <div className="topic-tabpanel">
+          <h3>Ask the AI Mentor</h3>
+          <p>If you're stuck, our AI Mentor can explain this topic in detail.</p>
+          <button
+            className="cta-btn"
+            onClick={handleMentorExplain}
+          >
+            Explain this topic
+          </button>
+        </div>
+      )}
     </div>
   );
-};
-
-export default TopicHub;
+}

@@ -1,24 +1,36 @@
-// src/pages/AiMentorPage.tsx
-import React, { useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+// NOTE: This is an updated version of the AI Mentor page that
+// integrates a unified mentor persona.  It imports the
+// `centralMentorPersona` definition and forwards it to the
+// `MentorPanel`, while leaving the existing planner and
+// question/explain flows intact.  The rest of the component
+// (subject/chapter selectors, trend snapshot and HPQ cards)
+// remains unchanged to preserve the current UX.
 
+import React, { useMemo, useState } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   class10TopicTrendList,
   class10MathTopicTrends,
   type Class10TopicKey,
   type TopicTier,
 } from "../data/class10MathTopicTrends";
-
 import {
   class10ScienceTopicTrendList,
   class10ScienceTopicTrends,
   type Class10ScienceTopicKey,
 } from "../data/class10ScienceTopicTrends";
-
 import { getHighlyProbableQuestions } from "../data/highlyProbableQuestions";
 
 import "./aiMentorStyles.css";
 import { MentorPanel } from "../components/MentorPanel";
+
+import { useCurrentURL } from "../utils/useCurrentURL";
+import { buildStudyPlanUrl } from "../utils/buildUrl";
+import { BackLink } from "../components/BackLink";
+// Import the central mentor persona.  This brings in the global rules
+// and mode definitions for the unified mentor.  See
+// src/mentors/centralPersona.ts for details.
+import { centralMentorPersona } from "../mentors/centralPersona";
 
 // Types
 type SubjectOption = "Maths" | "Science";
@@ -65,17 +77,46 @@ const buildDifficultyPercentFromCounts = (
 const AiMentorPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Solve/Explain entry mode
+  // Read :grade and :subject params; provide defaults
+  const { grade = "10", subject = "Maths" } =
+    useParams<"grade" | "subject">();
+  // Capture the current URL for back navigation
+  const currentURL = useCurrentURL();
+  // State passed from other pages (HPQ hub, topic hub, etc.)
   const state = location.state as any;
 
-  if (state?.conceptId || state?.hpqQuestionId || state?.mode) {
-    const pageSubject: "Maths" | "Science" = state.subject ?? "Maths";
-    const pageChapter: string | undefined = state.topic;
-    const fromPath: string | undefined = state.from;
+  /**
+   * Determine mode.  If state.mode is provided, use it;
+   * otherwise derive from hpqQuestionId or conceptId.
+   */
+  const mode =
+    state?.mode ||
+    (state?.hpqQuestionId
+      ? "solve"
+      : state?.conceptId
+      ? "explain"
+      : undefined);
 
-    const defaultMode =
-      state.mode ?? (state.hpqQuestionId ? "solve" : "explain");
+  /**
+   * Solve/Explain/Coach modes
+   * If mode is set (solve/explain), we render the modal view.
+   * Otherwise we fall back to planner mode.
+   */
+  if (mode) {
+    const pageSubject: "Maths" | "Science" =
+      state.subject ?? subject ?? "Maths";
+    const pageChapter: string | undefined =
+      state.topic ?? state.payload?.topic ?? undefined;
+    const fromPath: string | undefined = state.from;
+    const back: string | undefined = state.back;
+    const backLabel: string =
+      state.backLabel ??
+      (back && back.includes("/highly-probable")
+        ? "Back to HPQ hub"
+        : "Back");
+
+    // The default mode for MentorPanel: use mode or derive from hpqQuestionId.
+    const defaultMode = mode ?? (state.hpqQuestionId ? "solve" : "explain");
 
     const initialStudentState = {
       grade: state.grade ?? 10,
@@ -88,18 +129,19 @@ const AiMentorPage: React.FC = () => {
     };
 
     const pageContext = {
-      grade: state.grade ?? 10, // ⭐ REQUIRED by MentorPanel
+      grade: state.grade ?? 10,
       subject: pageSubject,
       chapter: pageChapter,
     } as const;
 
     const handleBack = () => {
-      if (fromPath) {
-        // Smooth loop back to HPQ (or origin page)
+      if (back) {
+        navigate(back);
+      } else if (fromPath) {
         navigate(fromPath);
       } else {
-        // Safe fallback if state.from is missing
-        navigate(-1);
+        // Safe fallback to home page if nothing is provided
+        navigate("/");
       }
     };
 
@@ -112,7 +154,7 @@ const AiMentorPage: React.FC = () => {
             className="mentor-back-button"
             onClick={handleBack}
           >
-            ← Back to previous view
+            ← {backLabel || "Back"}
           </button>
           <div className="mentor-modal-context">
             <span>
@@ -133,14 +175,22 @@ const AiMentorPage: React.FC = () => {
           defaultMode={defaultMode as any}
           autoFirstPrompt={state.gpt_directive}
           showModes
+          // Forward the unified persona so the backend knows which
+          // system prompts and rules to apply.
+          persona={centralMentorPersona}
         />
       </div>
     );
   }
 
-  // ---------------------------------------
-  // LOCAL STATES (Planner Mode)
-  // ---------------------------------------
+  /* ------------------------------------------------------------------
+   * Planner Mode
+   * ------------------------------------------------------------------
+   * When there is no concept/question provided, the page operates in planner mode.
+   * We allow the user to enter days left, hours per day, and target percentages
+   * for Maths and Science.  The plan is generated via planningPayload and
+   * handleOpenStudyPlan() navigates to the study plan page.
+   */
 
   const [daysLeft, setDaysLeft] = useState<number>(90);
   const [mathTargetPercent, setMathTargetPercent] = useState<number>(80);
@@ -149,25 +199,24 @@ const AiMentorPage: React.FC = () => {
   const [mathHoursPerDay, setMathHoursPerDay] = useState<number>(1);
   const [scienceHoursPerDay, setScienceHoursPerDay] = useState<number>(1);
 
-  const [subject, setSubject] = useState<SubjectOption>("Maths");
+  const [selectedSubject, setSelectedSubject] =
+    useState<SubjectOption>("Maths");
   const [selectedMathTopicKey, setSelectedMathTopicKey] =
     useState<Class10TopicKey | "">("");
   const [selectedScienceTopicName, setSelectedScienceTopicName] =
     useState<string>("");
 
   const difficultyMix =
-    subject === "Maths"
+    selectedSubject === "Maths"
       ? class10MathTopicTrends.difficultyDistributionPercent
       : class10ScienceTopicTrends.difficultyDistributionPercent;
 
   const mathTopicOptions = class10TopicTrendList;
   const scienceTopicOptions = class10ScienceTopicTrendList;
 
-  // ---------------------------------------
-  // Trend snapshot
-  // ---------------------------------------
+  // Trend snapshot based on the current subject and selected topic
   const currentTrend = useMemo(() => {
-    if (subject === "Maths") {
+    if (selectedSubject === "Maths") {
       if (!selectedMathTopicKey) return undefined;
 
       const entry = mathTopicOptions.find(
@@ -205,18 +254,16 @@ const AiMentorPage: React.FC = () => {
       };
     }
   }, [
-    subject,
+    selectedSubject,
     selectedMathTopicKey,
     selectedScienceTopicName,
     mathTopicOptions,
     scienceTopicOptions,
   ]);
 
-  // ---------------------------------------
-  // HPQ lookup
-  // ---------------------------------------
+  // HPQ lookup for the selected topic
   const hpqBucket = useMemo(() => {
-    if (subject === "Maths") {
+    if (selectedSubject === "Maths") {
       if (!selectedMathTopicKey) return undefined;
       const keyNorm = normalizeLabel(selectedMathTopicKey);
       return getHighlyProbableQuestions("Maths").find(
@@ -229,11 +276,13 @@ const AiMentorPage: React.FC = () => {
         (b) => normalizeLabel(b.topic) === nameNorm
       );
     }
-  }, [subject, selectedMathTopicKey, selectedScienceTopicName]);
+  }, [
+    selectedSubject,
+    selectedMathTopicKey,
+    selectedScienceTopicName,
+  ]);
 
-  // ---------------------------------------
-  // HPQ Stats
-  // ---------------------------------------
+  // HPQ statistics for the selected topic
   const hpqStats: HPQStats | null = useMemo(() => {
     if (!hpqBucket) return null;
 
@@ -254,22 +303,22 @@ const AiMentorPage: React.FC = () => {
     return { totalQuestions, approxMarks, byDifficulty };
   }, [hpqBucket]);
 
-  // ---------------------------------------
-  // Planner Payload
-  // ---------------------------------------
+  // Compose the planning payload used when navigating to /study-plan
   const planningPayload = useMemo(() => {
     const targetPercent =
-      subject === "Maths" ? mathTargetPercent : scienceTargetPercent;
+      selectedSubject === "Maths"
+        ? mathTargetPercent
+        : scienceTargetPercent;
 
     const totalDailyHours = mathHoursPerDay + scienceHoursPerDay;
 
     const mainChapterKey =
-      subject === "Maths"
+      selectedSubject === "Maths"
         ? selectedMathTopicKey || ""
         : currentTrend?.topicKey || "";
 
     const mainChapterName =
-      subject === "Maths"
+      selectedSubject === "Maths"
         ? selectedMathTopicKey || ""
         : selectedScienceTopicName || "";
 
@@ -304,17 +353,17 @@ const AiMentorPage: React.FC = () => {
 
     const links = {
       topicHubUrl: encodedTopic
-        ? `/topic-hub?grade=10&subject=${subject}&topic=${encodedTopic}`
+        ? `/topic-hub?grade=10&subject=${selectedSubject}&topic=${encodedTopic}`
         : undefined,
       hpqUrl: encodedTopic
-        ? `/highly-probable?grade=10&subject=${subject}&topic=${encodedTopic}`
+        ? `/highly-probable?grade=10&subject=${selectedSubject}&topic=${encodedTopic}`
         : undefined,
-      mockBuilderUrl: `/mock-builder?grade=10&subject=${subject}`,
-      predictivePapersUrl: `/predictive-papers?grade=10&subject=${subject}`,
+      mockBuilderUrl: `/mock-builder?grade=10&subject=${selectedSubject}`,
+      predictivePapersUrl: `/predictive-papers?grade=10&subject=${selectedSubject}`,
     };
 
     return {
-      subject,
+      subject: selectedSubject,
       classLevel: "10",
       board: "CBSE",
       daysLeft,
@@ -332,7 +381,7 @@ const AiMentorPage: React.FC = () => {
       links,
     };
   }, [
-    subject,
+    selectedSubject,
     daysLeft,
     mathTargetPercent,
     scienceTargetPercent,
@@ -346,9 +395,17 @@ const AiMentorPage: React.FC = () => {
     hpqStats,
   ]);
 
+  /**
+   * Navigate to the Study Plan page.
+   * We pass the planning parameters via state and include a back URL so that
+   * the user can return to AI Mentor (planner mode) easily.  The grade is fixed
+   * at "10" because the project currently focuses on Class 10 students.
+   */
   const handleOpenStudyPlan = () => {
-    navigate("/study-plan", {
+    navigate(buildStudyPlanUrl(grade, selectedSubject), {
       state: {
+        back: currentURL,
+        backLabel: "Back to AI Mentor",
         daysLeft,
         mathTargetPercent,
         scienceTargetPercent,
@@ -360,11 +417,18 @@ const AiMentorPage: React.FC = () => {
     });
   };
 
-  // ---------------------------------------
-  // UI (Planner mode)
-  // ---------------------------------------
   return (
     <div className="mentor-page">
+      {/* NEW: BackLink replaces the manual Home button.
+            It navigates to the previous page if state.back is set,
+            otherwise falls back to /trends/:grade/:subject. */}
+      <BackLink
+        defaultTo={`/trends/${grade}/${subject}`}
+        className="mentor-back-button"
+      >
+        ← Home
+      </BackLink>
+
       <div className="ai-mentor-header">
         <h1>AI Mentor – Smart Study Planner</h1>
         <p className="ai-mentor-tagline">
@@ -451,16 +515,16 @@ const AiMentorPage: React.FC = () => {
       <div className="mentor-card">
         <h2>Choose your subject</h2>
         <div className="mentor-subject-row">
-          {(["Maths", "Science"] as SubjectOption[]).map((subj) => (
+          {( ["Maths", "Science"] as SubjectOption[] ).map((subj) => (
             <button
               key={subj}
               type="button"
               className={
                 "pill-button" +
-                (subject === subj ? " pill-button--active" : "")
+                (selectedSubject === subj ? " pill-button--active" : "")
               }
               onClick={() => {
-                setSubject(subj);
+                setSelectedSubject(subj);
                 setSelectedMathTopicKey("");
                 setSelectedScienceTopicName("");
               }}
@@ -475,7 +539,7 @@ const AiMentorPage: React.FC = () => {
       <div className="mentor-card">
         <h2>Pick a chapter</h2>
 
-        {subject === "Maths" ? (
+        {selectedSubject === "Maths" ? (
           <select
             className="mentor-select"
             value={selectedMathTopicKey}
@@ -650,18 +714,15 @@ const AiMentorPage: React.FC = () => {
               {hpqStats && (
                 <ul className="hpq-stats-list">
                   <li>
-                    Questions:{" "}
+                    Questions: {" "}
                     <strong>{hpqStats.totalQuestions}</strong>
                   </li>
                   <li>
-                    Approx. marks:{" "}
+                    Approx. marks: {" "}
                     <strong>{hpqStats.approxMarks}</strong>
                   </li>
                   <li>
-                    Difficulty split: Easy{" "}
-                    {hpqStats.byDifficulty.Easy ?? 0}, Medium{" "}
-                    {hpqStats.byDifficulty.Medium ?? 0}, Hard{" "}
-                    {hpqStats.byDifficulty.Hard ?? 0}
+                    Difficulty split: Easy {hpqStats.byDifficulty.Easy ?? 0}, Medium {hpqStats.byDifficulty.Medium ?? 0}, Hard {hpqStats.byDifficulty.Hard ?? 0}
                   </li>
                 </ul>
               )}

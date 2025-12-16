@@ -11,6 +11,14 @@ import {
   type Class10ScienceTrendsRoot,
   type ScienceTopicTrend,
 } from "../data/class10ScienceTopicTrends";
+// NEW imports for navigation state and URL builders
+import { useCurrentURL } from "../utils/useCurrentURL";
+import {
+  buildTopicHubUrl,
+  buildHPQUrl,
+  buildMockBuilderUrl,
+  buildAiMentorUrl,
+} from "../utils/buildUrl";
 
 // --- Local types -------------------------------------------------
 
@@ -166,6 +174,9 @@ const TrendsPage: React.FC = () => {
   const grade = params.grade || "10";
   const subjectKey = normaliseSubject(params.subject);
 
+  // Capture the current URL for back-navigation
+  const currentURL = useCurrentURL();
+
   const [activeTier, setActiveTier] = useState<TierFilter>("all");
   const [activeStream, setActiveStream] = useState<StreamKey>("all");
 
@@ -215,28 +226,118 @@ const TrendsPage: React.FC = () => {
     });
   };
 
+  // UPDATED navigation handlers to use build functions and back-state
   const handleSampleQuestion = (topicName: string) => {
     navigate(
-      `/highly-probable?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
-        topicName
-      )}`
+      buildHPQUrl(grade, subjectKey, { topic: topicName }),
+      {
+        state: {
+          back: currentURL,
+          backLabel: "Back to trends",
+        },
+      }
     );
   };
 
   const handleGoToTopicHub = (topicName: string) => {
     navigate(
-      `/topic-hub?grade=${grade}&subject=${subjectKey}&topic=${encodeURIComponent(
-        topicName
-      )}`
+      buildTopicHubUrl(grade, subjectKey, topicName),
+      {
+        state: {
+          back: currentURL,
+          backLabel: "Back to trends",
+        },
+      }
     );
   };
 
+
+  const handleQuickTopicMock = (topicName: string) => {
+    navigate(
+      buildMockBuilderUrl(grade, subjectKey, {
+        from: "trends-topic",
+        topic: topicName,
+      }),
+      {
+        state: {
+          back: currentURL,
+          backLabel: "Back to trends",
+        },
+      }
+    );
+  };
+
+  const handlePracticeFromTopic = (topicName: string) => {
+    const url = `/practice/${grade}/${subjectKey}?topic=${encodeURIComponent(topicName)}`;
+    navigate(url, {
+      state: {
+        back: currentURL,
+        backLabel: "Back to trends",
+      },
+    });
+  };
+
+  /**
+   * Ask the mentor to explain an entire topic.  Navigates to the AI mentor
+   * page with `topic_explain` mode.  The topic name is passed as both
+   * `topic` and `topicKey` for basic routing; backend will map the human name
+   * to its internal key if needed.
+   */
+  const handleExplainTopic = (topicName: string) => {
+    navigate(buildAiMentorUrl(grade, subjectKey), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to trends",
+        payload: {
+          topic: topicName,
+          topicKey: topicName,
+        },
+        mode: "topic_explain",
+      },
+    });
+  };
+
+  /**
+   * Ask the mentor for exam strategy on how to score 95+ from a topic.  This
+   * navigates to the AI mentor page using the `topic_exam_tips` mode.
+   */
+  const handleExamTips = (topicName: string) => {
+    navigate(buildAiMentorUrl(grade, subjectKey), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to trends",
+        payload: {
+          topic: topicName,
+          topicKey: topicName,
+        },
+        mode: "topic_exam_tips",
+      },
+    });
+  };
+
+
   const goToHPQ = () => {
-    navigate("/highly-probable");
+    navigate(
+      buildHPQUrl(grade, subjectKey),
+      {
+        state: {
+          back: currentURL,
+          backLabel: "Back to trends",
+        },
+      }
+    );
   };
 
   const goToMockBuilder = () => {
-    navigate("/mock-builder");
+    navigate(
+      buildMockBuilderUrl(grade, subjectKey),
+      {
+        state: {
+          back: currentURL,
+          backLabel: "Back to trends",
+        },
+      }
+    );
   };
 
   return (
@@ -673,9 +774,9 @@ const TrendsPage: React.FC = () => {
               }}
             >
               Total weightage covered:{" "}
-                <span style={{ fontWeight: 600, color: "#020617" }}>
-                  {totalWeightage}%
-                </span>
+              <span style={{ fontWeight: 600, color: "#020617" }}>
+                {totalWeightage}%
+              </span>
             </div>
           </div>
 
@@ -816,7 +917,7 @@ const TrendsPage: React.FC = () => {
                               cursor: "pointer",
                             }}
                           >
-                            View 1 sample Q →
+                            Jump into HPQs →
                           </button>
 
                           <button
@@ -835,6 +936,71 @@ const TrendsPage: React.FC = () => {
                             }}
                           >
                             Go to topic hub →
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleQuickTopicMock(topicName)
+                            }
+                            style={{
+                              borderRadius: 999,
+                              padding: "5px 11px",
+                              border:
+                                "1px solid rgba(34,197,94,0.6)",
+                              background: "rgba(220,252,231,0.95)",
+                              fontSize: "0.75rem",
+                              color: "#15803d",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Mock me from this topic ⚡
+                          </button>
+
+                          <button
+                            onClick={() => handlePracticeFromTopic(topicName)}
+                            style={{
+                              borderRadius: 999,
+                              padding: "5px 11px",
+                              border: "1px solid rgba(168,85,247,0.6)",
+                              background: "rgba(237,233,254,0.98)",
+                              fontSize: "0.75rem",
+                              color: "#6d28d9",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Practice from this topic 🎯
+                          </button>
+
+                          {/* Explain topic button */}
+                          <button
+                            onClick={() => handleExplainTopic(topicName)}
+                            style={{
+                              borderRadius: 999,
+                              padding: "5px 11px",
+                              border: "1px solid rgba(59,130,246,0.6)",
+                              background: "rgba(219,234,254,0.95)",
+                              fontSize: "0.75rem",
+                              color: "#1d4ed8",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Explain topic 🧑‍🏫
+                          </button>
+
+                          {/* Score 95+ exam tips button */}
+                          <button
+                            onClick={() => handleExamTips(topicName)}
+                            style={{
+                              borderRadius: 999,
+                              padding: "5px 11px",
+                              border: "1px solid rgba(234,88,12,0.6)",
+                              background: "rgba(255,237,213,0.95)",
+                              fontSize: "0.75rem",
+                              color: "#c2410c",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Score 95+ tips 🏆
                           </button>
                         </div>
                       </div>

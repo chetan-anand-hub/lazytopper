@@ -1,3 +1,4 @@
+
 /* THEME D: CYBER GLASS ------------------------------------ */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
 
@@ -174,6 +175,47 @@ select:focus {
   color: var(--text);
   border: 1px solid rgba(148, 163, 184, 0.8);
   box-shadow: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dashboard focus mix styles                                        */
+/*
+ * These styles support the “Today’s Focus Mix” card on the
+ * dashboard.  Inspired by Duolingo’s bite‑sized lessons and gentle
+ * gamification【379702418329297†L61-L79】【561884163622332†L124-L133】, the mix is
+ * presented as a list with compact CTA chips.  The .small variant
+ * reduces padding and font size so multiple buttons fit on a single
+ * row without overwhelming the user.  The card itself reuses
+ * existing card styling via the .card class.
+ */
+.focus-card {
+  /* Additional vertical padding to separate it from the next card */
+  margin-bottom: 16px;
+}
+
+.mix-list {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.focus-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cta-btn.small {
+  margin-top: 0;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Trig dashboard helpers */
@@ -512,7 +554,7 @@ select:focus {
   color: var(--text-muted);
 }
 
-/* Primary CTA: bright, clear button (fixes the “dark button” issue) */
+/* Primary CTA: bright, clear button (fixes the "dark button" issue) */
 .chapter-primary-cta {
   margin-top: 10px;
   padding: 0.9rem 1.8rem;
@@ -540,7 +582,7 @@ select:focus {
   box-shadow: 0 14px 32px rgba(255, 123, 57, 0.55);
 }
 
-/* Right side “animation” card */
+/* Right side "animation" card */
 .chapter-hero-visual {
   display: flex;
   align-items: stretch;
@@ -589,7 +631,7 @@ select:focus {
 }
 
 .chapter-hero-anim-card ul li::before {
-  content: "•";
+  content: "-";
   position: absolute;
   left: 4px;
   top: 0;
@@ -1107,7 +1149,7 @@ select:focus {
   font-size: 0.78rem;
   opacity: 0.9;
 }
-/* === HOW TO USE LAZYTOPPER – FLOW DIAGRAM STYLE === */
+/* === HOW TO USE LAZYTOPPER - FLOW DIAGRAM STYLE === */
 
 .ai-steps-grid {
   position: relative;
@@ -1139,7 +1181,7 @@ select:focus {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
 }
 
-/* Numbered bubble 1–4 */
+/* Numbered bubble 1-4 */
 .ai-step-badge {
   position: absolute;
   top: 10px;
@@ -3014,7 +3056,7 @@ select:focus {
   margin-top: 0.5rem;
   margin-bottom: 0.75rem;
 }
-/* ---------- Predictive Papers – extra polish ---------- */
+/* ---------- Predictive Papers - extra polish ---------- */
 
 .pp-hero {
   margin-bottom: 1.25rem;
@@ -3159,7 +3201,7 @@ select:focus {
   font-size: 0.95rem;
   line-height: 1.5;
 }
-/* --- HPQ A–R block --- */
+/* --- HPQ A-R block --- */
 
 .hpq-ar-block {
   background: rgba(255, 255, 255, 0.9);
@@ -3204,7 +3246,7 @@ select:focus {
   color: #1450a3;
 }
 
-/* --- Predictive paper A–R block --- */
+/* --- Predictive paper A-R block --- */
 
 .pp-ar-block {
   background: #f7fbff;
@@ -3244,7 +3286,7 @@ select:focus {
   background: #e3f0ff;
   color: #1450a3;
 }
-/* Predictive papers – selector pills */
+/* Predictive papers - selector pills */
 .pp-paper-selector {
   gap: 0.75rem;
   flex-wrap: wrap;
@@ -3262,7 +3304,7 @@ select:focus {
   color: #ffffff;
 }
 
-/* Question list & A–R block – light styling */
+/* Question list & A-R block - light styling */
 .pp-paper-shell {
   margin-top: 1.5rem;
 }
@@ -3507,7 +3549,7 @@ select:focus {
   font-weight: 500;
 }
 
-/* Assertion–Reason styling */
+/* Assertion-Reason styling */
 .mock-ar-block {
   margin-top: 0.4rem;
   padding: 0.9rem 1rem;
@@ -3828,7 +3870,7 @@ select:focus {
   color: #6b7280;
 }
 
-/* CTA row with “Quick revision / Open topic hub” */
+/* CTA row with "Quick revision / Open topic hub" */
 
 .topic-cta-row {
   padding: 0 14px 8px;
@@ -3900,7 +3942,7 @@ select:focus {
   color: #4b5563;
 }
 
-/* --------- Bottom “Next step” card ---------- */
+/* --------- Bottom "Next step" card ---------- */
 
 .blueprint-preview {
   max-width: 1040px;
@@ -4307,7 +4349,7 @@ select:focus {
   background: #020617;
   color: #f9fafb;
 }
-/* HPQ & Mock builder pills – stay dark on hover */
+/* HPQ & Mock builder pills - stay dark on hover */
 .exam-stack-btn-primary,
 .exam-stack-btn-secondary {
   background: #020617;
@@ -7000,3 +7042,153 @@ select:focus {
   font-weight: 600;
   margin-bottom: 4px;
 }
+
+/* Summary sidebar */
+.summary-sidebar { position: fixed; inset: 0; display: none; z-index: 100; }
+.summary-sidebar.open { display: block; }
+.summary-sidebar__overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+.summary-sidebar__panel { position: absolute; right: 0; top: 0; bottom: 0; width: 320px; background: var(--bg-card); padding: 1rem; overflow-y: auto; box-shadow: -2px 0 8px rgba(0,0,0,0.1); }
+.summary-sidebar__close { border: none; background: transparent; font-size: 1.5rem; cursor: pointer; float: right; }
+.summary-sidebar__panel h4, .summary-sidebar__panel h5 { margin-top: 0; }
+.summary-sidebar__panel ul { list-style: none; padding-left: 0; }
+.summary-sidebar__panel li { margin-bottom: 0.5rem; }
+.summary-sidebar__panel button { background: none; border: none; color: var(--primary); cursor: pointer; text-decoration: underline; padding: 0; }
+.summary-sidebar__panel button:hover { text-decoration: none; }
+/* Summary toggle button – make it feel like a primary CTA chip */
+.summary-toggle-btn {
+  background: linear-gradient(135deg, #f97316, #facc15);
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.5);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+
+.summary-toggle-btn:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.summary-toggle-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
+}
+/* Smooth slide-in animation for the summary sidebar */
+@keyframes summaryPanelIn {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Apply animation when sidebar is open */
+.summary-sidebar.open .summary-sidebar__panel {
+  animation: summaryPanelIn 0.16s ease-out;
+}
+
+/* Make the panel nicer on small screens */
+@media (max-width: 640px) {
+  .summary-sidebar__panel {
+    width: min(420px, 100vw);
+  }
+}
+/* === LazyTopper additions === */
+
+/* Vibe toggle pill styles */
+.vibe-toggle button {
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.16s ease-out;
+}
+.vibe-toggle button[data-active="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Command palette backdrop and container */
+.command-palette-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  z-index: 50;
+}
+.command-palette {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  width: 90%;
+  max-width: 500px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+.command-palette-input {
+  width: 100%;
+  border: none;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.5);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+}
+.command-palette-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.command-palette-option {
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text);
+  transition: background 0.16s ease-out;
+}
+.command-palette-option:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.command-palette-empty {
+  padding: 12px 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+
+
+/* --- Dashboard Daily Focus Mix --- */
+.focus-card{margin-top:12px}
+.mix-list{margin:10px 0 0 18px;padding:0}
+.focus-cta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.cta-btn.small{padding:8px 10px;font-size:.9rem;border-radius:999px}

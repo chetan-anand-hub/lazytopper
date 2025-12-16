@@ -1936,4 +1936,15 @@ export const predictedQuestions: PredictedQuestion[] = [
     policyTag: "Basic properties",
   },
 ];
+// --- Helper exports for lookup & type-safety -----------------------------
+
+// All valid IDs from the predictedQuestions bank
+export type PredictedQuestionId = (typeof predictedQuestions)[number]["id"];
+
+// Fast lookup by id: predictedQuestionsById["2026-TRIG-SA-01"] → full question object
+export const predictedQuestionsById: Record<PredictedQuestionId, PredictedQuestion> =
+  predictedQuestions.reduce((acc, q) => {
+    acc[q.id as PredictedQuestionId] = q;
+    return acc;
+  }, {} as Record<PredictedQuestionId, PredictedQuestion>);
 

@@ -4,16 +4,23 @@ import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   predictedQuestions as predictedMathQuestions,
+  predictedQuestionsById,
   type PredictedQuestion,
+  type PredictedQuestionId,
   type SectionKey,
 } from "../data/predictedQuestions";
-import { predictedQuestionsScience } from "../data/predictedQuestionsScience";
+import {
+  predictedQuestionsScience,
+  type PredictedQuestionScience,
+} from "../data/predictedQuestionsScience";
 import { buildMockPaperFromBank } from "../utils/mockPaperEngine";
 import {
   predictivePapers,
   type SubjectKey,
 } from "../data/predictivePapers";
 import "../print.css"; // print styles
+
+type AnyPredictedQuestion = PredictedQuestion | PredictedQuestionScience;
 
 const sectionOrder: SectionKey[] = ["A", "B", "C", "D", "E"];
 
@@ -29,18 +36,70 @@ const MockPaperPage: React.FC = () => {
   // Subject of this paper (default to Maths)
   const subject: SubjectKey = paperMeta?.subject ?? "Maths";
 
-  // 2️⃣ Pick the right bank (Maths vs Science)
-  const questionBank: PredictedQuestion[] =
-    subject === "Science"
-      ? (predictedQuestionsScience as unknown as PredictedQuestion[])
-      : predictedMathQuestions;
+  // 2️⃣ Pick the right bank for the *fallback* engine.
+  // For now the generic auto-builder is tuned for Maths only, so we
+  // keep using the Maths predictive bank here. Science papers are
+  // expected to provide explicit questionIds via predictivePapers.
+  const questionBank: PredictedQuestion[] = predictedMathQuestions;
 
-  // 3️⃣ Build the mock paper from the engine
+  // 3️⃣ Build the mock paper from either:
+  //    a) curated predictive paper questionIds (when present), or
+  //    b) the generic auto-builder engine (fallback for now).
   const mockResult = React.useMemo(() => {
-    return buildMockPaperFromBank({
-      questionBank,
+    // If we don't have predictive metadata or explicit question ids yet,
+    // fall back to the existing engine so nothing breaks.
+    if (!paperMeta || !paperMeta.questionIds || paperMeta.questionIds.length === 0) {
+      return buildMockPaperFromBank({
+        questionBank,
+      });
+    }
+
+    // Build sections record in the same shape as the engine returns.
+    const baseSections: Record<SectionKey, { sectionMarks: number; questions: AnyPredictedQuestion[] }> = {
+      A: { sectionMarks: paperMeta.sectionMarks?.A ?? 0, questions: [] },
+      B: { sectionMarks: paperMeta.sectionMarks?.B ?? 0, questions: [] },
+      C: { sectionMarks: paperMeta.sectionMarks?.C ?? 0, questions: [] },
+      D: { sectionMarks: paperMeta.sectionMarks?.D ?? 0, questions: [] },
+      E: { sectionMarks: paperMeta.sectionMarks?.E ?? 0, questions: [] },
+    };
+
+    // Fast lookup map for the active bank (Science only).
+    const scienceById: Record<string, PredictedQuestionScience> =
+      subject === "Science"
+        ? predictedQuestionsScience.reduce(
+            (acc, q) => {
+              acc[q.id] = q;
+              return acc;
+            },
+            {} as Record<string, PredictedQuestionScience>
+          )
+        : {};
+
+    const sections = { ...baseSections };
+
+    paperMeta.questionIds.forEach((rawId) => {
+      const id = rawId as PredictedQuestionId;
+      let q: AnyPredictedQuestion | undefined;
+
+      if (subject === "Science") {
+        q = scienceById[id];
+      } else {
+        q = predictedQuestionsById[id] as PredictedQuestion | undefined;
+      }
+
+      if (!q) return;
+
+      const sec = (q.section ?? "A") as SectionKey;
+      sections[sec].questions.push(q);
     });
-  }, [questionBank]);
+
+    const totalMarks = Object.values(sections).reduce((sum, sec) => {
+      const sectionMarks = sec.questions.reduce((s, q) => s + (q.marks ?? 0), 0);
+      return sum + sectionMarks;
+    }, 0);
+
+    return { sections, totalMarks };
+  }, [paperMeta, questionBank, subject]);
 
   const { sections, totalMarks } = mockResult;
 
@@ -245,7 +304,7 @@ const MockPaperPage: React.FC = () => {
                     color: "#111827",
                   }}
                 >
-                  {section.questions.map((q: PredictedQuestion) => (
+                  {section.questions.map((q) => (
                     <li
                       key={q.id}
                       style={{

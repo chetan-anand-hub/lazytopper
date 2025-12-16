@@ -1,6 +1,7 @@
 // src/pages/StudyPlanPage.tsx
+
 import React, { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
   class10TopicTrendList,
@@ -9,6 +10,18 @@ import {
 import {
   class10ScienceTopicTrendList,
 } from "../data/class10ScienceTopicTrends";
+
+import { useCurrentURL } from "../utils/useCurrentURL";
+import {
+  buildAiMentorUrl,
+  buildTopicHubUrl,
+  buildHPQUrl,
+  buildMockBuilderUrl,
+} from "../utils/buildUrl";
+
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
 
 type SubjectKey = "Maths" | "Science";
 
@@ -67,6 +80,10 @@ const coerceTier = (t: any): UITier => {
   return "high-roi";
 };
 
+/**
+ * Builds a chapter list for a given subject, scaled by the exam weightage and
+ * an adjustment factor based on tier.  Returns an array sorted by tier and weight.
+ */
 function buildSubjectPlan(
   subject: SubjectKey,
   totalHours: number
@@ -115,13 +132,23 @@ function buildSubjectPlan(
     });
 }
 
+/* ------------------------------------------------------------------ */
+/* Component                                                          */
+/* ------------------------------------------------------------------ */
+
 const StudyPlanPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { grade: gradeParam } = useParams<"grade" | "subject">();
+  const currentURL = useCurrentURL();
 
   const state = (location.state || {}) as StudyPlanState;
 
-  const grade = "10";
+  const grade = gradeParam || "10";
+  // This page shows both subject plans; use activeSubject for navigation
+  const [activeSubject, setActiveSubject] = useState<SubjectKey>("Maths");
+
+  // Pull durations from state (fallback to defaults)
   const daysLeft = state.daysLeft ?? 90;
   const mathTargetPercent = state.mathTargetPercent ?? 80;
   const scienceTargetPercent = state.scienceTargetPercent ?? 80;
@@ -130,8 +157,6 @@ const StudyPlanPage: React.FC = () => {
 
   const totalMathHours = daysLeft * mathHoursPerDay;
   const totalScienceHours = daysLeft * scienceHoursPerDay;
-
-  const [activeSubject, setActiveSubject] = useState<SubjectKey>("Maths");
 
   const mathsPlan = useMemo(
     () => buildSubjectPlan("Maths", totalMathHours),
@@ -142,38 +167,94 @@ const StudyPlanPage: React.FC = () => {
     [totalScienceHours]
   );
 
+  // When navigating back to AI Mentor, preserve the state/back info if possible
+  const navState = location.state as any;
+  const back: string | undefined = navState?.back;
+  const backLabel: string =
+    navState?.backLabel ?? "Back to AI Mentor";
+
   const handleBackToMentor = () => {
-    navigate("/ai-mentor");
+    if (back) {
+      navigate(back);
+    } else {
+      // Fallback to default AI Mentor path, using grade and active subject
+      navigate(buildAiMentorUrl(grade, activeSubject));
+    }
   };
 
+  // Helpers to open other pages with grade & subject in the path
   const handleOpenTopicHub = (subject: SubjectKey, topicLabel: string) => {
-    const topicParam = encodeURIComponent(topicLabel);
-    navigate(
-      `/topic-hub?grade=${grade}&subject=${subject}&topic=${topicParam}`,
-      {
-        state: { from: location.pathname },
-      }
-    );
+    navigate(buildTopicHubUrl(grade, subject, topicLabel), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to study plan",
+      },
+    });
   };
 
   const handleOpenHPQ = (subject: SubjectKey, topicLabel: string) => {
-    const topicParam = encodeURIComponent(topicLabel);
-    navigate(
-      `/highly-probable?grade=${grade}&subject=${subject}&topic=${topicParam}`,
-      {
-        state: { from: location.pathname },
-      }
-    );
+    navigate(buildHPQUrl(grade, subject, { topic: topicLabel }), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to study plan",
+      },
+    });
   };
 
   const handleOpenMockBuilder = (subject: SubjectKey) => {
-    const params = new URLSearchParams();
-    params.set("grade", grade);
-    params.set("subject", subject);
-    navigate(`/mock-builder?${params.toString()}`, {
-      state: { from: location.pathname },
+    navigate(buildMockBuilderUrl(grade, subject), {
+      state: {
+        back: currentURL,
+        backLabel: "Back to study plan",
+      },
     });
   };
+
+
+  // The dashboard navigation helper was defined but never used.  It is
+  // commented out here to avoid unused variable warnings.  If you
+  // want a "Back to Dashboard" button on the study plan page, call
+  // navigate("/dashboard") directly in the button's onClick handler.
+  // const handleGoDashboard = () => {
+  //   navigate("/dashboard");
+  // };
+
+  /**
+   * UI state for category expansion.  Each tier can be toggled open or closed.
+   * We start with only the “Must‑crack” category open by default.
+   */
+  const [openCategories, setOpenCategories] = useState<Record<UITier, boolean>>({
+    "must-crack": true,
+    "high-roi": false,
+    "good-to-do": false,
+  });
+
+  const toggleCategory = (tier: UITier) => {
+    setOpenCategories((prev) => ({ ...prev, [tier]: !prev[tier] }));
+  };
+
+  /**
+   * Groups rows by tier and rounds hours for display.  Returns an array of
+   * category objects sorted by importance.
+   */
+  function prepareCategories(rows: PlanRow[]) {
+    const grouped: Record<UITier, { rows: PlanRow[]; totalHours: number }> = {
+      "must-crack": { rows: [], totalHours: 0 },
+      "high-roi": { rows: [], totalHours: 0 },
+      "good-to-do": { rows: [], totalHours: 0 },
+    };
+    rows.forEach((row) => {
+      const rounded = Math.round(row.hours);
+      const tier = row.tier;
+      grouped[tier].rows.push({ ...row, hours: rounded });
+      grouped[tier].totalHours += rounded;
+    });
+    return [
+      { tier: "must-crack" as UITier, ...grouped["must-crack"] },
+      { tier: "high-roi" as UITier, ...grouped["high-roi"] },
+      { tier: "good-to-do" as UITier, ...grouped["good-to-do"] },
+    ];
+  }
 
   const renderPlanTable = (subject: SubjectKey, rows: PlanRow[]) => {
     const targetPercent =
@@ -207,6 +288,8 @@ const StudyPlanPage: React.FC = () => {
         </div>
       );
     }
+
+    const categories = prepareCategories(rows);
 
     return (
       <section
@@ -245,167 +328,233 @@ const StudyPlanPage: React.FC = () => {
           to distribute by board weightage and topic tier.
         </p>
 
-        {/* Header row */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            color: "#64748b",
-            padding: "6px 10px",
-            borderRadius: 14,
-            backgroundColor: "#e5edff",
-            marginBottom: 8,
-          }}
-        >
-          <div>Chapter</div>
-          <div>Tier</div>
-          <div>Board wt.</div>
-          <div style={{ textAlign: "right" }}>
-            Recommended hours & actions
-          </div>
-        </div>
-
-        {/* Rows */}
+        {/* Category ribbon */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: 6,
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 12,
           }}
         >
-          {rows.map((row) => {
-            const tMeta = tierMeta[row.tier];
-
+          {categories.map(({ tier, totalHours }) => {
+            const meta = tierMeta[tier];
             return (
-              <div
-                key={row.topicKey}
+              <button
+                key={tier}
+                type="button"
+                onClick={() => toggleCategory(tier)}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
-                  padding: "10px 10px",
-                  borderRadius: 14,
-                  backgroundColor: "#ffffff",
-                  border: "1px solid rgba(226,232,240,0.9)",
+                  borderRadius: 999,
+                  padding: "6px 14px",
+                  border: "1px solid rgba(148,163,184,0.5)",
+                  backgroundColor: meta.chipBg,
+                  color: meta.chipText,
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 8,
+                  gap: 6,
                 }}
               >
-                <div
+                <span>{meta.emoji}</span>
+                <span>{meta.label}</span>
+                <span
                   style={{
-                    fontSize: "0.9rem",
+                    backgroundColor: "rgba(255,255,255,0.6)",
+                    borderRadius: 999,
+                    padding: "2px 8px",
+                    marginLeft: 6,
+                    color: meta.chipText,
                     fontWeight: 600,
-                    color: "#020617",
+                    fontSize: "0.7rem",
                   }}
                 >
-                  {row.topicLabel}
-                </div>
-
-                {/* Tier chip */}
-                <div>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      backgroundColor: tMeta.chipBg,
-                      color: tMeta.chipText,
-                      fontSize: "0.78rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    <span>{tMeta.emoji}</span>
-                    <span>{tMeta.label}</span>
-                  </span>
-                </div>
-
-                {/* Weightage */}
-                <div
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "#475569",
-                  }}
-                >
-                  ≈ {row.weightagePercent || "?"}% of paper
-                </div>
-
-                {/* Hours + actions */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "0.9rem",
-                      fontWeight: 600,
-                      color: "#0f172a",
-                    }}
-                  >
-                    {row.hours.toFixed(1)} hrs
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleOpenTopicHub(subject, row.topicLabel)
-                    }
-                    style={{
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      fontSize: "0.78rem",
-                      border: "1px solid rgba(59,130,246,0.8)",
-                      backgroundColor: "#eef2ff",
-                      color: "#1d4ed8",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Study in TopicHub
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOpenHPQ(subject, row.topicLabel)}
-                    style={{
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      fontSize: "0.78rem",
-                      border: "1px solid rgba(147,51,234,0.7)",
-                      backgroundColor: "#f5f3ff",
-                      color: "#6d28d9",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Practice HPQs
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleOpenMockBuilder(subject)}
-                    style={{
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      fontSize: "0.78rem",
-                      border: "1px solid rgba(34,197,94,0.7)",
-                      backgroundColor: "#ecfdf3",
-                      color: "#15803d",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Quick mock
-                  </button>
-                </div>
-              </div>
+                  {totalHours} hrs
+                </span>
+              </button>
             );
           })}
         </div>
+
+        {/* Category details */}
+        {categories.map(({ tier, rows: tierRows, totalHours }) =>
+          openCategories[tier] ? (
+            <div key={tier} style={{ marginTop: 10 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderRadius: 999,
+                    padding: "4px 10px",
+                    backgroundColor: tierMeta[tier].chipBg,
+                    color: tierMeta[tier].chipText,
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {tierMeta[tier].emoji} {tierMeta[tier].label}
+                </span>
+                <span style={{ fontSize: "0.85rem", color: "#475569" }}>
+                  {totalHours} hrs total
+                </span>
+              </div>
+              {/* Header row for the category */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  color: "#64748b",
+                  padding: "4px 10px",
+                  borderRadius: 8,
+                  backgroundColor: "rgba(230,236,255,0.6)",
+                  marginBottom: 4,
+                }}
+              >
+                <div>Chapter</div>
+                <div style={{ textAlign: "center" }}>Tier</div>
+                <div style={{ textAlign: "left" }}>Board wt.</div>
+                <div style={{ textAlign: "right" }}>
+                  Recommended hours & actions
+                </div>
+              </div>
+              {/* Rows for this category */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {tierRows.map((row) => {
+                  const meta = tierMeta[row.tier];
+                  return (
+                    <div
+                      key={row.topicKey}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "2.2fr 1fr 1.2fr 2.2fr",
+                        padding: "8px 10px",
+                        borderRadius: 14,
+                        backgroundColor: "#ffffff",
+                        border: "1px solid rgba(226,232,240,0.9)",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "0.9rem",
+                          fontWeight: 600,
+                          color: "#020617",
+                        }}
+                      >
+                        {row.topicLabel}
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            borderRadius: 999,
+                            padding: "3px 8px",
+                            backgroundColor: meta.chipBg,
+                            color: meta.chipText,
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {meta.emoji}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "#475569",
+                        }}
+                      >
+                        ≈ {row.weightagePercent || "?"}% of paper
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            color: "#0f172a",
+                          }}
+                        >
+                          {row.hours} hrs
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenTopicHub(subject, row.topicLabel)
+                          }
+                          style={{
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: "0.74rem",
+                            border: "1px solid rgba(59,130,246,0.8)",
+                            backgroundColor: "#eef2ff",
+                            color: "#1d4ed8",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Study in TopicHub
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenHPQ(subject, row.topicLabel)}
+                          style={{
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: "0.74rem",
+                            border: "1px solid rgba(147,51,234,0.7)",
+                            backgroundColor: "#f5f3ff",
+                            color: "#6d28d9",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Practice HPQs
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenMockBuilder(subject)}
+                          style={{
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: "0.74rem",
+                            border: "1px solid rgba(34,197,94,0.7)",
+                            backgroundColor: "#ecfdf3",
+                            color: "#15803d",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Quick mock
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null
+        )}
       </section>
     );
   };
@@ -457,7 +606,7 @@ const StudyPlanPage: React.FC = () => {
           }}
         >
           <span style={{ fontSize: "1rem" }}>←</span>
-          <span>Back to AI Mentor</span>
+          <span>{backLabel}</span>
         </button>
 
         {/* Hero */}
