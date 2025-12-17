@@ -1588,9 +1588,48 @@ const HighlyProbableQuestions: React.FC = () => {
                               fontSize: "0.85rem",
                               color: "#0f172a",
                               marginBottom: 4,
+                              lineHeight: 1.35,
                             }}
                           >
-                            {q.question}
+                            {/*
+                              Assertion–Reason items often store the real prompt
+                              inside `assertion` + `reason`. If we only render
+                              `q.question`, the card looks empty/incomplete.
+                            */}
+                            {q.kind === "assertion-reason" ||
+                            // Support both legacy and new schema
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (q as any).type === "AssertionReason" ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                <div style={{ fontWeight: 600 }}>
+                                  {q.question || "Assertion–Reason: refer to assertion and reason below."}
+                                </div>
+                                {q.assertion && (
+                                  <div>
+                                    <strong>Assertion:</strong> {q.assertion}
+                                  </div>
+                                )}
+                                {q.reason && (
+                                  <div>
+                                    <strong>Reason:</strong> {q.reason}
+                                  </div>
+                                )}
+                                {/* Render AR options if present */}
+                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                {(q as any).aROptions?.length ? (
+                                  <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    {(q as any).aROptions.map((opt: any) => (
+                                      <div key={opt.label} style={{ fontSize: "0.8rem", color: "#334155" }}>
+                                        <strong>{opt.label}.</strong> {opt.text}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <>{q.question}</>
+                            )}
                           </div>
 
                           {q.answer && (

@@ -1,6 +1,10 @@
 // src/data/class10MathTopicTrends.ts
+//
+// Clean, canonical topic-trends map for Class 10 Maths.
+// NOTE: Keys are quoted to avoid accidental shorthand/identifier parsing and to prevent duplicates.
+//
+// This file is used to derive Class10TopicKey (keyof topics). Keep keys aligned with the question banks.
 
-// ----- Types inferred from the data -----
 export type DifficultyKey = "Easy" | "Medium" | "Hard";
 
 // Tier labels (aligned with TopicHub etc.)
@@ -41,7 +45,7 @@ export const class10MathTopicTrends = {
     Hard: 20,
   } as Record<DifficultyKey, number>,
 
-  // Updated for CBSE 2026-style blueprint (80 marks total)
+  // CBSE-style blueprint (80 marks total)
   // A: 20×1 = 20, B: 5×2 = 10, C: 6×3 = 18, D: 4×5 = 20, E: 3×4 = 12
   marksAllocation: {
     "Section A (MCQ/Assertion, 1 mark)": 20,
@@ -53,23 +57,23 @@ export const class10MathTopicTrends = {
 
   topics: {
     "Real Numbers": {
-      weightagePercent: 5,
+      weightagePercent: 7,
       tier: "high-roi" as TopicTier,
       summary:
-        "1–2 direct MCQs or short answer questions. Most focus on HCF/LCM, Euclid’s lemma, rational/irrational proofs. No long or case-based questions in latest pattern.",
+        "Euclid division lemma, HCF/LCM, irrationality proofs, decimal expansions—often 1 short + 1 MCQ.",
       conceptWeightage: {
-        "Euclid's Division Algorithm": 30,
-        "Fundamental Theorem of Arithmetic": 30,
-        "Irrational Numbers & Proofs": 25,
-        "Decimal Expansions": 15,
+        "Euclid Division Lemma": 30,
+        "Fundamental Theorem of Arithmetic": 35,
+        "Irrationality Proofs": 25,
+        "Decimal Expansion": 10,
       },
     },
 
-    Polynomials: {
+    "Polynomials": {
       weightagePercent: 5,
       tier: "high-roi" as TopicTier,
       summary:
-        "Quick-solve chapter: roots/zeroes, factor theorem, identities. Frequently tested with easy or moderate MCQs/Assertions. All marks from rapid recall/problem manipulation.",
+        "Roots/zeroes, factor theorem, identities—frequently tested via quick MCQs/assertions and short items.",
       conceptWeightage: {
         [POLY_SUBTOPIC_COEFF_ROOT]: 45,
         [POLY_SUBTOPIC_ZEROS]: 35,
@@ -81,7 +85,7 @@ export const class10MathTopicTrends = {
       weightagePercent: 11,
       tier: "must-crack" as TopicTier,
       summary:
-        "Consistently high weighted; covers algebraic solution methods (elimination, substitution, cross-multiplication), real-world problems, and assertion/case-based scenarios. 2–3 items per paper, often at least one application or tough scenario.",
+        "Algebraic methods, consistency/nature of solutions, and word applications—high frequency across sections.",
       conceptWeightage: {
         [PLE_SUBTOPIC_ALGEBRAIC]: 40,
         [PLE_SUBTOPIC_WORD_APP]: 35,
@@ -90,10 +94,10 @@ export const class10MathTopicTrends = {
     },
 
     "Quadratic Equations": {
-      weightagePercent: 7,
+      weightagePercent: 8,
       tier: "must-crack" as TopicTier,
       summary:
-        "Medium-high probability of one moderate-to-long question. Focus shifts between nature of roots, application problems, and assertion on solution methods/discriminant.",
+        "Solution methods + discriminant/nature of roots + word problems—very common in Section A/C.",
       conceptWeightage: {
         [QE_SUBTOPIC_ALGEBRAIC]: 40,
         [QE_SUBTOPIC_NOR]: 30,
@@ -105,7 +109,7 @@ export const class10MathTopicTrends = {
       weightagePercent: 7,
       tier: "high-roi" as TopicTier,
       summary:
-        "Standard Nth term, sum, word problems. Most answers are point-and-plug or two-step applications. Expect one MCQ and one short/medium, rarely tough.",
+        "Nth term, sum, and word applications—usually one MCQ + one short/medium item.",
       conceptWeightage: {
         "nth Term": 35,
         "Sum of n Terms": 35,
@@ -113,11 +117,11 @@ export const class10MathTopicTrends = {
       },
     },
 
-    Triangles: {
+    "Triangles": {
       weightagePercent: 9,
       tier: "must-crack" as TopicTier,
       summary:
-        "Frequently appears as a proof or ratio question. BPT, similarity, area ratio, and challenging assertion/case-based geometry seen in every paper.",
+        "Similarity/BPT/area ratio + Pythagoras—often proof + application, frequently appears every paper.",
       conceptWeightage: {
         [TRI_SUBTOPIC_SIMILARITY]: 35,
         [TRI_SUBTOPIC_BPT]: 30,
@@ -127,10 +131,10 @@ export const class10MathTopicTrends = {
     },
 
     "Coordinate Geometry": {
-      weightagePercent: 6,
+      weightagePercent: 7,
       tier: "high-roi" as TopicTier,
       summary:
-        "Always at least one distance/area question; sometimes in MCQ/Section A. High scoring if standard formulas are mastered.",
+        "Distance/section/area of triangle—direct scoring, recurring in Section A/B.",
       conceptWeightage: {
         "Distance Formula": 40,
         "Section Formula": 35,
@@ -138,11 +142,11 @@ export const class10MathTopicTrends = {
       },
     },
 
-    Trigonometry: {
+    "Trigonometry": {
       weightagePercent: 10,
       tier: "must-crack" as TopicTier,
       summary:
-        "Top slot for board marks; ratios, identities, heights/distances, and case study real-world questions. Mixture of direct MCQ, calculation, and long application.",
+        "Ratios/identities + heights & distances—high ROI; supports case-based real-life contexts.",
       conceptWeightage: {
         [TRIG_SUBTOPIC_RATIOS]: 35,
         [TRIG_SUBTOPIC_IDENTITIES]: 35,
@@ -150,11 +154,11 @@ export const class10MathTopicTrends = {
       },
     },
 
-    Circles: {
+    "Circles": {
       weightagePercent: 6,
       tier: "high-roi" as TopicTier,
       summary:
-        "Focus on tangent theorems (equal length, perpendicularity, circle-segment arguments). Normally short/medium, proofs or scenario MCQ.",
+        "Tangent properties/theorems + short proofs/scenarios—typically short/medium items.",
       conceptWeightage: {
         "Tangent Properties": 45,
         "Tangent Theorems & Proofs": 35,
@@ -162,12 +166,11 @@ export const class10MathTopicTrends = {
       },
     },
 
-    // Not in your updated list, but kept with lower weight as per recent trends
-    Constructions: {
+    "Constructions": {
       weightagePercent: 3,
       tier: "good-to-do" as TopicTier,
       summary:
-        "Occasional 2–3 mark procedural question: divide a line segment, draw tangents, or construct a similar triangle. Useful but lower priority than must-crack algebra/geometry.",
+        "Procedural construction steps—lower weight but easy marks if practiced.",
       conceptWeightage: {
         "Divide Segment": 40,
         "Construct Tangent": 35,
@@ -179,7 +182,7 @@ export const class10MathTopicTrends = {
       weightagePercent: 4,
       tier: "good-to-do" as TopicTier,
       summary:
-        "Only one or two direct application MCQ/shorts. Expect sector/segment area or practical area Q. No proof/longs in new pattern.",
+        "Sector/segment and composite figures—usually direct application MCQ/shorts.",
       conceptWeightage: {
         "Sectors and Segments": 65,
         "Composite Figures": 35,
@@ -190,19 +193,19 @@ export const class10MathTopicTrends = {
       weightagePercent: 8,
       tier: "high-roi" as TopicTier,
       summary:
-        "Solid geometry: standard computation questions, surface area, volume, converting forms, water-level rising, etc. At least one calculation/medium Q, rarely tough.",
+        "Standard solids + combination problems + unit conversions—often one medium/long calculation.",
       conceptWeightage: {
         "Cylinder/Cone/Sphere": 60,
         "Combination/Transformation": 30,
-        Frustum: 10,
+        "Frustum": 10,
       },
     },
 
-    Statistics: {
+    "Statistics": {
       weightagePercent: 11,
       tier: "must-crack" as TopicTier,
       summary:
-        "Guaranteed 2–3 items per paper. Mean (step deviation, grouped), median (graphical), mode, or ogive/graph interpretation. Often has a real-life or data-study axis.",
+        "Grouped data mean/median/mode + ogive interpretation—high-frequency, scoring chapter.",
       conceptWeightage: {
         "Mean (Step Deviation)": 35,
         "Median of Grouped Data": 30,
@@ -211,11 +214,11 @@ export const class10MathTopicTrends = {
       },
     },
 
-    Probability: {
+    "Probability": {
       weightagePercent: 8,
       tier: "must-crack" as TopicTier,
       summary:
-        "Always 1–2 direct calculation or scenario MCQs (cards, coins, dice), sometimes case-based with hidden outcomes or complement-probability. Almost never a tough/long question.",
+        "Single-event probability + complements/combined scenarios—regular direct questions.",
       conceptWeightage: {
         "Single Event Probability": 65,
         "Combined/Word Problem Probability": 35,
@@ -231,17 +234,13 @@ export type Class10TopicKey = keyof Class10MathTopicTrendsData["topics"];
 // ---- Normalized list for easy linking across the app ----
 
 export interface TopicTrendEntry {
-  topicKey: Class10TopicKey; // e.g. "Pair of Linear Equations"
+  topicKey: Class10TopicKey;
   weightagePercent: number;
   tier?: TopicTier;
   summary?: string;
   conceptWeightage: Record<string, number>;
 }
 
-/**
- * Array form of topic trends, useful for mapping in UI and for
- * linking with content JSON by topicKey.
- */
 export const class10TopicTrendList: TopicTrendEntry[] = Object.entries(
   class10MathTopicTrends.topics
 ).map(([key, value]) => ({

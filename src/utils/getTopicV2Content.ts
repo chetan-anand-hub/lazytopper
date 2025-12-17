@@ -9,6 +9,7 @@
 // that topic has not yet been fully migrated to the v2 schema.
 
 import { topicHubV2Content } from '../data/topicHubV2Full';
+import { topicHubV2Enrichment } from '../data/topicHubV2Enrichment';
 import { resolveTopicKey, resolveTopicDisplayName } from './topicResolver';
 
 // Define the shape of each content record.  This mirrors the
@@ -77,7 +78,7 @@ export interface CaseStudySubQuestion {
  */
 export interface CaseStudy {
   id: string;
-  tier: 'must-crack' | 'high-roi';
+  tier: 'must-crack' | 'high-roi' | 'good-to-do';
   contextText: string;
   contextImage?: string;
   subQuestions: CaseStudySubQuestion[];
@@ -159,8 +160,20 @@ export default function getTopicV2Content(
   const slug = resolveTopicKey({ subjectKey: subjectKey.toLowerCase(), topicParam });
   // Look up a prebuilt record
   const record = (topicHubV2Content as any)[slug];
+  const enrichment = (topicHubV2Enrichment as any)[slug] as Partial<TopicHubV2Content> | undefined;
   if (record) {
-    return record as TopicHubV2Content;
+    // Shallow-merge enrichment for high-value blocks (arrays).
+    const base = record as TopicHubV2Content;
+    const e = enrichment ?? {};
+    return {
+      ...base,
+      ...e,
+      workedExamples: e.workedExamples ?? base.workedExamples,
+      labActivities: e.labActivities ?? base.labActivities,
+      caseStudies: e.caseStudies ?? base.caseStudies,
+      competencies: e.competencies ?? base.competencies,
+      misconceptions: e.misconceptions ?? base.misconceptions,
+    };
   }
   // Create a minimal fallback record.  We leave arrays empty and
   // provide a single overview line.  The tier is set to 'high-roi' by

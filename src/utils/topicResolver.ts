@@ -29,11 +29,19 @@ export function resolveTopicKey({
   if (explicitTopicKey) return explicitTopicKey;
   // Normalise the incoming parameter to a slug
   const cleaned = (topicParam || '').trim().toLowerCase();
-  // Replace spaces, underscores and multiple hyphens with a single hyphen
+  // IMPORTANT:
+  // Some topics contain punctuation like '&'. If we collapse hyphens BEFORE
+  // removing non-alphanumerics, strings like "x-&-y" become "x--y" after
+  // stripping '&', which then fails to match canonical keys.
+  //
+  // So we:
+  // 1) turn spaces/underscores into hyphens
+  // 2) strip invalid chars
+  // 3) collapse repeated hyphens again
   return cleaned
     .replace(/[_\s]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/[^a-z0-9-]/g, '');
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
 }
 
 /**

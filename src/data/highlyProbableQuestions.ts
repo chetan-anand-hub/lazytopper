@@ -1,5 +1,6 @@
 // src/data/highlyProbableQuestions.ts
 import type { PredictedQuestionId } from "./predictedQuestions";
+import { hpqAdditions } from "./hpqAdditionsAndDailyMixSeeds";
 
 // ---------------- Shared types for the HPQ engine ----------------
 
@@ -103,7 +104,7 @@ export const HPQ_SCIENCE_STREAMS: HPQStream[] = [
  *
  * NOTE: We keep IDs/data you supplied intact to avoid any UI/UX regressions.
  */
-export const highlyProbableQuestions: HPQTopicBucket[] = [
+export const highlyProbableQuestionsSeed: HPQTopicBucket[] = [
   // ==================== MATHS – SEED DATA ====================
 
   // -------------------- Maths: Real Numbers --------------------
@@ -1963,6 +1964,12 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
       },
     ],
   },
+];
+
+// ✅ Final HPQ bank (seed + append-only additions)
+export const highlyProbableQuestions: HPQTopicBucket[] = [
+  ...highlyProbableQuestionsSeed,
+  ...hpqAdditions,
 ];
 
 // ----------------------- Safe, typed helpers (UI-neutral) -----------------------

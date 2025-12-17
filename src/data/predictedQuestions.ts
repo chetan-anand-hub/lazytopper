@@ -1,6 +1,7 @@
 // src/data/predictedQuestions.ts
 
 import type { Class10TopicKey } from "./class10MathTopicTrends";
+import { predictedQuestionsAdditions } from "./predictedQuestionsAdditions";
 
 // Match the difficulty language we already use
 export type DifficultyKey = "Easy" | "Medium" | "Hard";
@@ -50,7 +51,7 @@ export interface PredictedQuestion {
 // Seed bank: “board-flavoured, high-probability” questions.
 // ---------------------------------------------------------------------------
 
-export const predictedQuestions: PredictedQuestion[] = [
+const predictedQuestionsBase: PredictedQuestion[] = [
   // ========== REAL NUMBERS (HIGH-ROI) ==========
 
   {
@@ -1939,6 +1940,11 @@ export const predictedQuestions: PredictedQuestion[] = [
 // --- Helper exports for lookup & type-safety -----------------------------
 
 // All valid IDs from the predictedQuestions bank
+export const predictedQuestions: PredictedQuestion[] = [
+  ...predictedQuestionsBase,
+  ...predictedQuestionsAdditions,
+];
+
 export type PredictedQuestionId = (typeof predictedQuestions)[number]["id"];
 
 // Fast lookup by id: predictedQuestionsById["2026-TRIG-SA-01"] → full question object

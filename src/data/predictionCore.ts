@@ -7,6 +7,42 @@
 
 import type { CanonicalQuestion } from "./predictionTypes";
 import { canonicalQuestionBank } from "./canonicalQuestionBank";
+import { QUESTION_TYPE_MULTIPLIER } from "../data/cbseCompetencyPolicy";
+
+function getQuestionTypeMultiplier(q: CanonicalQuestion): number {
+  // Map canonical formats to policy keys.
+  const fmt = (q.format ?? "").toLowerCase();
+  if (fmt === "mcq") return QUESTION_TYPE_MULTIPLIER.mcq ?? 1.0;
+  if (fmt === "assertion-reasoning")
+    return QUESTION_TYPE_MULTIPLIER.assertionReasoning ?? 1.0;
+  if (fmt === "case-based") return QUESTION_TYPE_MULTIPLIER.caseBased ?? 1.0;
+  // Long/Short/VSA tend to be more traditional unless explicitly tagged.
+  if ((q.policyTag ?? "").toLowerCase().includes("case")) {
+    return QUESTION_TYPE_MULTIPLIER.caseBased ?? 1.0;
+  }
+  return QUESTION_TYPE_MULTIPLIER.traditional ?? 1.0;
+}
+
+function getBloomMultiplier(q: CanonicalQuestion): number {
+  // Lightweight heuristic: gently boost Applying/Analysing (competency focus).
+  switch (q.bloomSkill) {
+    case "Applying":
+      return 1.12;
+    case "Analysing":
+      return 1.15;
+    case "Evaluating":
+      return 1.05;
+    case "Remembering":
+      return 0.92;
+    default:
+      return 1.0;
+  }
+}
+
+function getAdjustedScore(q: CanonicalQuestion): number {
+  const base = q.predictionScore ?? 1; // treat unscored items as neutral
+  return base * getQuestionTypeMultiplier(q) * getBloomMultiplier(q);
+}
 
 export const PredictionCore = {
   /**
@@ -35,6 +71,6 @@ export const PredictionCore = {
     return canonicalQuestionBank
       .filter((q) => q.topicKey === topicKey)
       .filter((q) => (conceptKey ? q.subtopic === conceptKey : true))
-      .sort((a, b) => (b.predictionScore ?? 0) - (a.predictionScore ?? 0));
+      .sort((a, b) => getAdjustedScore(b) - getAdjustedScore(a));
   },
 };

@@ -20,6 +20,7 @@ import type {
   SectionKey,
 } from "./predictedQuestions";
 import { predictedQuestions } from "./predictedQuestions";
+import { predictedQuestionsAdditions } from "./predictedQuestionsAdditions";
 
 import type {
   PredictedQuestionScience,
@@ -85,6 +86,12 @@ export interface UnifiedGeneratorRequest {
 
   mixMode?: MixMode;
 }
+
+// ✅ Single source of truth for Maths bank questions (seed + append-only additions)
+const ALL_MATHS_BANK_QUESTIONS: PredictedQuestion[] = [
+  ...predictedQuestions,
+  ...predictedQuestionsAdditions,
+];
 
 // ---------------------------------------------------------------------------
 // Internal helpers – random sampling
@@ -451,7 +458,7 @@ export function generateUnifiedPracticeQuestions(
         results.push(...picked);
       }
     } else if (req.subject === "Maths") {
-      const pool = predictedQuestions.filter((q) => {
+      const pool = ALL_MATHS_BANK_QUESTIONS.filter((q) => {
         if (q.topicKey !== (req.topicKey as Class10TopicKey)) return false;
         if (req.section && q.section !== req.section) return false;
         if (req.difficulty && q.difficulty !== req.difficulty) return false;
