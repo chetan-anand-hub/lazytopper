@@ -1,6 +1,7 @@
 // src/data/highlyProbableQuestions.ts
 import type { PredictedQuestionId } from "./predictedQuestions";
 import { hpqAdditions } from "./hpqAdditionsAndDailyMixSeeds";
+import { mergeBucketsByTopic } from "../utils/mergeBucketsByTopic.ts";
 
 // ---------------- Shared types for the HPQ engine ----------------
 
@@ -1966,10 +1967,17 @@ export const highlyProbableQuestionsSeed: HPQTopicBucket[] = [
   },
 ];
 
-// ✅ Final HPQ bank (seed + append-only additions)
-export const highlyProbableQuestions: HPQTopicBucket[] = [
+// ✅ Final HPQ bank (seed + append-only additions), merged safely by topic
+// so the HPQ page doesn't show duplicate topic cards when additions contain
+// buckets for chapters already present in the seed.
+const _rawHpqBuckets: HPQTopicBucket[] = [
   ...highlyProbableQuestionsSeed,
   ...hpqAdditions,
+];
+
+export const highlyProbableQuestions: HPQTopicBucket[] = [
+  ...mergeBucketsByTopic("Maths", _rawHpqBuckets),
+  ...mergeBucketsByTopic("Science", _rawHpqBuckets),
 ];
 
 // ----------------------- Safe, typed helpers (UI-neutral) -----------------------

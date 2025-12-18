@@ -186,6 +186,21 @@ const HighlyProbableQuestions: React.FC = () => {
     {}
   );
 
+  // If the route subject changes (Maths <-> Science), React Router may reuse the
+  // same component instance. Reset local UI state here to prevent filter/state
+  // leakage across subjects.
+  useEffect(() => {
+    setActiveStream("all");
+    setTierFilter("all");
+    setDifficultyFilter("all");
+    setExpandedTopics({});
+    setHpqFeedback({});
+    setTopicFilter("all");
+    // Ensure URL query doesn't carry stale filters across subjects.
+    setSearchParams(new URLSearchParams());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectKey]);
+
   // --- AI variant state ---
   // When students request AI‑generated variants of an HPQ, we store
   // loading/error flags and the resulting variants keyed by question ID.
@@ -373,19 +388,21 @@ const HighlyProbableQuestions: React.FC = () => {
   // Handlers
 
   const handleSubjectToggle = (next: HPQSubject) => {
-    // When toggling subject, drop topic filter and change the path.
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.delete("topic");
-    const searchStr = nextParams.toString();
-    navigate(
-      `/highly-probable/${grade}/${next}${searchStr ? `?${searchStr}` : ""}`,
-      {
-        state: { back: currentURL, backLabel: "Back to HPQ" },
-      }
-    );
-    if (next === "Maths") {
-      setActiveStream("all"); // reset stream for Maths
-    }
+    // Full reset on subject toggle:
+    // - don't carry query params (topic/filters) to the next subject
+    // - reset local UI state to avoid leakage when the component instance is reused
+    setActiveStream("all");
+    setTierFilter("all");
+    setDifficultyFilter("all");
+    setExpandedTopics({});
+    setHpqFeedback({});
+    setTopicFilter("all");
+    setSearchParams(new URLSearchParams());
+
+    navigate(`/highly-probable/${grade}/${next}`, {
+      state: { back: currentURL, backLabel: "Back to HPQ" },
+      replace: true,
+    });
   };
 
   const handleStreamToggle = (next: StreamFilterKey) => {

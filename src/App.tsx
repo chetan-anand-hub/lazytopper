@@ -4,10 +4,6 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
-import Chapters from "./pages/Chapters";
-import TrigChapter from "./pages/TrigChapter";
-import TrigQuiz from "./pages/TrigQuiz";
-import TrigFlashcards from "./pages/TrigFlashcards";
 import TrendsPage from "./pages/TrendsPage";
 import MockPaper from "./pages/MockPaper";
 import HighlyProbableQuestions from "./pages/HighlyProbableQuestions";
@@ -216,8 +212,6 @@ export default function App() {
           {/* Legacy planner route (no params) */}
           <Route path="/planner" element={<StudyPlannerView />} />
 
-          {/* Old Chapters Overview (Maths-only view) */}
-          <Route path="/chapters" element={<Chapters />} />
 
           {/* Legacy Topic content hub – maths topics via :topicKey param */}
           <Route path="/topics/:topicKey" element={<TopicHub />} />
@@ -228,13 +222,7 @@ export default function App() {
           {/* Generic Topic Hub entry via query params (for backwards compatibility) */}
           <Route path="/topic-hub" element={<TopicHub />} />
 
-          {/* Trigonometry Module */}
-          <Route path="/chapter/trigonometry" element={<TrigChapter />} />
-          <Route
-            path="/chapter/trigonometry/flashcards"
-            element={<TrigFlashcards />}
-          />
-          <Route path="/chapter/trigonometry/quiz" element={<TrigQuiz />} />
+      
 
           {/* Dynamic Trends Page (Maths + Science with toggle) */}
           <Route path="/trends/:grade/:subject" element={<TrendsPage />} />
