@@ -39,5 +39,14 @@ _exports/
 _backups/
 _quarantine/
 
+# ---- One-off cleanup pack artifacts (do not commit) ----
+LazyTopper_Phase1_Cleanup_Pack_*/
+Phase1_*.ps1
+Phase1_*.txt
+phase1_*.json
+phase1_*.csv
+LazyTopper_Repo_Cleanup_Phase1_Report_*.docx
+README_PHASE1_IMPLEMENTATION_STEPS.txt
+
 # ---- Optional local patch file ----
 src/lazytopper_patch.diff
