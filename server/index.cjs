@@ -13,11 +13,23 @@
 // Responses are simple JSON objects with CORS headers enabled so that the
 // browser SPA can call them directly during early stages / demos.
 
+
+// Load env vars from project root .env (works even though this file lives in /server).
+const path = require('path');
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+} catch (e) {
+  // dotenv is optional; if not installed, env vars must be provided by the shell.
+}
+
 const http = require('http');
 
 const PORT = process.env.PORT || 3001;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+const OPENAI_API_KEY_RAW = process.env.OPENAI_API_KEY || '';
+// If the key was accidentally quoted in .env, strip wrapping quotes.
+const OPENAI_API_KEY = OPENAI_API_KEY_RAW.replace(/^['\"]|['\"]$/g, '');
+const OPENAI_MODEL_RAW = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+const OPENAI_MODEL = OPENAI_MODEL_RAW.replace(/^['\"]|['\"]$/g, '');
 
 /**
  * Helper to send JSON with CORS headers.
@@ -252,14 +264,42 @@ async function callLLM(messages) {
  * @param {import('http').ServerResponse} res
  */
 function handleRequest(req, res) {
-  // CORS preflight for SPA requests
-  if (
-    req.method === 'OPTIONS' &&
-    (req.url === '/api/mentor' || req.url === '/api/more-like-this')
-  ) {
+  // Parse URL safely (supports query strings)
+  let pathname = req.url || '/';
+  try {
+    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    pathname = urlObj.pathname || pathname;
+  } catch (_) {
+    // ignore
+  }
+
+  // Health check (handy for verifying env + server)
+  // Try: http://localhost:3001/api/health
+  if (req.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
+    return sendJson(res, 200, {
+      ok: true,
+      status: 'up',
+      model: OPENAI_MODEL,
+      hasApiKey: Boolean(OPENAI_API_KEY),
+      node: process.version,
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  }
+
+  // Friendly root message (optional)
+  if (req.method === 'GET' && pathname === '/') {
+    return sendJson(res, 200, {
+      ok: true,
+      message: 'LazyTopper AI Gateway is running',
+      endpoints: ['/api/health', '/api/mentor', '/api/more-like-this'],
+    });
+  }
+
+  // CORS preflight for SPA requests (any /api/* route)
+  if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
     });
@@ -267,7 +307,7 @@ function handleRequest(req, res) {
   }
 
   // Mentor personas endpoint
-  if (req.method === 'POST' && req.url === '/api/mentor') {
+  if (req.method === 'POST' && pathname === '/api/mentor') {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk.toString();
@@ -387,7 +427,7 @@ function handleRequest(req, res) {
   }
 
   // "More like this" endpoint for HPQ-style variants
-  if (req.method === 'POST' && req.url === '/api/more-like-this') {
+  if (req.method === 'POST' && pathname === '/api/more-like-this') {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk.toString();
