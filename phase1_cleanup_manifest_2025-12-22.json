@@ -1,0 +1,86 @@
+{
+  "generated": "2025-12-24",
+  "notes": "Folder-focused Phase1 manifest: moves entire draft/legacy/roadmap + archives top-level backup/export/share folders. Delete actions are quarantine-first unless -HardDelete.",
+  "entries": [
+    {
+      "path": "src/contentDrafts",
+      "action": "move",
+      "dest": "docs/_drafts/src/contentDrafts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content and experiments; keep for reference but remove from runtime tree.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy",
+      "action": "move",
+      "dest": "docs/_legacy/src/legacy",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy implementations; keep for reference, avoid accidental imports.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap",
+      "action": "move",
+      "dest": "docs/_roadmap/src/roadmap",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental work; keep but move out of runtime.",
+      "risk": "low"
+    },
+    {
+      "path": "_backups",
+      "action": "move",
+      "dest": "docs/_repo_hygiene/archive/_backups",
+      "bucket": "C-quarantine",
+      "rationale": "Local backups; preserve but keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "_exports",
+      "action": "move",
+      "dest": "docs/_repo_hygiene/archive/_exports",
+      "bucket": "C-quarantine",
+      "rationale": "Export artifacts; preserve but remove from source tree.",
+      "risk": "low"
+    },
+    {
+      "path": "_share",
+      "action": "move",
+      "dest": "docs/_repo_hygiene/archive/_share",
+      "bucket": "C-quarantine",
+      "rationale": "Share artifacts; preserve but remove from source tree.",
+      "risk": "low"
+    },
+    {
+      "path": "_quarantine",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Quarantine is part of cleanup workflow; keep in repo during cleanup.",
+      "risk": "low"
+    },
+    {
+      "path": "desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact; safe to quarantine-delete.",
+      "risk": "low"
+    },
+    {
+      "path": "Thumbs.db",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact; safe to quarantine-delete.",
+      "risk": "low"
+    },
+    {
+      "path": ".DS_Store",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "macOS artifact; safe to quarantine-delete.",
+      "risk": "low"
+    }
+  ]
+}

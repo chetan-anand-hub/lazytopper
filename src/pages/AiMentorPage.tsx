@@ -6,8 +6,8 @@
 // (subject/chapter selectors, trend snapshot and HPQ cards)
 // remains unchanged to preserve the current UX.
 
-import React, { useMemo, useState } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import {
   class10TopicTrendList,
   class10MathTopicTrends,
@@ -82,114 +82,61 @@ const AiMentorPage: React.FC = () => {
     useParams<"grade" | "subject">();
   // Capture the current URL for back navigation
   const currentURL = useCurrentURL();
+  const [searchParams] = useSearchParams();
   // State passed from other pages (HPQ hub, topic hub, etc.)
-  const state = location.state as any;
+  const state = (location.state ?? {}) as Record<string, any>;
 
   /**
    * Determine mode.  If state.mode is provided, use it;
    * otherwise derive from hpqQuestionId or conceptId.
    */
+  const allowedModes = new Set([
+    "solve",
+    "explain",
+    "plan",
+    "coach",
+    "mindset",
+  ]);
+
+  const modeFromQueryRaw = (searchParams.get("mode") ?? "").toLowerCase();
+  const modeFromQuery = allowedModes.has(modeFromQueryRaw)
+    ? modeFromQueryRaw
+    : undefined;
+
+  /**
+   * Determine mode.
+   * Priority:
+   * 1) navigation state (best UX when navigating from within the app)
+   * 2) query param (?mode=explain) for refresh-safe/shareable deep links
+   * 3) derived fallback from hpqQuestionId/conceptId
+   */
   const mode =
     state?.mode ||
+    modeFromQuery ||
     (state?.hpqQuestionId
       ? "solve"
       : state?.conceptId
       ? "explain"
       : undefined);
 
+  // If we landed here via in-app navigation state (mode is set) but the URL
+  // has no ?mode=..., write it once (replace) to make refresh/share safe.
+  useEffect(() => {
+    if (!mode) return;
+
+    const current = (searchParams.get("mode") ?? "").toLowerCase();
+    if (current) return;
+
+    navigate(
+      { pathname: location.pathname, search: `?mode=${encodeURIComponent(mode)}` },
+      { replace: true, state: location.state }
+    );
+  }, [mode, navigate, location.pathname, location.state, searchParams]);
+
   /**
    * Solve/Explain/Coach modes
    * If mode is set (solve/explain), we render the modal view.
    * Otherwise we fall back to planner mode.
-   */
-  if (mode) {
-    const pageSubject: "Maths" | "Science" =
-      state.subject ?? subject ?? "Maths";
-    const pageChapter: string | undefined =
-      state.topic ?? state.payload?.topic ?? undefined;
-    const fromPath: string | undefined = state.from;
-    const back: string | undefined = state.back;
-    const backLabel: string =
-      state.backLabel ??
-      (back && back.includes("/highly-probable")
-        ? "Back to HPQ hub"
-        : "Back");
-
-    // The default mode for MentorPanel: use mode or derive from hpqQuestionId.
-    const defaultMode = mode ?? (state.hpqQuestionId ? "solve" : "explain");
-
-    const initialStudentState = {
-      grade: state.grade ?? 10,
-      daysLeft: state.daysLeft,
-      targetScore: state.targetPercent,
-      mathTargetScore: state.mathTargetPercent,
-      scienceTargetScore: state.scienceTargetPercent,
-      mathHoursPerDay: state.mathHoursPerDay,
-      scienceHoursPerDay: state.scienceHoursPerDay,
-    };
-
-    const pageContext = {
-      grade: state.grade ?? 10,
-      subject: pageSubject,
-      chapter: pageChapter,
-    } as const;
-
-    const handleBack = () => {
-      if (back) {
-        navigate(back);
-      } else if (fromPath) {
-        navigate(fromPath);
-      } else {
-        // Safe fallback to home page if nothing is provided
-        navigate("/");
-      }
-    };
-
-    return (
-      <div className="mentor-modal">
-        {/* Top strip for back + context when opened from HPQ / concept */}
-        <div className="mentor-modal-header">
-          <button
-            type="button"
-            className="mentor-back-button"
-            onClick={handleBack}
-          >
-            ← {backLabel || "Back"}
-          </button>
-          <div className="mentor-modal-context">
-            <span>
-              Class {pageContext.grade} • {pageSubject}
-              {pageChapter ? ` • ${pageChapter}` : ""}
-            </span>
-            {state.hpqQuestionId && (
-              <span className="mentor-modal-chip">
-                HPQ #{state.hpqQuestionId}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <MentorPanel
-          pageContext={pageContext}
-          initialStudentState={initialStudentState}
-          defaultMode={defaultMode as any}
-          autoFirstPrompt={state.gpt_directive}
-          showModes
-          // Forward the unified persona so the backend knows which
-          // system prompts and rules to apply.
-          persona={centralMentorPersona}
-        />
-      </div>
-    );
-  }
-
-  /* ------------------------------------------------------------------
-   * Planner Mode
-   * ------------------------------------------------------------------
-   * When there is no concept/question provided, the page operates in planner mode.
-   * We allow the user to enter days left, hours per day, and target percentages
-   * for Maths and Science.  The plan is generated via planningPayload and
-   * handleOpenStudyPlan() navigates to the study plan page.
    */
 
   const [daysLeft, setDaysLeft] = useState<number>(90);
@@ -417,6 +364,93 @@ const AiMentorPage: React.FC = () => {
     });
   };
 
+
+  if (mode) {
+    const pageSubject: "Maths" | "Science" =
+      state.subject ?? subject ?? "Maths";
+    const pageChapter: string | undefined =
+      state.topic ?? state.payload?.topic ?? undefined;
+    const fromPath: string | undefined = state.from;
+    const back: string | undefined = state.back;
+    const backLabel: string =
+      state.backLabel ??
+      (back && back.includes("/highly-probable")
+        ? "Back to HPQ hub"
+        : "Back");
+
+    // The default mode for MentorPanel: use mode or derive from hpqQuestionId.
+    const defaultMode = mode ?? (state.hpqQuestionId ? "solve" : "explain");
+
+    const initialStudentState = {
+      grade: state.grade ?? 10,
+      daysLeft: state.daysLeft,
+      targetScore: state.targetPercent,
+      mathTargetScore: state.mathTargetPercent,
+      scienceTargetScore: state.scienceTargetPercent,
+      mathHoursPerDay: state.mathHoursPerDay,
+      scienceHoursPerDay: state.scienceHoursPerDay,
+    };
+
+    const pageContext = {
+      grade: state.grade ?? 10,
+      subject: pageSubject,
+      chapter: pageChapter,
+    } as const;
+
+    const handleBack = () => {
+      if (back) {
+        navigate(back);
+      } else if (fromPath) {
+        navigate(fromPath);
+      } else {
+        // Safe fallback to home page if nothing is provided
+        navigate("/");
+      }
+    };
+
+    return (
+      <div className="mentor-modal">
+        {/* Top strip for back + context when opened from HPQ / concept */}
+        <div className="mentor-modal-header">
+          <button
+            type="button"
+            className="mentor-back-button"
+            onClick={handleBack}
+          >
+            ← {backLabel || "Back"}
+          </button>
+          <div className="mentor-modal-context">
+            <span>
+              Class {pageContext.grade} • {pageSubject}
+              {pageChapter ? ` • ${pageChapter}` : ""}
+            </span>
+            {state.hpqQuestionId && (
+              <span className="mentor-modal-chip">
+                HPQ #{state.hpqQuestionId}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <MentorPanel
+          pageContext={pageContext}
+          initialStudentState={initialStudentState}
+          defaultMode={defaultMode as any}
+          autoFirstPrompt={state.gpt_directive}
+          showModes
+          // Forward the unified persona so the backend knows which
+          // system prompts and rules to apply.
+          persona={centralMentorPersona}
+        />
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------------------------
+   * Planner Mode
+   * ------------------------------------------------------------------
+   * When there is no concept/question provided, the page operates in planner mode.
+   */
   return (
     <div className="mentor-page">
       {/* NEW: BackLink replaces the manual Home button.

@@ -1,0 +1,32 @@
+Phase 1 Smoke Test Checklist (Must-ship UI)
+
+After running Phase1_Apply_Quarantine.ps1, verify:
+
+1) App boots
+- npm run dev opens without errors.
+
+2) Must-ship routes/pages (open each)
+- Dashboard
+- TopicHub
+- Practice page
+- Trends / Predictive Engine UI
+- Highly Probable Questions (HPQ)
+- Predictive Papers
+- Mock Builder
+- Mock Paper rendering
+- DailyMix
+- Weekly Wrapped
+- Planner (Study Plan)
+- AI Mentor page
+
+3) Data integrity
+- Practice set generation works for at least one Maths topic and one Science topic.
+- Prediction debug/dev pages (if you use them) still compile.
+
+4) No regressions
+- Run Phase 0 commands:
+  npm run repo:check-imports
+  npm run repo:check-canonical-imports
+  npm run lint
+  npm run typecheck
+  npm run build

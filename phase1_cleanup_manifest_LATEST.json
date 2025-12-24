@@ -1,0 +1,1878 @@
+{
+  "generated": "2025-12-24",
+  "notes": "Phase 1 cleanup manifest generated from Keep/Move/Delete CSV (delete actions are quarantined by script unless -HardDelete).",
+  "entries": [
+    {
+      "path": ".gitignore",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "docs/accessibility_inclusivity_audit.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/BankHealthIntegrationNotes.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/data-layer-contract.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/DEPLOY_NOTES_Bundle1_2.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "docs/difficulty_refactor.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/difficultyPolicy_v1.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/gamification_engagement_ideas.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/implementation_notes.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/multi_language_expansion_plan.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/protips_plan.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/README.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "docs/README_PATCH.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "eslint.config.js",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "index.html",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "package.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "package-lock.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "public/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "public/vite.svg",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "README.md",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "server/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "server/index.cjs",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/.gitignore",
+      "action": "move",
+      "dest": "docs/_repo_hygiene/src_gitignore_archived/.gitignore",
+      "bucket": "C-quarantine",
+      "rationale": "Redundant; root .gitignore already covers patterns. Archive for reference.",
+      "risk": "low"
+    },
+    {
+      "path": "src/ai/aiClient.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/ai/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/App.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/assets/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/assets/react.svg",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/BackLink.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/DailyMixPlayer.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/MathText.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/MentorPanel.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/planner/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/planner/StudyPlannerView.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/topicHub/ConceptCard.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/topicHub/ConceptDetail.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/topicHub/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/components/WeeklyWrappedCarousel.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/blueprintConfig.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/blueprintConfig.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/caseBasedQuestions.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/caseBasedQuestions.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10ExampleQuestions.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10ExampleQuestions.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10HighImpactMathTopics.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10HighImpactMathTopics.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10MathBreakdown.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10MathBreakdown.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10MathChapterMeta.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10MathChapterMeta.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10MathMicroMocks.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10MathMicroMocks.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10MathQuestionBank.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10MathQuestionBank.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/class10TopicRegistry.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/class10TopicRegistry.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/questionGenerator.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/questionGenerator.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/trig/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/trig/trigFlashcards.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/trig/trigFlashcards.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/trig/trigQuestions.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/trig/trigQuestions.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/maths/weightage.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/maths/weightage.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/practice/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/practice/practiceFilters.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/practice/practiceFilters.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/practice/practicePackSummaries.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/practice/practicePackSummaries.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/prediction/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/prediction/prediction.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/prediction/prediction.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/prediction/predictionBlueprintMapping.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/prediction/predictionBlueprintMapping.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/prediction/predictionScoring.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/prediction/predictionScoring.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/README.md",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/README.md",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/science/class10SciencePredictedQuestions.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/science/class10SciencePredictedQuestions.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/science/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/science/scienceQuestionGenerator.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/science/scienceQuestionGenerator.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/topicHub/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/topicHub/topicHubCtaPracticePayloads.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/topicHub/topicHubCtaPracticePayloads.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/topicHub/topicHubV2ChapterSkeletonsPatch.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/topicHub/topicHubV2ChapterSkeletonsPatch.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/contentDrafts/topicHub/topicHubV2Microcopy.ts",
+      "action": "move",
+      "dest": "docs/_drafts/src_contentDrafts/topicHub/topicHubV2Microcopy.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Draft content not used by runtime; move out of src to keep launch repo clean.",
+      "risk": "low"
+    },
+    {
+      "path": "src/context/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/context/ProfileContext.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/context/vibeModeContext.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/_sources/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/_sources/science/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/_sources/science/predictedQuestionsScience.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/_sources/science/predictedScienceQuestions.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/canonicalQuestionBank.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/cbseCompetencyPolicy.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/class10ContentConfig.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "B-planned",
+      "rationale": "Aligned with TopicHub expansion; currently unused but keep for v1+.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/class10MathTopicTrends.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/class10MathTopicWeights.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/class10SciencePredictiveEngine.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/class10ScienceTopicTrends.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/highlyProbableQuestions.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/hpqAdditionsAndDailyMixSeeds.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/index.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/practiceSetGenerator.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictedQuestions.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictedQuestionsAdditions.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictionCore.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictionDataService.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictionTypes.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/predictivePapers.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/promptDPracticePacks.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/scienceQuestionAdditions.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/scienceQuestionBank.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/topicHubContent.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/topicHubCtaPracticePayloads.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/topicHubV2Enrichment.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/data/topicHubV2Full.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/dev/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/domain/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/domain/topicIdentity.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/engine/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/engine/smartLearningStore.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/engine/smartLearningTypes.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/engine/studyPlanner.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/engine/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/engine/paperEngine.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/engine/paperEngine.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/engine/predictionDataService_with_CBSEPracticeGen.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/engine/predictionDataService_with_CBSEPracticeGen.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/llm/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/llm/llmClient.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/llm/llmClient.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/llm/llmConfig.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/llm/llmConfig.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/llm/llmQuestionGenerator.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/llm/llmQuestionGenerator.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/llm/llmQuestionTypes.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/llm/llmQuestionTypes.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/README.md",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/README.md",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/ui/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/ui/theme.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/ui/theme.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/mockBlueprint.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/utils/mockBlueprint.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/mockBuilder.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/utils/mockBuilder.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/mockPaperEngineScience.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/utils/mockPaperEngineScience.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/planEngine.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/utils/planEngine.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/legacy/utils/topicMix.ts",
+      "action": "move",
+      "dest": "docs/_legacy/src_legacy/utils/topicMix.ts",
+      "bucket": "C-quarantine",
+      "rationale": "Legacy code; not referenced by current runtime, archive outside src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/llm/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/main.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/mentors/centralPersona.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/mentors/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/navigation/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/navigation/practiceNavigation.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/AiMentorPage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/aiMentorStyles.css",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/DailyMixPage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/Dashboard.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/HighlyProbableQuestions.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/Home.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/Login.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/MockBuilder.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/MockPaper.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/Onboarding.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/PracticePage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/PredictivePapers.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/StudyPlanPage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/TopicHub.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/TrendsPage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/pages/WeeklyWrappedPage.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/prediction/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/prediction/difficultyAutoSuggest.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/print.css",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ai/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ai/mentorPrompts.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ai/mentorPrompts.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ai/mentorPrompts_hi.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ai/mentorPrompts_hi.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/dailyMix/DailyMixWidget.tsx",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/dailyMix/DailyMixWidget.tsx",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/dailyMix/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/mentors/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/mentors/mentorModeDirectives.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/mentors/mentorModeDirectives.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/practice/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/practice/practiceEngine.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/practice/practiceEngine.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/prediction/bankHealth.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/prediction/bankHealth.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/prediction/buildTopicKeySources.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/prediction/buildTopicKeySources.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/prediction/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/prediction/difficultyAwarePractice.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/prediction/difficultyAwarePractice.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/predictiveSciencePapers.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/predictiveSciencePapers.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/README.md",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/README.md",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/dailyMixGenerator.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/dailyMixGenerator.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/dailyMixService.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/dailyMixService.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/matchScoreService.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/matchScoreService.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/sessionLogger.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/sessionLogger.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/streakService.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/streakService.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/services/weeklyWrapService.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/services/weeklyWrapService.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/topicHub/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/topicHub/ux/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/topicHub/ux/OutlineDrawer.tsx",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/topicHub/ux/OutlineDrawer.tsx",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/topicHub/ux/TopicHubTabs.tsx",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/topicHub/ux/TopicHubTabs.tsx",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/types/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/types/mentor.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/types/mentor.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/types/topicHubV2ConceptTypes.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/types/topicHubV2ConceptTypes.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/microcopy/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/microcopy/userFeedbackAlertsCopy.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ui/microcopy/userFeedbackAlertsCopy.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/microcopy/userFeedbackAlertsCopyVariants.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ui/microcopy/userFeedbackAlertsCopyVariants.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/microcopy/weeklyWrappedStoryCopy.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ui/microcopy/weeklyWrappedStoryCopy.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/ui/microcopy/weeklyWrappedStoryCopy_hi.ts",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/ui/microcopy/weeklyWrappedStoryCopy_hi.ts",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/weeklyWrapped/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/roadmap/weeklyWrapped/WeeklyWrappedWidget.tsx",
+      "action": "move",
+      "dest": "docs/_roadmap/src_roadmap/weeklyWrapped/WeeklyWrappedWidget.tsx",
+      "bucket": "B-planned",
+      "rationale": "Planned/experimental modules; keep for future but remove from runtime src.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/commandPaletteConfig.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/dailyMixPlayback.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/planStorage.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/practiceInsights.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/strategyEngine.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/strategyStorage.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/services/weeklyWrappedGenerator.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/styles.css",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/types/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/types/MentorRequest.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/types/navigation.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/components/CommandPalette.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/components/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/components/VibeToggle.tsx",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/microcopy/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/ui/microcopy/vibeCommandBadgeCopy.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/buildStudyPlan.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/buildUrl.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/getTopicV2Content.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/mergeBucketsByTopic.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/mockPaperEngine.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/strategy.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/topicResolver.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "src/utils/useCurrentURL.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/check-canonical-imports.mjs",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/cleanup-windows-artifacts.ps1",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/desktop.ini",
+      "action": "delete",
+      "dest": null,
+      "bucket": "D-delete",
+      "rationale": "Windows artifact (junk).",
+      "risk": "low"
+    },
+    {
+      "path": "tools/LazyTopper_Repo_Snapshot.ps1",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/README_GUARDRAILS.txt",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/repo-introspect.ps1",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/Step3_Apply_Quarantine.ps1",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/step3_quarantine_manifest.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tools/verify-import-paths.mjs",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tsconfig.app.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tsconfig.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "tsconfig.node.json",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    },
+    {
+      "path": "vite.config.ts",
+      "action": "keep",
+      "dest": null,
+      "bucket": "A-keep",
+      "rationale": "Part of runtime or repo tooling/docs.",
+      "risk": "low"
+    }
+  ]
+}

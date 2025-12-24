@@ -1,0 +1,246 @@
+path,action,reason
+desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+docs/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+docs/_repo_hygiene/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+docs/_repo_hygiene/src_gitignore_archived/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+public/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+server/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/ai/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/assets/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/components/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/components/planner/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/components/topicHub/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/maths/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/maths/trig/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/practice/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/prediction/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/science/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/contentDrafts/topicHub/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/context/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/data/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/data/_sources/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/data/_sources/science/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/dev/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/domain/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/engine/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/hooks/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/legacy/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/legacy/engine/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/legacy/llm/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/legacy/ui/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/legacy/utils/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/llm/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/mentors/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/navigation/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/pages/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/prediction/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/ai/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/dailyMix/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/mentors/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/practice/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/prediction/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/services/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/topicHub/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/topicHub/ux/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/types/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/ui/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/ui/microcopy/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/roadmap/weeklyWrapped/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/services/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/types/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/ui/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/ui/components/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/ui/microcopy/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+src/utils/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+tools/desktop.ini,DELETE,Windows OS artifact (desktop.ini). Safe to remove; add to .gitignore.
+npm,DELETE,Empty placeholder file (0 bytes). Remove unless intentionally used.
+set,DELETE,Empty placeholder file (0 bytes). Remove unless intentionally used.
+src/ai/mentorPrompts_hi.ts,DELETE,Empty placeholder file (0 bytes). Remove unless intentionally used.
+src/App.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ai/aiClient.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ai/mentorPrompts.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/ai/mentorPrompts_hi.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/components/BackLink.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/components/DailyMixPlayer.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/components/DailyMixWidget.tsx,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/components/MentorPanel.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/components/WeeklyWrappedCarousel.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/components/WeeklyWrappedWidget.tsx,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/components/planner/StudyPlannerView.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/context/ProfileContext.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/context/vibeModeContext.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/blueprintConfig.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/canonicalQuestionBank.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/caseBasedQuestions.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/cbseCompetencyPolicy.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/class10ContentConfig.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/class10ExampleQuestions.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10HighImpactMathTopics.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10MathBreakdown.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10MathChapterMeta.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10MathMicroMocks.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10MathQuestionBank.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10MathTopicTrends.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/class10MathTopicWeights.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10SciencePredictedQuestions.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/class10SciencePredictiveEngine.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/class10ScienceTopicTrends.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/class10TopicRegistry.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/highlyProbableQuestions.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/hpqAdditionsAndDailyMixSeeds.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/practiceFilters.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/practicePackSummaries.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/practiceSetGenerator.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictedQuestions.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictedQuestionsAdditions.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictedQuestionsScience.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictedScienceQuestions.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/prediction.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/predictionBlueprintMapping.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/predictionCore.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictionDataService.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictionScoring.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/predictionTypes.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictivePapers.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/predictiveSciencePapers.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/promptDPracticePacks.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/questionGenerator.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/scienceQuestionAdditions.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/scienceQuestionGenerator.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/topicHubContent.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/topicHubV2Enrichment.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/topicHubV2Full.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/data/trigFlashcards.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/trigQuestions.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/data/weightage.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/engine/paperEngine.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/engine/predictionDataService_with_CBSEPracticeGen.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/engine/smartLearningStore.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/engine/smartLearningTypes.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/engine/studyPlanner.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/hooks/useCurrentURL.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/llm/llmClient.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/llm/llmConfig.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/llm/llmQuestionGenerator.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/llm/llmQuestionTypes.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/main.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/mentors/centralPersona.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/navigation/practiceNavigation.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/AiMentorPage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/DailyMixPage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/Dashboard.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/HighlyProbableQuestions.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/Home.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/Login.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/MockBuilder.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/MockPaper.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/Onboarding.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/PracticePage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/PredictivePapers.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/StudyPlanPage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/TopicHub.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/TrendsPage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/pages/WeeklyWrappedPage.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/practiceEngine.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/prediction/bankHealth.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/prediction/buildTopicKeySources.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/prediction/difficultyAutoSuggest.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/prediction/difficultyAwarePractice.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/commandPaletteConfig.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/dailyMixGenerator.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/dailyMixPlayback.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/dailyMixService.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/matchScoreService.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/planStorage.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/practiceInsights.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/sessionLogger.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/strategyEngine.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/strategyStorage.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/services/streakService.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/weeklyWrapService.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/services/weeklyWrappedGenerator.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/types/MentorRequest.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/types/NavigationState.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/types/mentor.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/types/navigation.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ui/components/CommandPalette.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ui/components/VibeToggle.tsx,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ui/microcopy/userFeedbackAlertsCopy.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/ui/microcopy/userFeedbackAlertsCopyVariants.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/ui/microcopy/vibeCommandBadgeCopy.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/ui/microcopy/weeklyWrappedStoryCopy.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/ui/microcopy/weeklyWrappedStoryCopy_hi.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/ui/theme.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/buildStudyPlan.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/buildUrl.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/getTopicV2Content.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/mergeBucketsByTopic.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/mockBlueprint.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/mockBuilder.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/mockPaperEngine.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/mockPaperEngineScience.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/planEngine.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/strategy.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/topicMix.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/topicResolver.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/utils/trigQuiz.ts,QUARANTINE_CANDIDATE,Not reachable from src/main.tsx (likely unused/legacy/experimental). Candidate for quarantine then delete.
+src/utils/useCurrentURL.ts,KEEP_RUNTIME,Reachable from src/main.tsx via static imports/routes.
+src/App.css,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/ai/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/assets/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/assets/react.svg,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/components/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/components/planner/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/components/topicHub/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/maths/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/maths/trig/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/practice/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/prediction/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/science/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/contentDrafts/topicHub/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/context/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/data/_sources/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/data/_sources/science/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/data/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/dev/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/domain/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/engine/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/hooks/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/index.css,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/legacy/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/legacy/engine/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/legacy/llm/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/legacy/ui/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/legacy/utils/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/llm/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/mentors/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/navigation/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/pages/aiMentorStyles.css,KEEP_RUNTIME,Imported by reachable runtime code.
+src/pages/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/prediction/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/print.css,KEEP_RUNTIME,Imported by reachable runtime code.
+src/roadmap/ai/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/dailyMix/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/mentors/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/practice/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/prediction/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/services/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/topicHub/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/topicHub/ux/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/types/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/ui/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/ui/microcopy/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/roadmap/weeklyWrapped/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/services/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/styles.css,KEEP_RUNTIME,Imported by reachable runtime code.
+src/types/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/ui/components/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/ui/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/ui/microcopy/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.
+src/utils/desktop.ini,QUARANTINE_CANDIDATE,Not referenced by runtime imports.

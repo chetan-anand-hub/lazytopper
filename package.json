@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "server": "node server/index.cjs"
+    "server": "node server/index.cjs",
+    "lint:typed": "eslint \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "cors": "^2.8.5",

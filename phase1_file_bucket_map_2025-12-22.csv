@@ -1,0 +1,235 @@
+path,action,dest,bucket,rationale,risk
+.gitignore,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+docs/accessibility_inclusivity_audit.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/BankHealthIntegrationNotes.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/data-layer-contract.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/DEPLOY_NOTES_Bundle1_2.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+docs/difficulty_refactor.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/difficultyPolicy_v1.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/gamification_engagement_ideas.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/implementation_notes.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/multi_language_expansion_plan.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/protips_plan.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/README.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+docs/README_PATCH.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+eslint.config.js,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+index.html,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+package.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+package-lock.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+public/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+public/vite.svg,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+README.md,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+server/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+server/index.cjs,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/.gitignore,move,docs/_repo_hygiene/src_gitignore_archived/.gitignore,C-quarantine,Redundant; root .gitignore already covers patterns. Archive for reference.,low
+src/ai/aiClient.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/ai/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/App.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/assets/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/assets/react.svg,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/BackLink.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/DailyMixPlayer.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/components/MathText.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/MentorPanel.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/planner/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/components/planner/StudyPlannerView.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/topicHub/ConceptCard.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/topicHub/ConceptDetail.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/components/topicHub/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/components/WeeklyWrappedCarousel.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/contentDrafts/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/maths/blueprintConfig.ts,move,docs/_drafts/src_contentDrafts/maths/blueprintConfig.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/caseBasedQuestions.ts,move,docs/_drafts/src_contentDrafts/maths/caseBasedQuestions.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10ExampleQuestions.ts,move,docs/_drafts/src_contentDrafts/maths/class10ExampleQuestions.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10HighImpactMathTopics.ts,move,docs/_drafts/src_contentDrafts/maths/class10HighImpactMathTopics.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10MathBreakdown.ts,move,docs/_drafts/src_contentDrafts/maths/class10MathBreakdown.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10MathChapterMeta.ts,move,docs/_drafts/src_contentDrafts/maths/class10MathChapterMeta.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10MathMicroMocks.ts,move,docs/_drafts/src_contentDrafts/maths/class10MathMicroMocks.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10MathQuestionBank.ts,move,docs/_drafts/src_contentDrafts/maths/class10MathQuestionBank.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/class10TopicRegistry.ts,move,docs/_drafts/src_contentDrafts/maths/class10TopicRegistry.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/maths/questionGenerator.ts,move,docs/_drafts/src_contentDrafts/maths/questionGenerator.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/trig/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/maths/trig/trigFlashcards.ts,move,docs/_drafts/src_contentDrafts/maths/trig/trigFlashcards.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/trig/trigQuestions.ts,move,docs/_drafts/src_contentDrafts/maths/trig/trigQuestions.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/maths/weightage.ts,move,docs/_drafts/src_contentDrafts/maths/weightage.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/practice/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/practice/practiceFilters.ts,move,docs/_drafts/src_contentDrafts/practice/practiceFilters.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/practice/practicePackSummaries.ts,move,docs/_drafts/src_contentDrafts/practice/practicePackSummaries.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/prediction/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/prediction/prediction.ts,move,docs/_drafts/src_contentDrafts/prediction/prediction.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/prediction/predictionBlueprintMapping.ts,move,docs/_drafts/src_contentDrafts/prediction/predictionBlueprintMapping.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/prediction/predictionScoring.ts,move,docs/_drafts/src_contentDrafts/prediction/predictionScoring.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/README.md,move,docs/_drafts/src_contentDrafts/README.md,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/science/class10SciencePredictedQuestions.ts,move,docs/_drafts/src_contentDrafts/science/class10SciencePredictedQuestions.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/science/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/science/scienceQuestionGenerator.ts,move,docs/_drafts/src_contentDrafts/science/scienceQuestionGenerator.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/topicHub/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/contentDrafts/topicHub/topicHubCtaPracticePayloads.ts,move,docs/_drafts/src_contentDrafts/topicHub/topicHubCtaPracticePayloads.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/topicHub/topicHubV2ChapterSkeletonsPatch.ts,move,docs/_drafts/src_contentDrafts/topicHub/topicHubV2ChapterSkeletonsPatch.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/contentDrafts/topicHub/topicHubV2Microcopy.ts,move,docs/_drafts/src_contentDrafts/topicHub/topicHubV2Microcopy.ts,C-quarantine,Draft content not used by runtime; move out of src to keep launch repo clean.,low
+src/context/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/context/ProfileContext.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/context/vibeModeContext.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/_sources/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/data/_sources/science/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/data/_sources/science/predictedQuestionsScience.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/_sources/science/predictedScienceQuestions.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/canonicalQuestionBank.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/cbseCompetencyPolicy.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/class10ContentConfig.ts,keep,,B-planned,Aligned with TopicHub expansion; currently unused but keep for v1+.,low
+src/data/class10MathTopicTrends.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/class10MathTopicWeights.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/class10SciencePredictiveEngine.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/class10ScienceTopicTrends.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/data/highlyProbableQuestions.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/hpqAdditionsAndDailyMixSeeds.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/index.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/practiceSetGenerator.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictedQuestions.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictedQuestionsAdditions.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictionCore.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictionDataService.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictionTypes.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/predictivePapers.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/promptDPracticePacks.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/scienceQuestionAdditions.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/scienceQuestionBank.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/topicHubContent.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/topicHubCtaPracticePayloads.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/topicHubV2Enrichment.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/data/topicHubV2Full.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/dev/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/domain/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/domain/topicIdentity.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/engine/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/engine/smartLearningStore.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/engine/smartLearningTypes.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/engine/studyPlanner.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/legacy/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/legacy/engine/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/legacy/engine/paperEngine.ts,move,docs/_legacy/src_legacy/engine/paperEngine.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/engine/predictionDataService_with_CBSEPracticeGen.ts,move,docs/_legacy/src_legacy/engine/predictionDataService_with_CBSEPracticeGen.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/llm/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/legacy/llm/llmClient.ts,move,docs/_legacy/src_legacy/llm/llmClient.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/llm/llmConfig.ts,move,docs/_legacy/src_legacy/llm/llmConfig.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/llm/llmQuestionGenerator.ts,move,docs/_legacy/src_legacy/llm/llmQuestionGenerator.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/llm/llmQuestionTypes.ts,move,docs/_legacy/src_legacy/llm/llmQuestionTypes.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/README.md,move,docs/_legacy/src_legacy/README.md,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/ui/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/legacy/ui/theme.ts,move,docs/_legacy/src_legacy/ui/theme.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/utils/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/legacy/utils/mockBlueprint.ts,move,docs/_legacy/src_legacy/utils/mockBlueprint.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/utils/mockBuilder.ts,move,docs/_legacy/src_legacy/utils/mockBuilder.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/utils/mockPaperEngineScience.ts,move,docs/_legacy/src_legacy/utils/mockPaperEngineScience.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/utils/planEngine.ts,move,docs/_legacy/src_legacy/utils/planEngine.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/legacy/utils/topicMix.ts,move,docs/_legacy/src_legacy/utils/topicMix.ts,C-quarantine,"Legacy code; not referenced by current runtime, archive outside src.",low
+src/llm/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/main.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/mentors/centralPersona.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/mentors/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/navigation/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/navigation/practiceNavigation.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/AiMentorPage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/aiMentorStyles.css,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/DailyMixPage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/Dashboard.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/pages/HighlyProbableQuestions.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/Home.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/Login.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/MockBuilder.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/MockPaper.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/Onboarding.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/PracticePage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/PredictivePapers.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/StudyPlanPage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/TopicHub.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/TrendsPage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/pages/WeeklyWrappedPage.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/prediction/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/prediction/difficultyAutoSuggest.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/print.css,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/roadmap/ai/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/ai/mentorPrompts.ts,move,docs/_roadmap/src_roadmap/ai/mentorPrompts.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/ai/mentorPrompts_hi.ts,move,docs/_roadmap/src_roadmap/ai/mentorPrompts_hi.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/dailyMix/DailyMixWidget.tsx,move,docs/_roadmap/src_roadmap/dailyMix/DailyMixWidget.tsx,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/dailyMix/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/mentors/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/mentors/mentorModeDirectives.ts,move,docs/_roadmap/src_roadmap/mentors/mentorModeDirectives.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/practice/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/practice/practiceEngine.ts,move,docs/_roadmap/src_roadmap/practice/practiceEngine.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/prediction/bankHealth.ts,move,docs/_roadmap/src_roadmap/prediction/bankHealth.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/prediction/buildTopicKeySources.ts,move,docs/_roadmap/src_roadmap/prediction/buildTopicKeySources.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/prediction/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/prediction/difficultyAwarePractice.ts,move,docs/_roadmap/src_roadmap/prediction/difficultyAwarePractice.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/predictiveSciencePapers.ts,move,docs/_roadmap/src_roadmap/predictiveSciencePapers.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/README.md,move,docs/_roadmap/src_roadmap/README.md,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/dailyMixGenerator.ts,move,docs/_roadmap/src_roadmap/services/dailyMixGenerator.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/dailyMixService.ts,move,docs/_roadmap/src_roadmap/services/dailyMixService.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/services/matchScoreService.ts,move,docs/_roadmap/src_roadmap/services/matchScoreService.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/sessionLogger.ts,move,docs/_roadmap/src_roadmap/services/sessionLogger.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/streakService.ts,move,docs/_roadmap/src_roadmap/services/streakService.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/services/weeklyWrapService.ts,move,docs/_roadmap/src_roadmap/services/weeklyWrapService.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/topicHub/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/topicHub/ux/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/topicHub/ux/OutlineDrawer.tsx,move,docs/_roadmap/src_roadmap/topicHub/ux/OutlineDrawer.tsx,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/topicHub/ux/TopicHubTabs.tsx,move,docs/_roadmap/src_roadmap/topicHub/ux/TopicHubTabs.tsx,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/types/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/types/mentor.ts,move,docs/_roadmap/src_roadmap/types/mentor.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/types/topicHubV2ConceptTypes.ts,move,docs/_roadmap/src_roadmap/types/topicHubV2ConceptTypes.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/ui/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/ui/microcopy/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/ui/microcopy/userFeedbackAlertsCopy.ts,move,docs/_roadmap/src_roadmap/ui/microcopy/userFeedbackAlertsCopy.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/ui/microcopy/userFeedbackAlertsCopyVariants.ts,move,docs/_roadmap/src_roadmap/ui/microcopy/userFeedbackAlertsCopyVariants.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/ui/microcopy/weeklyWrappedStoryCopy.ts,move,docs/_roadmap/src_roadmap/ui/microcopy/weeklyWrappedStoryCopy.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/ui/microcopy/weeklyWrappedStoryCopy_hi.ts,move,docs/_roadmap/src_roadmap/ui/microcopy/weeklyWrappedStoryCopy_hi.ts,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/roadmap/weeklyWrapped/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/roadmap/weeklyWrapped/WeeklyWrappedWidget.tsx,move,docs/_roadmap/src_roadmap/weeklyWrapped/WeeklyWrappedWidget.tsx,B-planned,Planned/experimental modules; keep for future but remove from runtime src.,low
+src/services/commandPaletteConfig.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/dailyMixPlayback.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/services/planStorage.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/practiceInsights.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/strategyEngine.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/strategyStorage.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/services/weeklyWrappedGenerator.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/styles.css,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/types/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/types/MentorRequest.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/types/navigation.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/ui/components/CommandPalette.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/ui/components/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/ui/components/VibeToggle.tsx,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/ui/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/ui/microcopy/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/ui/microcopy/vibeCommandBadgeCopy.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/buildStudyPlan.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/buildUrl.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+src/utils/getTopicV2Content.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/mergeBucketsByTopic.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/mockPaperEngine.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/strategy.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/topicResolver.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+src/utils/useCurrentURL.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/check-canonical-imports.mjs,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/cleanup-windows-artifacts.ps1,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/desktop.ini,delete,,D-delete,Windows artifact (junk).,low
+tools/LazyTopper_Repo_Snapshot.ps1,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/README_GUARDRAILS.txt,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/repo-introspect.ps1,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/Step3_Apply_Quarantine.ps1,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/step3_quarantine_manifest.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tools/verify-import-paths.mjs,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tsconfig.app.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tsconfig.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+tsconfig.node.json,keep,,A-keep,Part of runtime or repo tooling/docs.,low
+vite.config.ts,keep,,A-keep,Part of runtime or repo tooling/docs.,low
