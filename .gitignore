@@ -30,3 +30,7 @@ server/.env.*
 .env.*
 
 !server/.env.example
+_rollback/
+_handoff/
+git/
+powershell/
