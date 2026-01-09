@@ -264,6 +264,55 @@ export type MentorResponse =
  * The frontend expects { kind: "question" | "hint" | "final", tutor: string, ... }.
  */
 export type SolveWithMeKind = 'question' | 'hint' | 'final';
+/**
+ * Diagram spec contract (v1).
+ * Backend sends a *spec*, frontend renders the diagram (no SVG strings).
+ *
+ * - type: high-level diagram category (currently triangles-first)
+ * - templateId: specific renderer template to use
+ * - payload: template-specific parameters (kept flexible for iteration)
+ */
+export type MentorDiagramType = 'triangle' | (string & {});
+
+/** Known triangle templates (expand over time). */
+export type MentorTriangleTemplateId = 'triangle-basic' | (string & {});
+
+export interface MentorDiagramSpec {
+  /** Contract version for forward compatibility. */
+  version: 1;
+  type: MentorDiagramType;
+  templateId: MentorTriangleTemplateId;
+  /** Template-specific payload (e.g., vertices, given values, annotations). */
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Anchors map tutor references ("side AB", "angle A", "point C") to stable ids
+ * that the renderer can highlight.
+ */
+export type MentorDiagramAnchorKind = 'point' | 'side' | 'angle';
+
+export interface MentorDiagramAnchor {
+  id: string;
+  kind: MentorDiagramAnchorKind;
+  /**
+   * Renderer target key (e.g., "A", "B", "C", "AB", "BC", "CA", "angleA").
+   * Keep this aligned with the diagram template's internal naming.
+   */
+  target: string;
+  /** Optional display label override (e.g., "∠A", "AB"). */
+  label?: string;
+}
+
+/**
+ * Optional mapping between solution steps and diagram highlights.
+ * stepId is intentionally a string to support both numbered ("1") and named steps ("given").
+ */
+export interface MentorDiagramStepLink {
+  stepId: string;
+  highlightAnchorIds: string[];
+}
+
 
 export interface SolveWithMeStructured {
   kind: SolveWithMeKind;
@@ -276,6 +325,14 @@ export interface SolveWithMeStructured {
   options?: string[];
   /** Optional short final answer if kind === 'final' */
   answer?: string;
+
+  /** Optional diagram spec for visual explanation (frontend renders). */
+  diagram?: MentorDiagramSpec;
+  /** Optional anchors for stable highlighting in the diagram renderer. */
+  anchors?: MentorDiagramAnchor[];
+  /** Optional step→highlight mapping to sync with tutor steps. */
+  diagramSteps?: MentorDiagramStepLink[];
+
 }
 
 /**
@@ -293,6 +350,14 @@ export interface BoardStepsStructured {
   steps: BoardStepLine[];
   /** Optional final answer line */
   finalAnswer?: string;
+
+  /** Optional diagram spec for visual explanation (frontend renders). */
+  diagram?: MentorDiagramSpec;
+  /** Optional anchors for stable highlighting in the diagram renderer. */
+  anchors?: MentorDiagramAnchor[];
+  /** Optional step→highlight mapping to sync with tutor steps. */
+  diagramSteps?: MentorDiagramStepLink[];
+
 }
 
 /**
