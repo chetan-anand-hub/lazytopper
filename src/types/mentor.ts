@@ -1,0 +1,310 @@
+/**
+ * Defines TypeScript interfaces for the `/api/mentor` backend contract.
+ *
+ * This version aligns the mode names with the front‑end (plan, solve,
+ * explain, coach, mindset) and introduces an optional persona property
+ * on requests so that a unified mentor persona can be specified.  Each
+ * mode corresponds to a different interaction style and may share
+ * payload/response definitions.
+ */
+
+/**
+ * Supported modes for the mentor endpoint.  Each mode corresponds to a
+ * persona:
+ *  - `plan`     → Study Planner (chapter‑wise plan generation)
+ *  - `solve`    → Question Solver (step‑by‑step solutions)
+ *  - `explain`  → Concept Explainer (summaries & examples)
+ *  - `coach`    → Exam Coach (time management & mindset tips)
+ *  - `mindset`  → Mindset Mentor (confidence & resilience)
+ */
+/**
+ * Supported modes for the mentor endpoint.  Each mode corresponds to a
+ * persona or conversation style.  In addition to the existing modes
+ * (plan, solve, explain, coach, mindset), we include topic‑level modes
+ * for TopicHub/Trends flows:
+ *
+ * - `topic_explain`: Explain a chapter or topic from basics.
+ * - `topic_exam_tips`: Provide concise guidance on how to score 95+ in
+ *   the specified topic/unit, including study strategy and exam tips.
+ */
+export type MentorMode =
+  | 'plan'
+  | 'solve'
+  | 'explain'
+  | 'coach'
+  | 'mindset'
+  | 'topic_explain'
+  | 'topic_exam_tips'
+  | 'solve_with_me'
+  | 'board_steps_ms';
+
+/**
+ * Configuration for a single mentor mode.  Defines how the backend should
+ * behave when this mode is active, including the system prompt and
+ * example prompts for users.
+ */
+export interface MentorModeConfig {
+  id: MentorMode;
+  label: string;
+  description: string;
+  systemPrompt: string;
+  exampleUserPrompts?: string[];
+}
+
+/**
+ * A persona aggregates global rules and mode-specific configurations for the
+ * AI mentor.  It defines the tone, behaviour and available modes.
+ */
+export interface MentorPersona {
+  id: string;
+  name: string;
+  tagline: string;
+  styleNotes: string;
+  coreRules: string[];
+  modes: MentorModeConfig[];
+}
+
+/**
+ * Base structure for all mentor requests.  The `mode` selects the persona
+ * and the `payload` carries the data required for that mode.  When using
+ * a unified persona system, an optional `persona` can be provided to
+ * override global defaults on the backend.
+ */
+export interface MentorRequest<TPayload> {
+  mode: MentorMode;
+  payload: TPayload;
+  persona?: MentorPersona;
+}
+
+/* ------------------------------------------------------------------ */
+/* Planner (plan) mode types                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Input payload for `plan` mode.  The Study Planner uses these
+ * parameters to construct a study plan.
+ */
+export interface PlannerPayload {
+  grade: string;
+  subject: 'Maths' | 'Science';
+  daysLeft: number;
+  /**
+   * Target percentage for the chosen subject.  Influences the level of
+   * detail and pace of the plan.
+   */
+  targetPercent: number;
+  /**
+   * Hours available per day.  The total hours and a per‑subject breakdown
+   * allow for differential pacing of Maths and Science.
+   */
+  hoursPerDay: {
+    total: number;
+    maths?: number;
+    science?: number;
+  };
+  /** List of chapters or topics the student considers weak (optional). */
+  weakChapters?: string[];
+  /** Chapters to cover only if time permits (optional). */
+  optionalChapters?: string[];
+}
+
+/**
+ * Response structure for `plan` mode.  It includes a high‑level plan,
+ * chapter‑wise hours allocation and a day‑by‑day schedule, along with
+ * optional metadata such as source links.  All hour values are integers.
+ */
+export interface PlannerResponse {
+  seasonPlan: {
+    phase: string;
+    durationDays: number;
+    focus: string;
+  }[];
+  chapterHours: {
+    chapter: string;
+    tier: 'must-crack' | 'high-roi' | 'good-to-do';
+    recommendedHours: number;
+    weightagePercent: number;
+    remarks?: string;
+  }[];
+  dailySchedule: {
+    dayNumber: number;
+    hours: {
+      Maths?: number;
+      Science?: number;
+    };
+    actions: string[];
+  }[];
+  meta?: {
+    sources?: {
+      chapter: string;
+      topicHubUrl?: string;
+      hpqUrl?: string;
+    }[];
+    version?: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Solve mode types                                                   */
+/* ------------------------------------------------------------------ */
+
+export interface SolvePayload {
+  grade: string;
+  subject: 'Maths' | 'Science';
+  /**
+   * An optional identifier if the question originates from the HPQ bank
+   * or mock builder.
+   */
+  questionId?: string;
+  /** The actual question text to solve. */
+  questionText: string;
+  /** Chapter or topic context for better answers. */
+  topic?: string;
+  /** Additional context such as difficulty or marks. */
+  context?: {
+    difficulty?: 'Easy' | 'Medium' | 'Hard';
+    marks?: number;
+  };
+}
+
+export interface SolveResponse {
+  steps: {
+    stepNumber: number;
+    description: string;
+    explanation?: string;
+  }[];
+  finalAnswer: string;
+  commonMistakes?: string[];
+  followUpLinks?: {
+    topicHubUrl?: string;
+    similarHpqUrl?: string;
+  };
+  meta?: {
+    version?: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Explain mode types                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface ExplainPayload {
+  grade: string;
+  subject: 'Maths' | 'Science';
+  /** Chapter or topic name. */
+  topic: string;
+  /** Optional concept identifier. */
+  conceptId?: string;
+}
+
+export interface ExplainResponse {
+  summary: string;
+  keyPoints: string[];
+  examples?: {
+    question: string;
+    solution: string;
+  }[];
+  links?: {
+    topicHubUrl?: string;
+    hpqUrl?: string;
+  };
+  meta?: {
+    version?: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Coach & Mindset mode types                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Input payload for `coach` or `mindset` modes.  The Exam Coach / Mindset
+ * Mentor provides time management, micro‑habits and mindset tips based
+ * on available time and recent performance.
+ */
+export interface ExamCoachPayload {
+  grade: string;
+  daysLeft: number;
+  hoursPerDay: number;
+  /** Recent mock scores by subject; used for personalised advice. */
+  recentScores?: Record<'Maths' | 'Science', number>;
+  /** Number of consecutive study days, to encourage streaks. */
+  streakDays?: number;
+}
+
+/**
+ * Response structure for `coach` or `mindset` modes.  Presents time allocation,
+ * micro‑habits and mindset tips to prepare for the exam.
+ */
+export interface ExamCoachResponse {
+  timeAllocation: Record<string, string>;
+  microHabits: string[];
+  mindsetTips: string[];
+  meta?: {
+    version?: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Unified response type                                              */
+/* ------------------------------------------------------------------ */
+
+export type MentorResponse =
+  | { mode: 'plan'; data: PlannerResponse; meta?: PlannerResponse['meta'] }
+  | { mode: 'solve'; data: SolveResponse; meta?: SolveResponse['meta'] }
+  | { mode: 'explain'; data: ExplainResponse; meta?: ExplainResponse['meta'] }
+  | { mode: 'coach'; data: ExamCoachResponse; meta?: ExamCoachResponse['meta'] }
+  | { mode: 'mindset'; data: ExamCoachResponse; meta?: ExamCoachResponse['meta'] };
+// ---------------------------------------------------------------------------
+// Protocol-mode structured payloads (gateway returns these under data.structured)
+// ---------------------------------------------------------------------------
+
+/**
+ * Solve-With-Me is an interactive tutoring protocol. The gateway returns one turn at a time.
+ * The frontend expects { kind: "question" | "hint" | "final", tutor: string, ... }.
+ */
+export type SolveWithMeKind = 'question' | 'hint' | 'final';
+
+export interface SolveWithMeStructured {
+  kind: SolveWithMeKind;
+  tutor: string;
+  /** Optional small title or tag (e.g., "Step 2") */
+  label?: string;
+  /** Optional problem restatement / working line */
+  prompt?: string;
+  /** Optional multiple choice options (future-ready) */
+  options?: string[];
+  /** Optional short final answer if kind === 'final' */
+  answer?: string;
+}
+
+/**
+ * Board steps protocol for CBSE-style marking scheme.
+ */
+export interface BoardStepLine {
+  stepNo: number;
+  text: string;
+  marks: number;
+}
+
+export interface BoardStepsStructured {
+  kind: 'board_steps_ms';
+  totalMarks: number;
+  steps: BoardStepLine[];
+  /** Optional final answer line */
+  finalAnswer?: string;
+}
+
+/**
+ * Union of all structured protocols we currently support.
+ * (Other modes generally return plain text only.)
+ */
+export type MentorStructured = SolveWithMeStructured | BoardStepsStructured;
+
+/**
+ * Mentor gateway response data payload.
+ */
+export interface MentorGatewayData {
+  text: string;
+  structured?: MentorStructured;
+}

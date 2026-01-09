@@ -1,0 +1,31 @@
+# Dependencies / builds
+node_modules
+dist
+build
+
+# Env files
+.env
+.env.*
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+**/desktop.ini
+
+# Editor
+.vscode
+src/lazytopper_patch.diff
+
+# ---- LazyTopper guard: OS junk ----
+.BIN/
+*.lnk
+
+
+# --- LazyTopper AI secrets (do not commit) ---
+server/.env
+server/.env.*
+.env
+.env.*
+
