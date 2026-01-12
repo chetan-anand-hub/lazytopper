@@ -71,3 +71,11 @@ export default defineConfig([
   },
 ])
 ```
+
+## Repo hygiene
+Windows metadata files are cleaned automatically before dev/build and blocked at commit time.
+Enable the pre-commit hook once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```

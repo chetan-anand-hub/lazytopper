@@ -11,6 +11,7 @@ build
 # OS junk
 .DS_Store
 Thumbs.db
+ehthumbs.db
 desktop.ini
 **/desktop.ini
 
