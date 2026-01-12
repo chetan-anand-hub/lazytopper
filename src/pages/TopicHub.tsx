@@ -12,6 +12,7 @@ import { getTopicV2Content, normalizeTopicKey } from "../utils/topicHubV2Store";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import type { TopicHubV2Content, V2Definition, V2Example, Misconception, Competency, LabActivity, CaseStudy } from "../utils/getTopicV2Content";
 import { PredictionCore } from "../data/predictionCore";
+import { generatePracticeSet } from "../data/practiceSetGenerator";
 import { useVibeMode } from "../context/vibeModeContext";
 
 type SubjectKey = "maths" | "science";
@@ -373,8 +374,32 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     { title: "Quick Q5", question: `Write a 2-line summary of the fastest revision strategy for ${title}.` },
   ] as any;
 }, [title, isDiagramTopic]);
+
+  const quickQuizFromPractice = useMemo(() => {
+    const practiceTopicKey = normalizeTopicKey(topicKey) || topicKey;
+    const practiceSet = generatePracticeSet({
+      subject: subject as any,
+      topicKey: practiceTopicKey,
+      totalQuestions: 5,
+      shuffle: true,
+    });
+
+    const mapped = (practiceSet.questions || [])
+      .map((q: any, idx: number) => {
+        const text = String(q?.questionText ?? q?.text ?? q?.question ?? "").trim();
+        if (!text) return null;
+        return { title: `Q${idx + 1}`, question: text } as V2Example;
+      })
+      .filter(Boolean) as V2Example[];
+
+    return mapped.slice(0, 5);
+  }, [subject, topicKey]);
   const rawQuickQuiz = safeArray<V2Example>((v2 as any).quickQuiz);
-  const quickQuiz = rawQuickQuiz.length ? rawQuickQuiz : buildFallbackQuickQuiz();
+  const quickQuiz = quickQuizFromPractice.length
+    ? quickQuizFromPractice
+    : rawQuickQuiz.length
+      ? rawQuickQuiz
+      : buildFallbackQuickQuiz();
 
   const misconceptions = safeArray<Misconception>((v2 as any).misconceptions);
   const competencies = safeArray<Competency>((v2 as any).competencies);
@@ -828,7 +853,7 @@ const showInZombie = (sectionId: string) => {
           {isGrind && showInZombie("quick-quiz") && quickQuiz.length > 0 && (
             <AccordionCard id="quick-quiz" title="Quick quiz (2 mins)" defaultOpen={mode === "zombie"}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-                {quickQuiz.slice(0, 8).map((q, idx) => (
+                {quickQuiz.slice(0, 5).map((q, idx) => (
                   <div
                     key={idx}
                     style={{
