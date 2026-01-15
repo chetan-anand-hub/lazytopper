@@ -326,6 +326,11 @@ export interface SolveWithMeStructured {
   /** Optional short final answer if kind === 'final' */
   answer?: string;
 
+  /** Optional diagram type for lightweight frontend rendering. */
+  diagramType?: string;
+  /** Optional label map for the diagram. */
+  diagramLabels?: Record<string, string>;
+
   /** Optional diagram spec for visual explanation (frontend renders). */
   diagram?: MentorDiagramSpec;
   /** Optional anchors for stable highlighting in the diagram renderer. */
@@ -350,6 +355,11 @@ export interface BoardStepsStructured {
   steps: BoardStepLine[];
   /** Optional final answer line */
   finalAnswer?: string;
+
+  /** Optional diagram type for lightweight frontend rendering. */
+  diagramType?: string;
+  /** Optional label map for the diagram. */
+  diagramLabels?: Record<string, string>;
 
   /** Optional diagram spec for visual explanation (frontend renders). */
   diagram?: MentorDiagramSpec;
