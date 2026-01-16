@@ -5,7 +5,7 @@
 // - Renders baked TopicHubV2 content (base + enrichment)
 // - Implements the locked UI direction: sticky action bar + progressive disclosure (accordions)
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { getTopicV2Content, normalizeTopicKey } from "../utils/topicHubV2Store";
@@ -15,8 +15,8 @@ import { PredictionCore } from "../data/predictionCore";
 import { generatePracticeSet } from "../data/practiceSetGenerator";
 import { useVibeMode } from "../context/vibeModeContext";
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
+import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
-import TutorDrawerV2 from "../components/tutor/TutorDrawerV2";
 
 type SubjectKey = "maths" | "science";
 type ModeKey = "zombie" | "beast";
@@ -186,6 +186,8 @@ export default function TopicHub() {
   } | null>(null);
   const [mentorSolveStyle, setMentorSolveStyle] = useState<"socratic" | "board">("socratic");
   const [tutorDrawerOpen, setTutorDrawerOpen] = useState(false);
+  const [grindDrawerOpen, setGrindDrawerOpen] = useState(false);
+  const [grindNodeId, setGrindNodeId] = useState<string>("" );
   const [tutorTab, setTutorTab] = useState<TutorTab>("teach");
   const [tutorNodeIndex, setTutorNodeIndex] = useState(0);
 
@@ -262,7 +264,7 @@ if (!v2) {
     }}>
         <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 16px" }}>
           <div style={{ opacity: 0.7, marginBottom: 10 }}>
-            Class {grade}  -  {subject.toUpperCase()}
+            Class {grade} Ã¢â‚¬Â¢ {subject.toUpperCase()}
           </div>
 
           <h1 style={{ fontSize: 44, margin: "8px 0 8px" }}>{topicKey}</h1>
@@ -299,7 +301,7 @@ if (!v2) {
   const definitions = safeArray<V2Definition>((v2 as any).definitions);
   const markingTips = safeArray<string>((v2 as any).markingTips);
   const scoreTips = safeArray<string>((v2 as any).scoreTips);
-// Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
+// Board-pattern anchors (AÃ¢â‚¬â€œE) pulled from the canonical question bank for this topic.
 const [exampleSection, setExampleSection] = useState<"A" | "B" | "C" | "D" | "E">("A");
 
 const exampleAnchors = useMemo(() => {
@@ -405,7 +407,7 @@ const buildFallbackWorkedExampleQuestion = useCallback(
       const marksBySectionLocal: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 };
       const marks = marksBySectionLocal[section] ?? 2;
 
-      const header = `Class ${grade} ${subjectTitle}  -  ${title}`;
+      const header = `Class ${grade} ${subjectTitle} Ã¢â‚¬Â¢ ${title}`;
       const diagramLine = isDiagramTopic
         ? `Diagram: Draw a neat labelled diagram wherever applicable.`
         : "";
@@ -438,7 +440,7 @@ In ?ABC, D lies on AB and E lies on AC. If DE ? BC, AD = 3 cm, DB = 6 cm and EC 
             return `${header}
 
 Pattern C (${marks} marks):
-(i) In ?ABC, ?A = 50°, ?B = 60°. In ?PQR, ?P = 50°, ?Q = 60°. Prove ?ABC ~ ?PQR.
+(i) In ?ABC, ?A = 50Ã‚Â°, ?B = 60Ã‚Â°. In ?PQR, ?P = 50Ã‚Â°, ?Q = 60Ã‚Â°. Prove ?ABC ~ ?PQR.
 (ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ?ABC and ?PQR.`;
           case "D":
             return `${header}
@@ -456,7 +458,7 @@ ${diagramLine}
 
 Pattern E (${marks} marks, mixed concept):
 In a right triangle ?ABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
-(i) Prove that AB² = BD · BC and AC² = CD · BC.
+(i) Prove that ABÃ‚Â² = BD Ã‚Â· BC and ACÃ‚Â² = CD Ã‚Â· BC.
 (ii) If BD = 9 cm and BC = 25 cm, find AB.`;
           default:
             break;
@@ -566,6 +568,7 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const formulae = safeArray<any>((v2 as any).formulae || (v2 as any).formulas || (v2 as any).formulaSheet);
   const videos = safeArray<any>((v2 as any).videos || (v2 as any).videoLinks || (v2 as any).youtube);
   const guidedMindmap = topicKey === "triangles" ? trianglesGuidedMindmap : null;
+  const grindMindmap = topicKey === "triangles" ? trianglesGrindMindmap : null;
   const guidedOrder = guidedMindmap?.recommendedOrder || [];
   const guidedNodes = guidedMindmap?.nodes || [];
   const guidedNodeById = useMemo(() => {
@@ -587,6 +590,26 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const currentTutorCore = currentTutorNodeId ? guidedCoreByNodeId[currentTutorNodeId] : null;
   const currentTutorCoreId = currentTutorNodeId ? guidedCoreIdByNodeId[currentTutorNodeId] : null;
 
+  const defaultGrindNodeId = useMemo(() => {
+    const hw = grindMindmap?.highways || [];
+    for (const h of hw) {
+      const order = Array.isArray(h.recommendedNodeOrder) ? h.recommendedNodeOrder : [];
+      if (order.length) return String(order[0]);
+    }
+    const keys = grindMindmap ? Object.keys(grindMindmap.nodesById || {}) : [];
+    return keys[0] ? String(keys[0]) : "";
+  }, [grindMindmap]);
+
+  useEffect(() => {
+    if (!grindMindmap) {
+      setGrindDrawerOpen(false);
+      setGrindNodeId("");
+      return;
+    }
+    setGrindNodeId((prev) => prev || defaultGrindNodeId);
+  }, [grindMindmap, defaultGrindNodeId]);
+
+
   const mapProofFocusToNodeId = useCallback((focus?: string) => {
     const f = String(focus || "").toLowerCase();
     if (f.includes("bpt")) return "gBPT";
@@ -602,6 +625,20 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const closeTutorDrawer = useCallback(() => {
     setTutorDrawerOpen(false);
   }, []);
+
+  const closeGrindDrawer = useCallback(() => {
+    setGrindDrawerOpen(false);
+  }, []);
+
+  const openGrindDrawer = useCallback(
+    (opts?: { nodeId?: string | null }) => {
+      const next = String(opts?.nodeId || grindNodeId || defaultGrindNodeId || "");
+      setGrindNodeId(next);
+      setGrindDrawerOpen(true);
+    },
+    [defaultGrindNodeId, grindNodeId]
+  );
+
 
   const resolveTutorNodeIndex = useCallback(
     (nodeId?: string | null) => {
@@ -701,7 +738,7 @@ const showInZombie = (sectionId: string) => {
 
           <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontSize: 14, opacity: 0.75 }}>
-              Class {grade}  -  {subject.toUpperCase()}
+              Class {grade} Ã¢â‚¬Â¢ {subject.toUpperCase()}
             </div>
 
             <div
@@ -769,6 +806,33 @@ const showInZombie = (sectionId: string) => {
                 onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
               >
                 Let me teach you
+              </button>
+            </div>
+          ) : null}
+
+          {isGrind && isTrianglesTopic ? (
+            <div
+              style={{
+                borderRadius: 18,
+                padding: "14px 14px",
+                background: "rgba(255,255,255,0.65)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>Triangles Grind</div>
+                <div style={{ fontSize: 13, opacity: 0.75 }}>
+                  Marks-roadmap practice: rubrics, board skeletons, traps, and micro-drills.
+                </div>
+              </div>
+              <button type="button" className="pill" onClick={() => openGrindDrawer({ nodeId: defaultGrindNodeId })}>
+                Start grind
               </button>
             </div>
           ) : null}
@@ -925,7 +989,7 @@ Use CBSE exam language and include a labelled diagram.`,
                       return;
                     }
                     openMentorDrawer({
-                      title: `${title} - Common misconceptions`,
+                      title: `${title} Æ’?â€º Common misconceptions`,
                       question: `Act like a CBSE Class ${grade} teacher. For ${title}:
 
 1) List the TOP 5 common misconceptions students have.
@@ -994,7 +1058,7 @@ Use CBSE exam language and include a labelled diagram.`,
                     }
                     const joined = scoreTips.slice(0, 10).map((x, i) => `${i + 1}. ${String(x || "")}`).join("\n");
                     openMentorDrawer({
-                      title: `Score tips - ${title}`,
+                      title: `Score tips Ã‚Â· ${title}`,
                       question:
                         `You are a CBSE Class ${grade} ${subjectTitle} mentor.\n` +
                         `Using these score tips, teach me how to write answers for FULL marks.\n\n` +
@@ -1016,7 +1080,7 @@ Use CBSE exam language and include a labelled diagram.`,
             </AccordionCard>
           )}
      {isGrind && showInZombie("worked-examples") && (
-  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A-E)">
+  <AccordionCard id="worked-examples" title="Worked examples (Board patterns AÃ¢â‚¬â€œE)">
     {(() => {
       const anchors = exampleAnchors as any;
       const exampleSections: Array<"A" | "B" | "C" | "D" | "E"> = ["A", "B", "C", "D", "E"];
@@ -1069,7 +1133,7 @@ Use CBSE exam language and include a labelled diagram.`,
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontWeight: 900 }}>
-                Example  -  Pattern {exampleSection}{" "}
+                Example Ã¢â‚¬Â¢ Pattern {exampleSection}{" "}
                 <span style={{ fontWeight: 700, opacity: 0.65 }}>
                   {isAnchor ? "(from bank)" : "(auto sample)"}
                 </span>
@@ -1104,7 +1168,7 @@ Use CBSE exam language and include a labelled diagram.`,
                 className="pill"
                 onClick={() =>
                   openMentorDrawer({
-                    title: `Pattern ${exampleSection}  -  ${title}`,
+                    title: `Pattern ${exampleSection} Ã¢â‚¬Â¢ ${title}`,
                     question:
                       `Solve this exact example in exam-ready steps.\n\n` +
                       `Pattern: ${exampleSection}\n` +
@@ -1129,7 +1193,7 @@ Use CBSE exam language and include a labelled diagram.`,
 
             {!isAnchor ? (
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                Note: this is an auto-sample because your bank doesn't have a stored anchor for
+                Note: this is an auto-sample because your bank doesnÃ¢â‚¬â„¢t have a stored anchor for
                 Pattern {exampleSection} yet. The Mentor can still solve it properly.
               </div>
             ) : null}
@@ -1146,7 +1210,7 @@ Use CBSE exam language and include a labelled diagram.`,
               >
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 900 }}>
-                    Example - Pattern {exampleSection} {typeof marks === "number" ? ` - ${marks} marks` : ""}
+                    Example Ã‚Â· Pattern {exampleSection} {typeof marks === "number" ? `Ã‚Â· ${marks} marks` : ""}
                   </div>
                   <div style={{ opacity: 0.7, fontSize: 12 }}>
                     {isAnchor ? "From your curated bank" : "Sample (fallback)"}
@@ -1210,7 +1274,7 @@ Use CBSE exam language and include a labelled diagram.`,
                           }
                           if (!list.length) return;
                           openMentorDrawer({
-                            title: `NCERT competency - ${cid}`,
+                            title: `NCERT competency Ã‚Â· ${cid}`,
                             question:
                               `Explain the NCERT competency ${cid} for Class ${grade} ${subjectTitle}.\n` +
                               `Competency: ${desc}\n\n` +
@@ -1229,7 +1293,7 @@ Use CBSE exam language and include a labelled diagram.`,
 
                       <div style={{ fontSize: 12, opacity: 0.75 }}>
                         Selected: <b>{cid}</b>
-                        {bloom ? <span>  -  {bloom}</span> : null}
+                        {bloom ? <span> Ã¢â‚¬Â¢ {bloom}</span> : null}
                       </div>
                     </div>
 
@@ -1254,7 +1318,7 @@ Use CBSE exam language and include a labelled diagram.`,
                           >
                             <b>{id}:</b> {String(c?.description || "")}
                             {c?.bloomLevel ? (
-                              <span style={{ opacity: 0.7 }}>  -  {String(c.bloomLevel)}</span>
+                              <span style={{ opacity: 0.7 }}> Ã¢â‚¬Â¢ {String(c.bloomLevel)}</span>
                             ) : null}
                           </li>
                         );
@@ -1275,7 +1339,7 @@ Use CBSE exam language and include a labelled diagram.`,
                   className="pill"
                   onClick={() =>
                     openMentorDrawer({
-                      title: `${title}  -  Lab / activities`,
+                      title: `${title} Ã¢â‚¬Â¢ Lab / activities`,
                       question: `Help me prepare for lab/activities in ${title}. Give the objective, steps, observations, and 2 viva questions with answers.`,
                       solveStyle: "board",
                     })
@@ -1346,7 +1410,7 @@ Use CBSE exam language and include a labelled diagram.`,
             <>
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
-                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
+                  Quick revision kit for <b>{title}</b> Ã¢â‚¬â€ mindmap, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <button
@@ -1354,7 +1418,7 @@ Use CBSE exam language and include a labelled diagram.`,
                     className="pill"
                     onClick={() =>
                       openMentorDrawer({
-                        title: `${title}  -  Resources`,
+                        title: `${title} Ã¢â‚¬Â¢ Resources`,
                         question: `Make me a 10-minute revision plan for ${title}. Keep it CBSE-focused and marks-friendly.`,
                         solveStyle: "socratic",
                       })
@@ -1368,7 +1432,7 @@ Use CBSE exam language and include a labelled diagram.`,
               <AccordionCard id="mindmap" title="Mindmap" defaultOpen>
                 {!mindMap ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
-                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
+                    Mindmap coming soon for this topic. (WeÃ¢â‚¬â„¢ll auto-fill as the bank grows.)
                   </div>
                 ) : (
                   <MindMapCanvas
@@ -1425,7 +1489,7 @@ Use CBSE exam language and include a labelled diagram.`,
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title}  -  Formula`,
+                                  title: `${title} Ã¢â‚¬Â¢ Formula`,
                                   question: `Teach me the formula: ${label}. Also show 2 solved CBSE-style examples where it is used.`,
                                   solveStyle: "socratic",
                                 })
@@ -1493,7 +1557,7 @@ Use CBSE exam language and include a labelled diagram.`,
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title}  -  Video recap`,
+                                  title: `${title} Ã¢â‚¬Â¢ Video recap`,
                                   question: `Summarize the key takeaways for ${title} as a 1-page CBSE revision note. Add 3 mini-questions with answers.`,
                                   solveStyle: "socratic",
                                 })
@@ -1514,6 +1578,17 @@ Use CBSE exam language and include a labelled diagram.`,
 
         </div>
       </div>
+      <GrindDrawerV1
+        open={grindDrawerOpen && isTrianglesTopic}
+        onClose={closeGrindDrawer}
+        mindmap={grindMindmap}
+        nodeId={grindNodeId || defaultGrindNodeId}
+        setNodeId={setGrindNodeId}
+        grade={grade}
+        subjectTitle={subjectTitle}
+        topicKey={topicKey}
+        mode={mode}
+      />
       <TutorDrawerV2
         open={tutorDrawerOpen && isTrianglesTopic}
         onClose={closeTutorDrawer}
@@ -1546,6 +1621,745 @@ Use CBSE exam language and include a labelled diagram.`,
 </div>
   );
 }
+
+
+function TutorDrawerV2(props: {
+  open: boolean;
+  onClose: () => void;
+  tab: TutorTab;
+  setTab: (tab: TutorTab) => void;
+  nodeIndex: number;
+  setNodeIndex: (idx: number) => void;
+  nodeId: string | undefined;
+  node: { title: string; text?: string } | null;
+  core: { means: string; when: string[]; exam: string; trap: string } | null;
+  coreId: string | null;
+  order: string[];
+  nodeTitles: Record<string, string>;
+  grade: string;
+  subjectTitle: string;
+  topicKey: string;
+  mode: ModeKey;
+}) {
+  const {
+    open,
+    onClose,
+    tab,
+    setTab,
+    nodeIndex,
+    setNodeIndex,
+    nodeId,
+    node,
+    core,
+    coreId,
+    order,
+    nodeTitles,
+    grade,
+    subjectTitle,
+    topicKey,
+    mode,
+  } = props;
+
+  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [doubtInput, setDoubtInput] = useState("");
+  const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
+  const [doubtError, setDoubtError] = useState<string | null>(null);
+  const [doubtLoading, setDoubtLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const doubtInputRef = useRef<HTMLInputElement | null>(null);
+
+  const nodeTitle = String(node?.title || "Concept");
+  const nodeText = String(node?.text || core?.means || "");
+  const coreText = core
+    ? [
+        `What it means: ${core.means}`,
+        core.when?.length ? `When used: ${core.when.join("; ")}` : "",
+        `Exam line: ${core.exam}`,
+        `Trap: ${core.trap}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
+  const currentKey = nodeId ? `${tab}:${nodeId}` : "";
+  const currentResponse = currentKey ? responses[currentKey] : null;
+  const currentError = currentKey ? errors[currentKey] : null;
+  const isLoading = loadingKey === currentKey;
+
+  const cancelInFlight = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setLoadingKey(null);
+  }, []);
+
+  const safeJsonParse = (raw: string) => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const extractDiagramMeta = (obj: any) => {
+    const diagramType =
+      String(obj?.diagramType || obj?.diagram?.diagramType || obj?.diagram?.type || "").trim() ||
+      "";
+    const diagramLabels = obj?.diagramLabels || obj?.diagram?.diagramLabels || obj?.diagram?.labels || null;
+    const diagramSpec = obj?.diagram || obj?.diagramSpec || null;
+    return { diagramType, diagramLabels, diagramSpec };
+  };
+
+  const validateTeach = (obj: any, diagramType: string, diagramSpec: any) => {
+    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
+    const bullets = Array.isArray(obj?.conceptBullets) ? obj.conceptBullets : [];
+    const examLines = Array.isArray(obj?.examLines) ? obj.examLines : [];
+    const worked = obj?.workedExample || {};
+    const steps = Array.isArray(worked.steps) ? worked.steps : [];
+    if (bullets.length < 5) return "Teach response incomplete. Please retry.";
+    if (examLines.length < 2) return "Teach response incomplete. Please retry.";
+    if (!String(worked.question || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!steps.length) return "Teach response incomplete. Please retry.";
+    if (!String(worked.finalAnswer || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!String(obj?.commonError || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!String(obj?.commonFix || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!String(obj?.checkQuestion || "").trim()) return "Teach response incomplete. Please retry.";
+    return null;
+  };
+
+  const validateExamples = (obj: any, diagramType: string, diagramSpec: any) => {
+    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
+    const teach = obj?.teach || {};
+    const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
+    const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
+    const worked = Array.isArray(obj?.workedExamples) ? obj.workedExamples : [];
+    if (simple.length < 4) return "Examples response incomplete. Please retry.";
+    if (exam.length < 2) return "Examples response incomplete. Please retry.";
+    if (worked.length !== 2) return "Board Examples must include exactly 2 worked examples.";
+    return null;
+  };
+
+  const formatDoubtStructured = (obj: any) => {
+    if (!obj || typeof obj !== "object") return "";
+    if (obj.kind === "learn_mindmap") {
+      const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets.slice(0, 4) : [];
+      const examLines = Array.isArray(obj.examLines) ? obj.examLines.slice(0, 2) : [];
+      const lines = [];
+      bullets.forEach((b: string) => lines.push(`- ${b}`));
+      examLines.forEach((l: string, idx: number) => lines.push(`Exam line ${idx + 1}: ${l}`));
+      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
+      return lines.join("\n");
+    }
+    if (obj.kind === "learn_teach") {
+      const teach = obj.teach || {};
+      const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation.slice(0, 4) : [];
+      const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence.slice(0, 2) : [];
+      const lines = [];
+      simple.forEach((b: string) => lines.push(`- ${b}`));
+      exam.forEach((l: string) => lines.push(`Exam line: ${l}`));
+      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
+      return lines.join("\n");
+    }
+    return "";
+  };
+
+  const buildPayload = (nextTab: TutorTab, doubtContext?: any, prompt?: string) => {
+    const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
+    return {
+      mode: modeApi,
+      payload: {
+        subject: subjectTitle,
+        grade: Number(grade),
+        topicKey,
+        chapter: topicKey,
+        cardTitle: nodeTitle,
+        cardName: nodeTitle,
+        section: "learn",
+        subSection: nextTab === "teach" ? "mindmap" : "board-examples",
+        selectedTab: nextTab,
+        selectedMode: modeApi,
+        mindmapNodeId: nodeId,
+        mindmapNodeTitle: nodeTitle,
+        mindmapNodeText: nodeText,
+        mindmapCoreId: coreId,
+        explainType: "mindmap_node",
+        contextText: coreText || nodeText,
+        stepIndex: nodeIndex,
+        vibe: mode,
+        doubtContext,
+      },
+      messages: prompt ? [{ role: "user", content: prompt }] : undefined,
+    };
+  };
+
+  const requestTutor = useCallback(
+    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string }) => {
+      if (!open || !nodeId) return;
+      const key = `${nextTab}:${nodeId}`;
+      if (!opts?.force && responses[key]) return;
+      if (loadingKey === key) return;
+
+      cancelInFlight();
+      setErrors((prev) => ({ ...prev, [key]: "" }));
+      setLoadingKey(key);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const body = buildPayload(nextTab, undefined, opts?.prompt);
+        const res = await fetch("/api/mentor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+
+        const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
+        if (!structured) throw new Error("Mentor response incomplete. Please retry.");
+
+        const meta = extractDiagramMeta(structured);
+        const validation =
+          nextTab === "teach"
+            ? validateTeach(structured, meta.diagramType, meta.diagramSpec)
+            : validateExamples(structured, meta.diagramType, meta.diagramSpec);
+        if (validation) {
+          setErrors((prev) => ({ ...prev, [key]: validation }));
+          return;
+        }
+
+        setResponses((prev) => ({
+          ...prev,
+          [key]: {
+            structured,
+            diagramType: meta.diagramType,
+            diagramLabels: meta.diagramLabels,
+            diagramSpec: meta.diagramSpec,
+            responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            summary: JSON.stringify(structured).slice(0, 280),
+          },
+        }));
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+        setErrors((prev) => ({ ...prev, [key]: err?.message || "Mentor error. Please retry." }));
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingKey(null);
+        }
+      }
+    },
+    [
+      open,
+      nodeId,
+      responses,
+      loadingKey,
+      cancelInFlight,
+      subjectTitle,
+      grade,
+      topicKey,
+      nodeTitle,
+      nodeText,
+      coreId,
+      coreText,
+      nodeIndex,
+      mode,
+    ]
+  );
+
+  const sendDoubt = useCallback(
+    async (prompt: string) => {
+      if (!prompt.trim() || doubtLoading || !nodeId) return;
+      setDoubtError(null);
+      setDoubtLoading(true);
+
+      const last = currentResponse || {};
+      const doubtContext = {
+        chapter: topicKey,
+        cardId: nodeId,
+        cardTitle: nodeTitle,
+        cardSection: "learn",
+        cardSubSection: tab,
+        selectedTab: tab,
+        nodeId,
+        nodeTitle,
+        stepIndex: nodeIndex,
+        lastDiagram: last.diagramType,
+        lastResponseId: last.responseId,
+        lastResponseSummary: last.summary,
+      };
+
+      try {
+        const body = buildPayload(tab, doubtContext, prompt);
+        const res = await fetch("/api/mentor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+
+        const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
+        const formatted = structured ? formatDoubtStructured(structured) : String(data?.data?.text || "");
+        setDoubtAnswer(formatted || "Mentor reply received.");
+        setDoubtInput("");
+      } catch (err: any) {
+        setDoubtError(err?.message || "Mentor error. Please retry.");
+      } finally {
+        setDoubtLoading(false);
+      }
+    },
+    [
+      doubtLoading,
+      nodeId,
+      currentResponse,
+      topicKey,
+      nodeTitle,
+      tab,
+      nodeIndex,
+      buildPayload,
+    ]
+  );
+
+  useEffect(() => {
+    if (!open) {
+      cancelInFlight();
+      setDoubtInput("");
+      setDoubtAnswer(null);
+      setDoubtError(null);
+      return;
+    }
+    if (!nodeId) return;
+    if (currentError) return;
+    if (!currentResponse && !isLoading) {
+      requestTutor(tab);
+    }
+  }, [open, nodeId, tab, currentResponse, currentError, isLoading, requestTutor, cancelInFlight]);
+
+  useEffect(() => {
+    setDoubtAnswer(null);
+    setDoubtError(null);
+    setDoubtInput("");
+  }, [tab, nodeId]);
+
+  if (!open) return null;
+
+  const drawerBg =
+    mode === "beast"
+      ? "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,247,255,0.98) 100%)"
+      : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,255,248,0.98) 100%)";
+
+  const handleTabChange = (nextTab: TutorTab) => {
+    if (nextTab === tab) return;
+    cancelInFlight();
+    setTab(nextTab);
+  };
+
+  const goToNodeIndex = (idx: number) => {
+    if (idx < 0 || idx >= order.length) return;
+    cancelInFlight();
+    setNodeIndex(idx);
+  };
+
+  const handleNextConcept = () => {
+    const next = Math.min(nodeIndex + 1, Math.max(0, order.length - 1));
+    if (next !== nodeIndex) goToNodeIndex(next);
+  };
+
+  const renderTeach = () => {
+    const obj = currentResponse?.structured || null;
+    if (!obj) return null;
+    const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
+    const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
+    const worked = obj.workedExample || {};
+    const steps = Array.isArray(worked.steps) ? worked.steps : [];
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <DiagramBlock
+          diagramType={currentResponse.diagramType}
+          diagramLabels={currentResponse.diagramLabels}
+          diagramSpec={currentResponse.diagramSpec}
+          note="CBSE diagram block"
+        />
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {bullets.map((b: any, idx: number) => (
+              <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam lines</div>
+          {examLines.map((l: any, idx: number) => (
+            <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
+              {String(l)}
+            </div>
+          ))}
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Mini worked example</div>
+          {worked.question ? (
+            <div style={{ marginBottom: 8, opacity: 0.9 }}>{String(worked.question)}</div>
+          ) : null}
+          {steps.length ? (
+            <ol style={{ margin: 0, paddingLeft: 18 }}>
+              {steps.map((s: any, idx: number) => (
+                <li key={idx} style={{ marginBottom: 6 }}>{String(s)}</li>
+              ))}
+            </ol>
+          ) : null}
+          {worked.finalAnswer ? (
+            <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(worked.finalAnswer)}</div>
+          ) : null}
+        </div>
+        <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(255,180,0,0.08)" }}>
+          <div style={{ fontWeight: 800 }}>Common error + fix</div>
+          <div style={{ marginTop: 6 }}>{String(obj.commonError || "")}</div>
+          <div style={{ marginTop: 6, fontWeight: 700 }}>Fix: {String(obj.commonFix || "")}</div>
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Quick check</div>
+          <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            {String(obj.checkQuestion || "")}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="pill"
+            onClick={handleNextConcept}
+            disabled={nodeIndex >= order.length - 1}
+          >
+            Continue
+          </button>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => doubtInputRef.current?.focus()}
+          >
+            Ask a doubt
+          </button>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => handleTabChange("examples")}
+          >
+            Show an example for this
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderExamples = () => {
+    const obj = currentResponse?.structured || null;
+    if (!obj) return null;
+    const teach = obj.teach || {};
+    const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
+    const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
+    const worked = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
+    const mistakes = Array.isArray(obj.commonMistakes) ? obj.commonMistakes : [];
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <DiagramBlock
+          diagramType={currentResponse.diagramType}
+          diagramLabels={currentResponse.diagramLabels}
+          diagramSpec={currentResponse.diagramSpec}
+          note="CBSE diagram block"
+        />
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {simple.map((b: any, idx: number) => (
+              <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam line</div>
+          {exam.map((l: any, idx: number) => (
+            <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
+              {String(l)}
+            </div>
+          ))}
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked examples (2)</div>
+          {worked.map((ex: any, exIdx: number) => {
+            const steps = Array.isArray(ex?.steps) ? ex.steps : [];
+            const sumMarks = steps.reduce((acc: number, s: any) => acc + (Number(s?.marks) || 0), 0);
+            const total = Number(ex?.totalMarks);
+            return (
+              <div key={exIdx} style={{ borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(0,0,0,0.08)", marginBottom: 10 }}>
+                <div style={{ fontWeight: 800 }}>
+                  {exIdx === 0 ? "Example 1: Basic" : "Example 2: Board-style"}
+                </div>
+                {ex?.question ? <div style={{ marginTop: 6 }}>{String(ex.question)}</div> : null}
+                {steps.length ? (
+                  <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                    {steps.map((s: any, idx: number) => (
+                      <li key={idx} style={{ marginBottom: 6 }}>
+                        <b>[{Number(s?.marks) || 0}]</b> {String(s?.text || "")}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                {Number.isFinite(total) ? (
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Total marks: {total}</div>
+                ) : null}
+                {Number.isFinite(total) && Number.isFinite(sumMarks) && total !== sumMarks ? (
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#9b5a00" }}>
+                    Marking check: step marks sum to {sumMarks}, expected {total}.
+                  </div>
+                ) : null}
+                {ex?.finalAnswer ? (
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(ex.finalAnswer)}</div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        {mistakes.length ? (
+          <div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>Common mistakes</div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {mistakes.map((m: any, idx: number) => (
+                <li key={idx} style={{ marginBottom: 6 }}>{String(m)}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {obj.checkQuestion ? (
+          <div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>Check question</div>
+            <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+              {String(obj.checkQuestion)}
+            </div>
+          </div>
+        ) : null}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="pill" onClick={() => handleTabChange("teach")}>
+            Back to teaching (Resume Step {nodeIndex + 1})
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const drawerContent = () => {
+    if (currentError) {
+      return (
+        <div style={{ padding: 12, borderRadius: 12, border: "1px solid rgba(255,0,0,0.2)", background: "rgba(255,0,0,0.06)" }}>
+          <div>{currentError}</div>
+          <button
+            type="button"
+            className="pill"
+            style={{ marginTop: 10 }}
+            onClick={() => requestTutor(tab, { force: true })}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    if (!currentResponse && isLoading) {
+      return <div style={{ padding: 12, opacity: 0.75 }}>Tutor is preparing your lesson...</div>;
+    }
+
+    if (!currentResponse) {
+      return <div style={{ padding: 12, opacity: 0.75 }}>No tutor response yet.</div>;
+    }
+
+    return tab === "teach" ? renderTeach() : renderExamples();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(0,0,0,0.35)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          height: "100%",
+          width: "min(440px, 94vw)",
+          background: drawerBg,
+          boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+          display: "flex",
+          flexDirection: "column",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor</div>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => handleTabChange("teach")}
+              style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white" }}
+            >
+              Teach
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => handleTabChange("examples")}
+              style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white" }}
+            >
+              Board Examples
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={onClose}
+              title="Close"
+              style={{ background: "white" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
+          Youâ€™re learning: <b>{nodeTitle}</b> â€¢ Step {nodeIndex + 1} of {Math.max(1, order.length)}
+        </div>
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => goToNodeIndex(0)}
+            disabled={nodeIndex === 0}
+          >
+            Start from basics
+          </button>
+          <button
+            type="button"
+            className="pill"
+            onClick={handleNextConcept}
+            disabled={nodeIndex >= order.length - 1}
+          >
+            Next concept
+          </button>
+          <select
+            value={nodeId || ""}
+            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value))}
+            style={{
+              borderRadius: 999,
+              padding: "6px 10px",
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "white",
+              fontWeight: 700,
+            }}
+          >
+            {order.map((id, idx) => (
+              <option key={id} value={id}>
+                {idx + 1}. {nodeTitles[id] || id}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            flex: 1,
+            overflow: "auto",
+            padding: 10,
+            borderRadius: 14,
+            border: "1px solid rgba(0,0,0,0.10)",
+            background: "rgba(255,255,255,0.6)",
+          }}
+        >
+          {drawerContent()}
+        </div>
+
+        {doubtAnswer ? (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            <div style={{ whiteSpace: "pre-wrap" }}>{doubtAnswer}</div>
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="pill" onClick={() => setDoubtAnswer(null)}>
+                Resume
+              </button>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => sendDoubt("Explain this in simpler words, shorter and clearer.")}
+                disabled={doubtLoading}
+              >
+                Explain simpler
+              </button>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => {
+                  setDoubtAnswer(null);
+                  handleTabChange("examples");
+                }}
+              >
+                Show board example
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {doubtError ? (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(255,0,0,0.06)" }}>
+            {doubtError}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+          <input
+            ref={doubtInputRef}
+            value={doubtInput}
+            onChange={(e) => setDoubtInput(e.target.value)}
+            placeholder="Ask a doubt about this step..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") sendDoubt(doubtInput);
+            }}
+            style={{
+              flex: 1,
+              borderRadius: 14,
+              border: "1px solid rgba(0,0,0,0.14)",
+              padding: "10px 12px",
+              fontSize: 14,
+              outline: "none",
+              background: "white",
+            }}
+            disabled={doubtLoading}
+          />
+          <button
+            type="button"
+            className="pill"
+            onClick={() => sendDoubt(doubtInput)}
+            disabled={doubtLoading || !doubtInput.trim()}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 
 
 function MentorSolveDrawer({
@@ -1875,7 +2689,7 @@ if (!obj) {
   return stripped;
 }
 
-  // Board steps (one-shot) - show full marking scheme in an exam-friendly format.
+  // Board steps (one-shot) Ã¢â‚¬â€ show full marking scheme in an exam-friendly format.
   if (obj.kind === "board_steps_ms") {
     const total = Number(obj.totalMarks) || undefined;
     const steps = Array.isArray(obj.steps) ? obj.steps : [];
@@ -1885,7 +2699,7 @@ if (!obj) {
       return acc + (Number.isFinite(m) ? m : 0);
     }, 0);
     const headerSuffix = total
-      ? ` (Total: ${total} marks - Steps: ${sumMarks} marks)`
+      ? ` (Total: ${total} marks Ã‚Â· Steps: ${sumMarks} marks)`
       : sumMarks
       ? ` (Steps: ${sumMarks} marks)`
       : "";
@@ -1900,8 +2714,8 @@ if (!obj) {
       const text = s && s.text ? String(s.text) : "";
       lines.push("");
       lines.push(`${idx + 1}) [${m}] ${text}`);
-      if (s?.whyThisGetsMarks) lines.push(`    -  Why: ${String(s.whyThisGetsMarks)}`);
-      if (s?.commonMistake) lines.push(`    -  Common mistake: ${String(s.commonMistake)}`);
+      if (s?.whyThisGetsMarks) lines.push(`   Ã¢â‚¬Â¢ Why: ${String(s.whyThisGetsMarks)}`);
+      if (s?.commonMistake) lines.push(`   Ã¢â‚¬Â¢ Common mistake: ${String(s.commonMistake)}`);
     });
 
     if (obj.finalAnswer) {
@@ -2359,7 +3173,7 @@ const renderAssistantContent = (raw: string) => {
         throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "Ã¢â‚¬Â¦" }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -2440,7 +3254,7 @@ const renderAssistantContent = (raw: string) => {
         throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "Ã¢â‚¬Â¦" }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -2553,7 +3367,7 @@ const renderAssistantContent = (raw: string) => {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> -{" "}
+          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> Ã‚Â·{" "}
           {seedExample?.title || "Worked example"}
         </div>
 
@@ -2599,7 +3413,7 @@ const renderAssistantContent = (raw: string) => {
 
           {loading ? (
             <div style={{ fontSize: 13, opacity: 0.7, padding: 6 }}>
-              Mentor is typing...
+              Mentor is typingÃ¢â‚¬Â¦
             </div>
           ) : null}
 
@@ -2687,7 +3501,7 @@ const renderAssistantContent = (raw: string) => {
             </>
           ) : (
             <>
-              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that's how CBSE awards marks.
+              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; thatÃ¢â‚¬â„¢s how CBSE awards marks.
             </>
           )}
         </div>
@@ -2815,7 +3629,7 @@ function MindMapCanvas(props: {
     const n = byId.get(nodeId);
     if (!n || !onAskMentor) return;
     onAskMentor(
-      `Mindmap  -  ${n.label}`,
+      `Mindmap Ã¢â‚¬Â¢ ${n.label}`,
       `Teach me "${n.label}" from the mindmap. Explain in CBSE-friendly steps with 2 examples and 3 quick practice questions.`
     );
   };
@@ -2860,7 +3674,7 @@ function MindMapCanvas(props: {
                 fontWeight="900"
                 fill="rgba(0,0,0,0.82)"
               >
-                {n.label.length > 18 ? `${n.label.slice(0, 18)}...` : n.label}
+                {n.label.length > 18 ? `${n.label.slice(0, 18)}Ã¢â‚¬Â¦` : n.label}
               </text>
             </g>
           ))}
@@ -3142,9 +3956,367 @@ function GuidedMindmapPanel(props: {
 
 
 
+function GrindDrawerV1(props: {
+  open: boolean;
+  onClose: () => void;
+  mindmap: any;
+  nodeId: string;
+  setNodeId: (id: string) => void;
+  grade: string;
+  subjectTitle: string;
+  topicKey: string;
+  mode: ModeKey;
+}) {
+  const { open, onClose, mindmap, nodeId, setNodeId, grade, subjectTitle, topicKey } = props;
 
+  const nodesById: Record<string, any> = mindmap?.nodesById || {};
+  const highways: any[] = Array.isArray(mindmap?.highways) ? mindmap.highways : [];
+  const activeNode = nodesById[nodeId] || null;
 
+  const [doubtInput, setDoubtInput] = useState("");
+  const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
+  const [doubtError, setDoubtError] = useState<string | null>(null);
+  const [doubtLoading, setDoubtLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    if (!open) {
+      setDoubtInput("");
+      setDoubtAnswer(null);
+      setDoubtError(null);
+      setDoubtLoading(false);
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, [open]);
 
+  useEffect(() => {
+    // Clear inline doubt thread when switching nodes
+    setDoubtAnswer(null);
+    setDoubtError(null);
+  }, [nodeId]);
 
+  const stop = () => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+    setDoubtLoading(false);
+  };
 
+  const submitDoubt = async () => {
+    const q = String(doubtInput || '').trim();
+    if (!q) return;
+    if (doubtLoading) return;
+
+    setDoubtLoading(true);
+    setDoubtError(null);
+    setDoubtAnswer(null);
+
+    stop();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const nodeTitle = String(activeNode?.title || 'Triangles');
+    const context = [
+      `Topic: ${topicKey} (Class ${grade} ${subjectTitle})`,
+      `Grind node: ${nodeTitle} (${String(activeNode?.nodeId || nodeId)})`,
+      activeNode?.rubric ? `Rubric (${activeNode.rubric.totalMarksTypical} marks typical): ` + (Array.isArray(activeNode.rubric.checkpoints) ? activeNode.rubric.checkpoints.map((c: any) => `${c.label} (${c.marks})`).join('; ') : '') : '',
+      Array.isArray(activeNode?.solutionSkeleton) ? 'Board skeleton: ' + activeNode.solutionSkeleton.map((s: any) => s.heading).join(' -> ') : '',
+      Array.isArray(activeNode?.commonMistakes) ? 'Common traps: ' + activeNode.commonMistakes.map((m: any) => String(m.studentFriendly)).slice(0, 3).join(' | ') : '',
+    ].filter(Boolean).join('\n');
+
+    const prompt = `Student doubt: ${q}
+
+Use the context below. Answer in CBSE board style: 4-7 bullets + 1 micro-example + 1 quick check. Keep it crisp.
+
+${context}`;
+
+    try {
+      const body = {
+        mode: 'solve_with_me',
+        payload: {
+          subject: subjectTitle,
+          grade: Number(grade),
+          topicKey,
+          chapter: topicKey,
+          section: 'grind',
+          subSection: 'inline-doubt',
+          cardTitle: nodeTitle,
+          questionText: q,
+          contextText: context,
+        },
+        messages: [{ role: 'user', content: prompt }],
+      };
+
+      const res = await fetch('/api/mentor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Mentor request failed.');
+
+      const txt = String(data?.data?.text || '').trim();
+      const structured = data?.data?.structured;
+      if (txt) setDoubtAnswer(txt);
+      else if (structured) setDoubtAnswer(JSON.stringify(structured, null, 2));
+      else setDoubtAnswer('No answer returned. Please retry.');
+    } catch (e: any) {
+      if (String(e?.name || '') === 'AbortError') return;
+      setDoubtError(String(e?.message || 'Failed to get answer.'));
+    } finally {
+      setDoubtLoading(false);
+      abortRef.current = null;
+    }
+  };
+
+  if (!open || !mindmap) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
+        background: 'rgba(0,0,0,0.38)',
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          width: 'min(1100px, 100%)',
+          height: '100%',
+          background: 'rgba(255,255,255,0.98)',
+          borderLeft: '1px solid rgba(0,0,0,0.10)',
+          boxShadow: '-14px 0 40px rgba(0,0,0,0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 950, fontSize: 16 }}>Grind</div>
+            <div style={{ fontSize: 12, opacity: 0.72 }}>Triangles • Marks roadmap • Rubrics + board skeletons</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="pill"
+              style={{ padding: '8px 12px' }}
+              onClick={() => { stop(); onClose(); }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', minHeight: 0 }}>
+          {/* Left nav */}
+          <div
+            style={{
+              borderRight: '1px solid rgba(0,0,0,0.08)',
+              padding: '12px 12px',
+              overflow: 'auto',
+            }}
+          >
+            {highways.map((h) => {
+              const order = Array.isArray(h.recommendedNodeOrder) ? h.recommendedNodeOrder : [];
+              if (!order.length) return null;
+              return (
+                <div key={String(h.id)} style={{ marginBottom: 12 }}>
+                  <div style={{ fontWeight: 950, fontSize: 13, marginBottom: 6 }}>{String(h.title || h.id)}</div>
+                  <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 8, lineHeight: 1.35 }}>{String(h.intent || '')}</div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {order.map((id: string) => {
+                      const n = nodesById[id];
+                      const active = String(id) === String(nodeId);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setNodeId(String(id))}
+                          style={{
+                            textAlign: 'left',
+                            padding: '10px 10px',
+                            borderRadius: 14,
+                            border: active ? '1px solid rgba(17,24,39,0.22)' : '1px solid rgba(0,0,0,0.10)',
+                            background: active ? 'rgba(17,24,39,0.06)' : 'rgba(255,255,255,0.7)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontWeight: 900, fontSize: 13 }}>{String(n?.title || id)}</div>
+                          <div style={{ fontSize: 12, opacity: 0.72, marginTop: 2 }}>
+                            Weight {String(n?.examWeight || '')} • {String(n?.difficulty || '')}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Coach panel */}
+          <div style={{ padding: '14px 14px', overflow: 'auto' }}>
+            {!activeNode ? (
+              <div style={{ opacity: 0.75 }}>Pick a node to start.</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: -0.2 }}>{String(activeNode.title)}</div>
+                    <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.10)' }}>
+                        Weight: {String(activeNode.examWeight)}
+                      </span>
+                      <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.10)' }}>
+                        Difficulty: {String(activeNode.difficulty)}
+                      </span>
+                      {Array.isArray(activeNode.questionTypes) ? (
+                        <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.10)' }}>
+                          Types: {activeNode.questionTypes.join(', ')}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+                  {/* Rubric */}
+                  {activeNode.rubric ? (
+                    <div style={{ borderRadius: 16, padding: '12px 12px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.72)' }}>
+                      <div style={{ fontWeight: 950 }}>Rubric (typical {String(activeNode.rubric.totalMarksTypical)} marks)</div>
+                      <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                        {Array.isArray(activeNode.rubric.checkpoints)
+                          ? activeNode.rubric.checkpoints.map((c: any) => (
+                              <div key={String(c.id)} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                                <div style={{ lineHeight: 1.4 }}>• {String(c.label)}</div>
+                                <div style={{ fontWeight: 900, opacity: 0.8 }}>{String(c.marks)}m</div>
+                              </div>
+                            ))
+                          : null}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Board skeleton */}
+                  {Array.isArray(activeNode.solutionSkeleton) && activeNode.solutionSkeleton.length ? (
+                    <div style={{ borderRadius: 16, padding: '12px 12px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.72)' }}>
+                      <div style={{ fontWeight: 950 }}>Board-style skeleton</div>
+                      <ol style={{ margin: '10px 0 0', paddingLeft: 18 }}>
+                        {activeNode.solutionSkeleton.map((s: any) => (
+                          <li key={String(s.id)} style={{ marginBottom: 8, lineHeight: 1.45 }}>
+                            <b>{String(s.heading)}</b>
+                            <span style={{ opacity: 0.75 }}> • {String(s.expectedForm)}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : null}
+
+                  {/* Mistakes */}
+                  {Array.isArray(activeNode.commonMistakes) && activeNode.commonMistakes.length ? (
+                    <div style={{ borderRadius: 16, padding: '12px 12px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.72)' }}>
+                      <div style={{ fontWeight: 950 }}>Common traps (and fixes)</div>
+                      <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                        {activeNode.commonMistakes.map((m: any) => (
+                          <div key={String(m.tag)} style={{ borderRadius: 14, padding: '10px 10px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(0,0,0,0.02)' }}>
+                            <div style={{ fontWeight: 900 }}>{String(m.studentFriendly)}</div>
+                            <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}><b>Fix:</b> {String(m.fixTip)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Micro-drills */}
+                  {Array.isArray(activeNode.microDrills) && activeNode.microDrills.length ? (
+                    <div style={{ borderRadius: 16, padding: '12px 12px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.72)' }}>
+                      <div style={{ fontWeight: 950 }}>Micro-drills</div>
+                      <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                        {activeNode.microDrills.map((d: any) => (
+                          <div key={String(d.id)} style={{ borderRadius: 14, padding: '10px 10px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(0,0,0,0.02)' }}>
+                            <div style={{ fontWeight: 900 }}>{String(d.prompt)}</div>
+                            {Array.isArray(d.expectedAnswerHints) && d.expectedAnswerHints.length ? (
+                              <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>
+                                <b>Hint words:</b> {d.expectedAnswerHints.join(', ')}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Inline doubt */}
+                  <div style={{ borderRadius: 16, padding: '12px 12px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.72)' }}>
+                    <div style={{ fontWeight: 950 }}>Ask a doubt</div>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        value={doubtInput}
+                        onChange={(e) => setDoubtInput(e.target.value)}
+                        placeholder="Type your doubt..."
+                        style={{
+                          flex: 1,
+                          minWidth: 220,
+                          padding: '10px 12px',
+                          borderRadius: 12,
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          outline: 'none',
+                        }}
+                      />
+                      <button type="button" className="pill" onClick={submitDoubt} disabled={doubtLoading || !String(doubtInput).trim()}>
+                        {doubtLoading ? 'Thinking...' : 'Send'}
+                      </button>
+                      {doubtLoading ? (
+                        <button type="button" className="pill" onClick={stop} style={{ opacity: 0.8 }}>
+                          Stop
+                        </button>
+                      ) : null}
+                    </div>
+                    {doubtError ? (
+                      <div style={{ marginTop: 10, color: 'rgba(185,28,28,0.95)', fontSize: 13 }}>{doubtError}</div>
+                    ) : null}
+                    {doubtAnswer ? (
+                      <pre
+                        style={{
+                          marginTop: 10,
+                          whiteSpace: 'pre-wrap',
+                          borderRadius: 14,
+                          padding: '10px 10px',
+                          background: 'rgba(0,0,0,0.03)',
+                          border: '1px solid rgba(0,0,0,0.08)',
+                          lineHeight: 1.45,
+                          fontSize: 13,
+                        }}
+                      >
+                        {doubtAnswer}
+                      </pre>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
