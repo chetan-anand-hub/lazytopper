@@ -8,6 +8,7 @@ Scope Box:
 - Forbidden: Trends/HPQ/Mocks/Grind changes, broad refactors.
 
 ## Status
+- Learn gate: CLOSED (frozen; only bugfix if found)
 - Plan: completed
 - Implement: completed
 - Re-test: pending

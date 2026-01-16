@@ -9,12 +9,12 @@ Last Updated: 2026-01-16 09:24
 - [x] Parking Lot file exists and is used for non-blocking ideas
 
 ## 1) Repo wiring & entry points
-- [x] â€œLet me teach youâ€ CTA exists on **Triangles -> Learn** page
+- [x] "Let me teach you" CTA exists on **Triangles -> Learn** page
 - [x] CTA opens Tutor Drawer directly into **Teach tab**
 - [x] Default Teach starts at **first node** in trianglesGuidedMindmap.recommendedOrder
-- [x] Any old â€œAsk mentorâ€ buttons in Triangles Learn are repointed to open this same drawer (no extra panels)
+- [x] Any old "Ask mentor" buttons in Triangles Learn are repointed to open this same drawer (no extra panels)
 
-**Acceptance check:** Student clicks once and is *immediately in teaching*, not in â€œchoose mode confusionâ€.
+**Acceptance check:** Student clicks once and is *immediately in teaching*, not in "choose mode confusion".
 
 ## 2) Tutor Drawer v2 UI (locked UX)
 ### Structure
@@ -34,7 +34,7 @@ Last Updated: 2026-01-16 09:24
 ### Board Examples tab layout
 - [x] Diagram block renders **first**
 - [x] teach.simpleExplanation bullets render
-- [x] teach.cbseExamSentence highlighted as â€œExam lineâ€
+- [x] teach.cbseExamSentence highlighted as "Exam line"
 - [x] Worked examples show **exactly 2**:
   - [x] Example 1: Basic
   - [x] Example 2: Board-style
@@ -42,11 +42,11 @@ Last Updated: 2026-01-16 09:24
 - [x] Check question renders
 - [x] Button: **Back to teaching (Resume Step X)**
 
-## 3) Mindmap as the â€œsoulâ€ (Teach progression)
+## 3) Mindmap as the "soul" (Teach progression)
 - [x] Teach uses current nodeId from mindmap data
-- [x] â€œNext conceptâ€ advances to the next node in recommendedOrder
+- [x] "Next concept" advances to the next node in recommendedOrder
 - [x] (Optional) Jump-to concept dropdown exists (if implemented)
-- [x] Current concept title visibly shown (â€œYouâ€™re learning: <node title>â€)
+- [x] Current concept title visibly shown ("You're learning: <node title>")
 
 **Acceptance check:** A student can continue step-by-step without needing to interpret the mindmap visually.
 
@@ -60,7 +60,7 @@ Last Updated: 2026-01-16 09:24
 - [x] If diagram missing/irrelevant -> **Diagram missing/bad** error UI + Retry
 - [x] No teaching/explanation renders without a diagram block container
 
-## 5) Inline Doubts (Option A) â€” embedded in BOTH tabs
+## 5) Inline Doubts (Option A) -- embedded in BOTH tabs
 - [x] Single inline doubt input exists in Teach and Examples
 - [x] Doubt submit sends full context:
   - [x] chapter/topicKey
@@ -91,17 +91,17 @@ Last Updated: 2026-01-16 09:24
 ## 7) DoD compliance checkpoints (Triangles Learn)
 - [x] Teach-first is true (no MCQ-first / blank-first)
 - [x] Diagram-first is enforced for geometry
-- [x] Two modes meaningfully different (Teach â‰  Examples)
+- [x] Two modes meaningfully different (Teach != Examples)
 - [x] Two-level progression preserved (Basic + Board-style)
-- [x] No â€œA/B/C/Dâ€ MCQ text leaks into Learn output
+- [x] No "A/B/C/D" MCQ text leaks into Learn output
 - [x] Friendly failures, never empty outputs
 
 ## 8) Build + verification
 - [x] npm run build passes
 - [ ] Manual walkthrough:
-  - [ ] TopicHub -> Triangles -> Learn -> â€œLet me teach youâ€
+  - [ ] TopicHub -> Triangles -> Learn -> "Let me teach you"
   - [ ] Teach shows diagram + teach + quick check
-  - [ ] â€œShow an example for thisâ€ -> Examples tab correct content
+  - [ ] "Show an example for this" -> Examples tab correct content
   - [ ] Examples shows 2 examples + marks + mistakes + checkQ
   - [ ] Doubt works and resumes correctly
   - [ ] No request storms
@@ -117,11 +117,11 @@ Last Updated: 2026-01-16 09:24
 - [x] Excludes node_modules/build caches/.git
 - [x] Stored at target folder
 
-## â€œStop-the-lineâ€ instant fail flags
+## "Stop-the-line" instant fail flags
 If any of these occur, stop and fix immediately:
 - [ ] No diagram but explanation renders
-- [ ] Examples show â‰  2 examples
-- [ ] Doubt loses context / canâ€™t resume step
+- [ ] Examples show != 2 examples
+- [ ] Doubt loses context / can't resume step
 - [ ] Request storm / repeated API calls
 - [ ] Blank output or silent fail
 - [ ] Build fails
