@@ -4023,16 +4023,12 @@ function GrindDrawerV1(props: {
       Array.isArray(activeNode?.solutionSkeleton) ? 'Board skeleton: ' + activeNode.solutionSkeleton.map((s: any) => s.heading).join(' -> ') : '',
       Array.isArray(activeNode?.commonMistakes) ? 'Common traps: ' + activeNode.commonMistakes.map((m: any) => String(m.studentFriendly)).slice(0, 3).join(' | ') : '',
     ].filter(Boolean).join('\n');
-
-    const prompt = `Student doubt: ${q}
-
-Use the context below. Answer in CBSE board style: 4-7 bullets + 1 micro-example + 1 quick check. Keep it crisp.
-
-${context}`;
+    const nodeText = String(activeNode?.text || activeNode?.description || '');
+    const selectedNodeId = String(activeNode?.nodeId || nodeId || '');
 
     try {
       const body = {
-        mode: 'solve_with_me',
+        mode: 'grind_triangles_v1',
         payload: {
           subject: subjectTitle,
           grade: Number(grade),
@@ -4041,10 +4037,15 @@ ${context}`;
           section: 'grind',
           subSection: 'inline-doubt',
           cardTitle: nodeTitle,
-          questionText: q,
+          cardId: selectedNodeId,
+          mindmapNodeId: selectedNodeId,
+          mindmapNodeTitle: nodeTitle,
+          mindmapNodeText: nodeText,
+          doubtContext: context,
           contextText: context,
+          questionText: q,
         },
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: `Student doubt: ${q}` }],
       };
 
       const res = await fetch('/api/mentor', {
@@ -4070,6 +4071,45 @@ ${context}`;
       abortRef.current = null;
     }
   };
+
+  const trianglesContract = useMemo(() => {
+    if (typeof doubtAnswer !== "string") return null;
+    try {
+      const parsed = JSON.parse(doubtAnswer);
+      if (parsed && parsed.type === "grind_triangles_v1") return parsed;
+    } catch {
+      return null;
+    }
+    return null;
+  }, [doubtAnswer]);
+  const boardForContract = trianglesContract?.board || null;
+  const contractRubric = trianglesContract?.rubric || null;
+  const contractCommonTraps = safeArray(trianglesContract?.commonTraps);
+  const contractMicroDrills = safeArray(trianglesContract?.microDrills);
+  const contractSectionStyle = {
+    borderRadius: 14,
+    padding: "12px",
+    border: "1px solid rgba(0,0,0,0.08)",
+    background: "rgba(255,255,255,0.92)",
+  };
+  const renderArrayField = (label: string, values: string[]) => (
+    <div>
+      <div style={{ fontSize: 11, letterSpacing: 0.5, textTransform: "uppercase", color: "rgba(0,0,0,0.6)" }}>
+        {label}
+      </div>
+      {values.length ? (
+        <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
+          {values.map((value, idx) => (
+            <div key={`${label}-${idx}`} style={{ fontSize: 13, lineHeight: 1.45 }}>
+              {value}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ marginTop: 6, opacity: 0.65 }}>Not provided</div>
+      )}
+    </div>
+  );
 
   if (!open || !mindmap) return null;
 
@@ -4295,20 +4335,139 @@ ${context}`;
                       <div style={{ marginTop: 10, color: 'rgba(185,28,28,0.95)', fontSize: 13 }}>{doubtError}</div>
                     ) : null}
                     {doubtAnswer ? (
-                      <pre
-                        style={{
-                          marginTop: 10,
-                          whiteSpace: 'pre-wrap',
-                          borderRadius: 14,
-                          padding: '10px 10px',
-                          background: 'rgba(0,0,0,0.03)',
-                          border: '1px solid rgba(0,0,0,0.08)',
-                          lineHeight: 1.45,
-                          fontSize: 13,
-                        }}
-                      >
-                        {doubtAnswer}
-                      </pre>
+                      trianglesContract ? (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            borderRadius: 14,
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            background: 'rgba(255,255,255,0.92)',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                            <div style={{ fontWeight: 950, fontSize: 15 }}>
+                              {String(trianglesContract.node?.title || 'Grind node summary')}
+                            </div>
+                            {trianglesContract.node?.id ? (
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>ID: {trianglesContract.node.id}</div>
+                            ) : null}
+                          </div>
+                          <div style={{ display: 'grid', gap: 12 }}>
+                            <div style={contractSectionStyle}>
+                              <div style={{ fontWeight: 900 }}>Board</div>
+                              <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                                {renderArrayField('Given facts', safeArray(boardForContract?.given))}
+                                {renderArrayField('To prove', safeArray(boardForContract?.toProve))}
+                                {renderArrayField('Figure hints', safeArray(boardForContract?.figureHints))}
+                                {renderArrayField('Steps', safeArray(boardForContract?.steps))}
+                              </div>
+                            </div>
+                            <div style={contractSectionStyle}>
+                              <div style={{ fontWeight: 900 }}>Rubric</div>
+                              <div style={{ marginTop: 8 }}>
+                                <div style={{ fontSize: 13, opacity: 0.8 }}>Marks: {contractRubric?.marks ?? 'N/A'}</div>
+                                {renderArrayField('Checkpoints', safeArray(contractRubric?.checkpoints))}
+                              </div>
+                            </div>
+                            {contractCommonTraps.length ? (
+                              <div style={contractSectionStyle}>
+                                <div style={{ fontWeight: 900 }}>
+                                  Common traps <span style={{ fontSize: 12, opacity: 0.7 }}>(with fixes)</span>
+                                </div>
+                                <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                                  {contractCommonTraps.map((trap, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        borderRadius: 12,
+                                        padding: '10px',
+                                        border: '1px solid rgba(0,0,0,0.08)',
+                                        background: 'rgba(0,0,0,0.01)',
+                                      }}
+                                    >
+                                      <div style={{ fontWeight: 900, fontSize: 13 }}>
+                                        {String(trap?.trap || 'Trap missing')}
+                                      </div>
+                                      <div
+                                        style={{
+                                          marginTop: 6,
+                                          fontSize: 12,
+                                          opacity: 0.85,
+                                        }}
+                                      >
+                                        <strong>Fix:</strong> {String(trap?.fix || 'Fix missing')}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {contractMicroDrills.length ? (
+                              <div style={contractSectionStyle}>
+                                <div style={{ fontWeight: 900 }}>Micro drills</div>
+                                <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                                  {contractMicroDrills.map((drill, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        borderRadius: 12,
+                                        padding: '10px',
+                                        border: '1px solid rgba(0,0,0,0.08)',
+                                        background: 'rgba(0,0,0,0.01)',
+                                      }}
+                                    >
+                                      <div style={{ fontWeight: 900, fontSize: 13 }}>
+                                        {String(drill?.prompt || 'Prompt missing')}
+                                      </div>
+                                      <div
+                                        style={{
+                                          marginTop: 4,
+                                          fontSize: 12,
+                                          opacity: 0.85,
+                                        }}
+                                      >
+                                        Answer key: {String(drill?.answerKey || 'Not provided')}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {trianglesContract.next ? (
+                              <div style={contractSectionStyle}>
+                                <div style={{ fontWeight: 900 }}>Next</div>
+                                <div style={{ marginTop: 8, fontSize: 13 }}>
+                                  <div>
+                                    Recommended node: {String(trianglesContract.next.recommendedNodeId || 'Unknown')}
+                                  </div>
+                                  <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                                    Reason: {String(trianglesContract.next.reason || 'No reason provided')}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <pre
+                          style={{
+                            marginTop: 10,
+                            whiteSpace: 'pre-wrap',
+                            borderRadius: 14,
+                            padding: '10px 10px',
+                            background: 'rgba(0,0,0,0.03)',
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            lineHeight: 1.45,
+                            fontSize: 13,
+                          }}
+                        >
+                          {doubtAnswer}
+                        </pre>
+                      )
                     ) : null}
                   </div>
                 </div>
