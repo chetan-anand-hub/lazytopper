@@ -1,4 +1,4 @@
-﻿# 2026-01-21 Master Report
+# 2026-01-21 Master Report
 
 North Star: Ship Tutor Drawer v2 for Triangles -> Learn tab with Teach + Board Examples, diagram-first, inline doubts, and hard gates; build passes.
 
@@ -10,8 +10,8 @@ Scope Box:
 ## Status
 - Plan: completed
 - Implement: completed
-- Re-test: completed
-
+- Re-test: pending
+- Manual walkthrough: NOT VERIFIED (set Re-test to pending).
 ## Notes
 - Guided mindmap source: `src/data/trianglesGuidedMindmap.ts`.
 - Learn tab lives in `src/pages/TopicHub.tsx`; Tutor Drawer v2 lives in `src/components/tutor/TutorDrawerV2.tsx`.
