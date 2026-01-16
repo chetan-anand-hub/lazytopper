@@ -253,6 +253,14 @@ function isLearnCompetencyPayload(payload) {
   return false;
 }
 
+function isLearnKeyDefinitionsPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  const section = String(payload.section || '').toLowerCase();
+  const subSection = String(payload.subSection || '').toLowerCase();
+  if (section !== 'learn') return false;
+  return subSection.includes('key-definitions');
+}
+
 function buildCompetencyTeachPrompt(payload) {
   const subject = payload.subject || 'Maths/Science';
   const topic = payload.topic || payload.topicKey || '';
@@ -438,6 +446,97 @@ const MINDMAP_TEACH_OUTLINES = {
   },
 };
 
+const TRIANGLES_LEARN_SEED = {
+  keyDefinitions: {
+    simpleExplanation: [
+      'Similar triangles have the same shape but can be different sizes.',
+      'Corresponding angles are equal and corresponding sides are in the same ratio.',
+      'AA: two equal angles are enough to prove similarity.',
+      'SAS: included angle equal and adjacent sides proportional.',
+      'SSS: all three pairs of sides proportional.',
+      'CPST: corresponding parts of similar triangles are proportional/equal.',
+    ],
+    cbseExamSentence: [
+      'If ∠A = ∠P and ∠B = ∠Q, then ΔABC ~ ΔPQR by AA.',
+      'From similarity, AB/PQ = BC/QR = AC/PR (CPST).',
+    ],
+    workedExamples: [
+      {
+        title: 'AA similarity',
+        question: 'If ∠A = ∠P and ∠B = ∠Q, prove ΔABC ~ ΔPQR.',
+        steps: [
+          { text: 'Given ∠A = ∠P and ∠B = ∠Q.', marks: 1 },
+          { text: 'Two angles equal ⇒ AA similarity.', marks: 1 },
+          { text: 'So ΔABC ~ ΔPQR.', marks: 1 },
+        ],
+        totalMarks: 3,
+        finalAnswer: 'ΔABC ~ ΔPQR by AA.',
+      },
+      {
+        title: 'CPST application',
+        question: 'If ΔABC ~ ΔPQR, AB = 6 cm, PQ = 3 cm, BC = 5 cm, find QR.',
+        steps: [
+          { text: 'AB/PQ = BC/QR by CPST.', marks: 1 },
+          { text: '6/3 = 5/QR ⇒ 2 = 5/QR.', marks: 1 },
+          { text: 'QR = 2.5 cm.', marks: 1 },
+        ],
+        totalMarks: 3,
+        finalAnswer: 'QR = 2.5 cm.',
+      },
+    ],
+    commonMistakes: [
+      'Mixing correspondence order.',
+      'Using SAS with a non-included angle.',
+      'Using CPST before proving similarity.',
+    ],
+    checkQuestion: 'What two conditions must be verified before using AA similarity?',
+    diagramType: 'SIMILARITY_AA',
+    diagramLabels: { A: 'A', B: 'B', C: 'C', P: 'P', Q: 'Q', R: 'R' },
+  },
+  mindmapNodes: {
+    gQ1: {
+      bullets: [
+        'Similarity means equal corresponding angles.',
+        'Side ratios of corresponding sides are equal.',
+        'Order of vertices fixes correspondence.',
+        'Similarity helps find unknown sides.',
+        'Use AA/SSS/SAS to prove it first.',
+      ],
+      examLines: [
+        'State the criterion and the correspondence order.',
+        'Write ΔABC ~ ΔPQR before using CPST.',
+      ],
+      example: {
+        question: 'If ∠A = ∠P and ∠B = ∠Q, prove similarity and state one ratio.',
+        steps: ['AA similarity ⇒ ΔABC ~ ΔPQR.', 'Then AB/PQ = BC/QR.'],
+        finalAnswer: 'ΔABC ~ ΔPQR and AB/PQ = BC/QR.',
+      },
+      commonError: 'Skipping the correspondence order.',
+      commonFix: 'Write the angle equalities and the matching order before using CPST.',
+      checkQuestion: 'Which criterion proves similarity when two angles match?',
+    },
+  },
+  proof: {
+    given: ['In ΔABC, DE || BC with D on AB and E on AC.'],
+    toProve: ['AD/DB = AE/EC.'],
+    construction: ['Not required.'],
+    proofSteps: [
+      { statement: '∠ADE = ∠ABC and ∠AED = ∠ACB.', reason: 'Alternate interior angles', mark: 1 },
+      { statement: 'ΔADE ~ ΔABC.', reason: 'AA similarity', mark: 1 },
+      { statement: 'AD/AB = AE/AC.', reason: 'CPST', mark: 1 },
+      { statement: 'AD/DB = AE/EC.', reason: 'Componendo', mark: 1 },
+    ],
+    conclusion: ['Hence AD/DB = AE/EC.'],
+    totalMarks: 4,
+    diagramType: 'BPT',
+    diagramLabels: { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' },
+  },
+  solveWithMe: {
+    question: 'Which two triangles are being compared for similarity here?',
+    answerFormat: 'Short sentence (e.g., ΔADE and ΔABC).',
+  },
+};
+
 function isLearnMindmapPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
   const section = String(payload.section || '').toLowerCase();
@@ -455,6 +554,7 @@ function buildMindmapTeachPrompt(payload) {
   const topic = payload.topic || payload.topicKey || '';
   const nodeTitle = payload.mindmapNodeTitle || payload.itemTitle || payload.title || 'Mindmap node';
   const nodeText = payload.mindmapNodeText || payload.itemText || payload.contextText || '';
+  const nodePayload = payload.contextText || '';
   const nodeIdRaw = payload.mindmapNodeId || payload.itemId || '';
   const coreId =
     String(payload.mindmapCoreId || '')
@@ -485,11 +585,18 @@ function buildMindmapTeachPrompt(payload) {
     '- Include exactly ONE mini-example and ONE check question.',
     '- Use triangle labels like ABC and PQR; avoid formula lists and MCQ framing.',
     '- Use the trap/common error if provided in the node hint.',
+    '- Do not use placeholder or generic filler language.',
     diagramLine ? `- In the Solved mini-example section, include: ${diagramLine}.` : '',
     '- Do not mention system or prompt instructions.',
     '',
     doubtContext ? `${doubtContext}` : '',
   ].filter(Boolean);
+
+  if (nodePayload) {
+    lines.push('');
+    lines.push('Node payload (use all items if present):');
+    lines.push(nodePayload);
+  }
 
   if (outline) {
     lines.push('');
@@ -514,6 +621,13 @@ function isProofWritingPayload(payload) {
   if (section !== 'learn') return false;
   if (subSection.includes('proof')) return true;
   return false;
+}
+
+function isTrianglesLearnPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  const section = String(payload.section || '').toLowerCase();
+  if (section !== 'learn') return false;
+  return isTrianglesTopic(payload);
 }
 
 function isTrianglesTopic(payload) {
@@ -548,7 +662,10 @@ function inferDiagramType(payload) {
   if (hint.includes('pyth')) return 'PYTHAGORAS';
   if (hint.includes('sas')) return 'SIMILARITY_SAS';
   if (hint.includes('sss')) return 'SIMILARITY_SSS';
-  if (hint.includes('aa') || hint.includes('similar')) return 'SIMILARITY_AA';
+  if (hint.includes('aa')) return 'SIMILARITY_AA';
+  if (hint.includes('parallel') && hint.includes('angle')) return 'PARALLEL_LINE_ANGLE_RELATIONS';
+  if (hint.includes('definition') && hint.includes('similar')) return 'SIMILARITY_AA';
+  if (hint.includes('similar')) return 'SIMILARITY_AA';
   return 'TRIANGLE_GENERIC';
 }
 
@@ -556,7 +673,8 @@ function diagramLabelsForType(diagramType) {
   const t = String(diagramType || '').toUpperCase();
   if (t === 'BPT') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
   if (t === 'PYTHAGORAS') return { A: 'A', B: 'B', C: 'C' };
-  if (t.startsWith('SIMILARITY')) return { A: 'A', B: 'B', C: 'C', P: 'P', Q: 'Q', R: 'R' };
+  if (t.includes('SIMILARITY')) return { A: 'A', B: 'B', C: 'C', P: 'P', Q: 'Q', R: 'R' };
+  if (t === 'PARALLEL_LINE_ANGLE_RELATIONS') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
   return { A: 'A', B: 'B', C: 'C' };
 }
 
@@ -924,6 +1042,168 @@ function validateProofSolveWithMe(obj, payload, isFirstTurn) {
   return { ok: issues.length === 0, issues };
 }
 
+function validateLearnTeach(obj, payload) {
+  const issues = [];
+  if (!obj || typeof obj !== 'object') return { ok: false, issues: ['Missing JSON object.'] };
+  if (obj.kind !== 'learn_teach') issues.push('kind must be learn_teach.');
+  const teach = obj.teach || {};
+  const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
+  const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
+  if (simple.length < 4) issues.push('teach.simpleExplanation needs >= 4 items.');
+  if (exam.length < 2) issues.push('teach.cbseExamSentence needs >= 2 items.');
+
+  const worked = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
+  if (worked.length !== 2) issues.push('workedExamples must be exactly 2 items.');
+  worked.forEach((ex, idx) => {
+    if (!ex || typeof ex !== 'object') {
+      issues.push(`workedExamples[${idx}] is invalid.`);
+      return;
+    }
+    const steps = Array.isArray(ex.steps) ? ex.steps : [];
+    if (!steps.length) issues.push(`workedExamples[${idx}] has no steps.`);
+    const total = Number(ex.totalMarks);
+    const sum = steps.reduce((acc, s) => acc + (Number(s?.marks) || 0), 0);
+    if (!Number.isFinite(total)) issues.push(`workedExamples[${idx}] totalMarks missing.`);
+    if (Number.isFinite(total) && Math.abs(total - sum) > 0.001) {
+      issues.push(`workedExamples[${idx}] totalMarks != sum of step marks.`);
+    }
+    if (!String(ex.finalAnswer || '').trim()) {
+      issues.push(`workedExamples[${idx}] finalAnswer missing.`);
+    }
+  });
+
+  const commonMistakes = Array.isArray(obj.commonMistakes) ? obj.commonMistakes : [];
+  if (commonMistakes.length < 1) issues.push('commonMistakes needs >= 1 items.');
+  if (!String(obj.checkQuestion || '').trim()) issues.push('checkQuestion missing.');
+
+  if (!String(obj.diagramType || '').trim()) issues.push('diagramType missing.');
+  if (!obj.diagramLabels || typeof obj.diagramLabels !== 'object') issues.push('diagramLabels missing.');
+
+  const blob = JSON.stringify(obj || {});
+  const hasMindmapContext =
+    Boolean(payload?.mindmapNodeId || payload?.mindmapNodeTitle || payload?.mindmapNodeText) ||
+    String(payload?.subSection || '').toLowerCase().includes('mindmap');
+  if (!hasMindmapContext) {
+    const requiredPatterns = [
+      /\bsimilar\s+triangles?\b/i,
+      /\bcorresponding\s+sides?\b/i,
+      /\bcorresponding\s+angles?\b/i,
+      /\bAA\b/i,
+      /\bSAS\b/i,
+      /\bSSS\b/i,
+      /\bCPST\b/i,
+    ];
+    requiredPatterns.forEach((re) => {
+      if (!re.test(blob)) issues.push(`Missing required key definition: ${re.source}.`);
+    });
+  }
+
+  if (containsPlaceholderLanguage(blob)) {
+    issues.push('Placeholder language detected.');
+  }
+
+  return { ok: issues.length === 0, issues };
+}
+
+function validateLearnMindmap(obj) {
+  const issues = [];
+  if (!obj || typeof obj !== 'object') return { ok: false, issues: ['Missing JSON object.'] };
+  if (obj.kind !== 'learn_mindmap') issues.push('kind must be learn_mindmap.');
+  const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
+  const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
+  const worked = obj.workedExample || {};
+  const steps = Array.isArray(worked.steps) ? worked.steps : [];
+  if (bullets.length < 5) issues.push('conceptBullets needs >= 5 items.');
+  if (examLines.length < 2) issues.push('examLines needs >= 2 items.');
+  if (!String(worked.question || '').trim()) issues.push('workedExample.question missing.');
+  if (!steps.length) issues.push('workedExample.steps missing.');
+  if (!String(worked.finalAnswer || '').trim()) issues.push('workedExample.finalAnswer missing.');
+  if (!String(obj.commonError || '').trim()) issues.push('commonError missing.');
+  if (!String(obj.commonFix || '').trim()) issues.push('commonFix missing.');
+  if (!String(obj.checkQuestion || '').trim()) issues.push('checkQuestion missing.');
+  if (!String(obj.diagramType || '').trim()) issues.push('diagramType missing.');
+  if (!obj.diagramLabels || typeof obj.diagramLabels !== 'object') issues.push('diagramLabels missing.');
+  const blob = JSON.stringify(obj || {});
+  if (containsPlaceholderLanguage(blob)) issues.push('Placeholder language detected.');
+  return { ok: issues.length === 0, issues };
+}
+
+function validateLearnProof(obj) {
+  const issues = [];
+  if (!obj || typeof obj !== 'object') return { ok: false, issues: ['Missing JSON object.'] };
+  if (obj.kind !== 'learn_proof') issues.push('kind must be learn_proof.');
+
+  const given = Array.isArray(obj.given) ? obj.given : [];
+  const toProve = Array.isArray(obj.toProve) ? obj.toProve : [];
+  const construction = Array.isArray(obj.construction) ? obj.construction : null;
+  const proofSteps = Array.isArray(obj.proofSteps) ? obj.proofSteps : [];
+  const conclusion = Array.isArray(obj.conclusion) ? obj.conclusion : [];
+  if (!given.length) issues.push('given missing.');
+  if (!toProve.length) issues.push('toProve missing.');
+  if (!construction) issues.push('construction must be present (can be empty).');
+  if (!proofSteps.length) issues.push('proofSteps missing.');
+  if (!conclusion.length) issues.push('conclusion missing.');
+
+  const total = Number(obj.totalMarks);
+  const sum = proofSteps.reduce((acc, s) => acc + (Number(s?.mark) || 0), 0);
+  if (!Number.isFinite(total)) issues.push('totalMarks missing.');
+  if (Number.isFinite(total) && Math.abs(total - sum) > 0.001) {
+    issues.push('totalMarks != sum of proofSteps marks.');
+  }
+
+  if (!String(obj.diagramType || '').trim()) issues.push('diagramType missing.');
+  if (!obj.diagramLabels || typeof obj.diagramLabels !== 'object') issues.push('diagramLabels missing.');
+
+  const blob = JSON.stringify(obj || {});
+  if (containsPlaceholderLanguage(blob)) {
+    issues.push('Placeholder language detected.');
+  }
+
+  return { ok: issues.length === 0, issues };
+}
+
+function validateStructuredForMode(obj, mode, payload, opts) {
+  const issues = [];
+  if (mode === 'solve_with_me') {
+    if (!isValidMentorProtocol(obj, mode)) issues.push('Invalid solve_with_me protocol.');
+    if (isProofWritingPayload(payload)) {
+      const isFirstTurn = Boolean(opts && opts.isFirstTurn);
+      const proofCheck = validateProofSolveWithMe(obj, payload, isFirstTurn);
+      if (!proofCheck.ok) issues.push(...proofCheck.issues);
+    }
+  } else if (mode === 'board_steps_ms') {
+    if (!isValidMentorProtocol(obj, mode)) issues.push('Invalid board_steps_ms protocol.');
+  } else if (mode === 'learn_teach') {
+    const teachCheck = validateLearnTeach(obj, payload);
+    if (!teachCheck.ok) issues.push(...teachCheck.issues);
+  } else if (mode === 'learn_mindmap') {
+    const mindmapCheck = validateLearnMindmap(obj);
+    if (!mindmapCheck.ok) issues.push(...mindmapCheck.issues);
+  } else if (mode === 'learn_proof') {
+    const proofCheck = validateLearnProof(obj);
+    if (!proofCheck.ok) issues.push(...proofCheck.issues);
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+function buildRepairPromptForMode(mode, payload, invalidOutput, issues) {
+  const issueText = Array.isArray(issues) && issues.length ? issues.map((i) => `- ${i}`).join('\n') : '- Format issues detected.';
+  const schema = getJsonSchemaTextForMode(mode, payload);
+  return [
+    'You returned invalid or incomplete JSON for the required schema.',
+    issueText,
+    '',
+    'Return ONLY valid JSON. No extra keys. No markdown.',
+    'JSON schema:',
+    schema,
+    '',
+    'Invalid output (may be truncated):',
+    invalidOutput,
+    '',
+    'Return the corrected JSON ONLY.',
+  ].join('\n');
+}
+
 function buildProofFallbackBoardSteps(payload) {
   const marks = Number(payload?.marks ?? payload?.totalMarks ?? payload?.total_marks) || 3;
   const perStep = Math.round((marks / 5) * 10) / 10;
@@ -950,6 +1230,87 @@ function buildProofFallbackSolveWithMe(payload) {
       'Start with the Given and To Prove. What are the two triangles/segments involved, and what exactly must be proved?',
     answerFormat: 'Short sentence',
   };
+}
+
+function getJsonSchemaTextForMode(mode, payload) {
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+
+  if (mode === 'solve_with_me') {
+    return [
+      '{',
+      '  "kind": "question" | "hint" | "final",',
+      '  "tutor": "string",',
+      '  "answerFormat": "string",',
+      '  "mcq": { "A": "...", "B": "...", "C": "...", "D": "..." },',
+      '  "finalAnswer": "string",',
+      '  "boardWriteup": "string",',
+      `  "diagramType": "${diagramType}",`,
+      `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+      '}',
+    ].join('\n');
+  }
+
+  if (mode === 'board_steps_ms') {
+    return [
+      '{',
+      '  "kind": "board_steps_ms",',
+      '  "totalMarks": number,',
+      '  "steps": [ { "text": "string", "marks": number, "whyThisGetsMarks": "string", "commonMistake": "string" } ],',
+      '  "finalAnswer": "string",',
+      '  "warnings": ["string"],',
+      `  "diagramType": "${diagramType}",`,
+      `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+      '}',
+    ].join('\n');
+  }
+
+  if (mode === 'learn_teach') {
+    return [
+      '{',
+      '  "kind": "learn_teach",',
+      '  "teach": { "simpleExplanation": ["..."], "cbseExamSentence": ["..."] },',
+      '  "workedExamples": [ { "title": "...", "question": "...", "steps": [ { "text": "...", "marks": number } ], "totalMarks": number, "finalAnswer": "..." } ],',
+      '  "commonMistakes": ["..."],',
+      '  "checkQuestion": "...",',
+      `  "diagramType": "${diagramType}",`,
+      `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+      '}',
+    ].join('\n');
+  }
+
+  if (mode === 'learn_proof') {
+    return [
+      '{',
+      '  "kind": "learn_proof",',
+      '  "given": ["..."],',
+      '  "toProve": ["..."],',
+      '  "construction": ["..."],',
+      '  "proofSteps": [ { "statement": "...", "reason": "...", "mark": number } ],',
+      '  "conclusion": ["..."],',
+      '  "totalMarks": number,',
+      `  "diagramType": "${diagramType}",`,
+      `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+      '}',
+    ].join('\n');
+  }
+
+  if (mode === 'learn_mindmap') {
+    return [
+      '{',
+      '  "kind": "learn_mindmap",',
+      '  "conceptBullets": ["..."],',
+      '  "examLines": ["..."],',
+      '  "workedExample": { "question": "...", "steps": ["..."], "finalAnswer": "..." },',
+      '  "commonError": "...",',
+      '  "checkQuestion": "...",',
+      `  "diagramType": "${diagramType}",`,
+      `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+      '}',
+    ].join('\n');
+  }
+
+  return '';
 }
 
 function buildProofRepairPrompt(mode, payload, issues) {
@@ -1075,8 +1436,23 @@ function hasMindmapTeachSections(text) {
     t.includes('2) Exam-writing sentence') &&
     t.includes('3) Solved mini-example') &&
     t.includes('4) Common exam error') &&
-    t.includes('5) Check-for-understanding question')
+    t.includes('5) Check-for-understanding question') &&
+    !containsPlaceholderLanguage(t)
   );
+}
+
+function containsPlaceholderLanguage(text) {
+  const t = String(text || '').toLowerCase();
+  const patterns = [
+    'here is a short',
+    'placeholder',
+    'lorem ipsum',
+    'to be added',
+    'fill in',
+    'tbd',
+    'example here',
+  ];
+  return patterns.some((p) => t.includes(p));
 }
 
 function fallbackMindmapTeachResponse(payload) {
@@ -1228,6 +1604,7 @@ function buildSolveWithMeProtocolPrompt(payload) {
   const topicKey = payload.topicKey || payload.topic || '';
   const questionText = payload.questionText || payload.question || payload.prompt || '';
   const proofAddendum = isProofWritingPayload(payload) ? buildProofWritingAddendum(payload, 'solve_with_me') : '';
+  const seedContext = isTrianglesLearnPayload(payload) ? buildLearnSeedContext(payload, 'key-definitions') : '';
   const diagramRequired = shouldRequireDiagram(payload);
   const diagramType = diagramRequired ? inferDiagramType(payload) : '';
   const diagramLabels = diagramRequired ? diagramLabelsForType(diagramType) : null;
@@ -1272,6 +1649,9 @@ function buildSolveWithMeProtocolPrompt(payload) {
     proofAddendum ? '' : '',
     doubtContext ? `${doubtContext}` : '',
     doubtContext ? '' : '',
+    seedContext ? 'A-Prime seed (reference):' : '',
+    seedContext ? seedContext : '',
+    seedContext ? '' : '',
     'FIRST TURN: start by asking the first Socratic question for the problem below.',
     '',
     'PROBLEM:',
@@ -1358,6 +1738,380 @@ function buildBoardStepsMSPrompt(payload) {
     marks ? `- marks=${marks}` : '- marks=UNKNOWN',
     section ? `- section=${section}` : '- section=UNKNOWN'
   ].filter(Boolean);
+}
+
+function getLearnSeedPack(payload) {
+  return isTrianglesLearnPayload(payload) ? TRIANGLES_LEARN_SEED : null;
+}
+
+function buildLearnSeedContext(payload, sectionKey) {
+  const seed = getLearnSeedPack(payload);
+  if (!seed) return '';
+
+  if (sectionKey === 'key-definitions') {
+    const defs = seed.keyDefinitions;
+    return [
+      'A-Prime seed (key definitions):',
+      `- Definitions: ${defs.simpleExplanation.join(' | ')}`,
+      `- Exam lines: ${defs.cbseExamSentence.join(' | ')}`,
+      `- Common mistakes: ${defs.commonMistakes.join(' | ')}`,
+    ].join('\n');
+  }
+
+  if (sectionKey === 'proof') {
+    const proof = seed.proof;
+    return [
+      'A-Prime seed (proof structure):',
+      `- Given: ${proof.given.join(' ')}`,
+      `- To Prove: ${proof.toProve.join(' ')}`,
+      `- Steps: ${proof.proofSteps.map((s) => s.statement).join(' | ')}`,
+      `- Conclusion: ${proof.conclusion.join(' ')}`,
+    ].join('\n');
+  }
+
+  if (sectionKey === 'mindmap') {
+    const nodeId = payload?.mindmapNodeId || payload?.itemId || 'gQ1';
+    const node = seed.mindmapNodes[nodeId] || seed.mindmapNodes.gQ1;
+    const commonFix = node.commonFix || 'Use the correct criterion and correspondence order.';
+    return [
+      'A-Prime seed (mindmap node):',
+      `- Bullets: ${node.bullets.join(' | ')}`,
+      `- Exam lines: ${node.examLines.join(' | ')}`,
+      `- Common error: ${node.commonError}`,
+      `- Common fix: ${commonFix}`,
+      `- Check question: ${node.checkQuestion}`,
+    ].join('\n');
+  }
+
+  return '';
+}
+
+function scaleMarks(steps, targetTotal) {
+  if (!Array.isArray(steps)) return steps;
+  if (!Number.isFinite(targetTotal) || targetTotal <= 0) return steps;
+  const sum = steps.reduce((acc, s) => acc + (Number(s?.mark ?? s?.marks) || 0), 0);
+  if (!sum) return steps;
+  const factor = targetTotal / sum;
+  return steps.map((s) => {
+    const raw = (Number(s?.mark ?? s?.marks) || 0) * factor;
+    const rounded = Math.round(raw * 2) / 2;
+    if (s?.mark != null) return { ...s, mark: rounded };
+    return { ...s, marks: rounded };
+  });
+}
+
+function buildLearnTeachFallback(payload) {
+  const seed = getLearnSeedPack(payload);
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  const hasMindmapContext =
+    Boolean(payload?.mindmapNodeId || payload?.mindmapNodeTitle || payload?.mindmapNodeText) ||
+    String(payload?.subSection || '').toLowerCase().includes('mindmap');
+  if (!seed) {
+    return {
+      kind: 'learn_teach',
+      teach: { simpleExplanation: ['Triangles are similar if corresponding angles are equal.'], cbseExamSentence: ['State the criterion used.'] },
+      workedExamples: [],
+      commonMistakes: ['Skipping correspondence order.'],
+      checkQuestion: 'Which criterion applies here?',
+      diagramType,
+      diagramLabels,
+    };
+  }
+  if (hasMindmapContext) {
+    const nodeId = payload?.mindmapNodeId || payload?.itemId || 'gQ1';
+    const node = seed.mindmapNodes[nodeId] || seed.mindmapNodes.gQ1;
+    const steps = Array.isArray(node?.example?.steps) ? node.example.steps : ['State the criterion.', 'Write one matching ratio.'];
+    const markedSteps = steps.map((s) => ({ text: s, marks: 1 }));
+    const totalMarks = markedSteps.reduce((acc, s) => acc + (Number(s.marks) || 0), 0);
+    const baseQuestion = node?.example?.question || 'State the criterion and write one ratio using CPST.';
+    return {
+      kind: 'learn_teach',
+      teach: {
+        simpleExplanation: node?.bullets || seed.keyDefinitions.simpleExplanation,
+        cbseExamSentence: node?.examLines || seed.keyDefinitions.cbseExamSentence,
+      },
+      workedExamples: [
+        {
+          title: 'Basic example',
+          question: baseQuestion,
+          steps: markedSteps,
+          totalMarks,
+          finalAnswer: node?.example?.finalAnswer || 'Criterion stated and one correct ratio written.',
+        },
+        {
+          title: 'Board-style example',
+          question: baseQuestion,
+          steps: markedSteps,
+          totalMarks,
+          finalAnswer: node?.example?.finalAnswer || 'Criterion stated and one correct ratio written.',
+        },
+      ],
+      commonMistakes: [node?.commonError || 'Mixing correspondence order.'],
+      checkQuestion: node?.checkQuestion || seed.keyDefinitions.checkQuestion,
+      diagramType,
+      diagramLabels,
+    };
+  }
+  return {
+    kind: 'learn_teach',
+    teach: {
+      simpleExplanation: seed.keyDefinitions.simpleExplanation,
+      cbseExamSentence: seed.keyDefinitions.cbseExamSentence,
+    },
+    workedExamples: seed.keyDefinitions.workedExamples,
+    commonMistakes: seed.keyDefinitions.commonMistakes,
+    checkQuestion: seed.keyDefinitions.checkQuestion,
+    diagramType: seed.keyDefinitions.diagramType || diagramType,
+    diagramLabels: seed.keyDefinitions.diagramLabels || diagramLabels,
+  };
+}
+
+function buildLearnProofFallback(payload) {
+  const seed = getLearnSeedPack(payload);
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  if (!seed) {
+    return {
+      kind: 'learn_proof',
+      given: ['Given: (use question data).'],
+      toProve: ['To Prove: (state required result).'],
+      construction: ['Not required.'],
+      proofSteps: [
+        { statement: 'State the theorem/criterion.', reason: 'Theorem', mark: 1 },
+        { statement: 'Apply the theorem to the triangles.', reason: 'Application', mark: 1 },
+      ],
+      conclusion: ['Hence proved.'],
+      totalMarks: 2,
+      diagramType,
+      diagramLabels,
+    };
+  }
+  const marksRaw = payload?.marks ?? payload?.totalMarks ?? payload?.total_marks;
+  const marks = Number(marksRaw);
+  const steps = Number.isFinite(marks) ? scaleMarks(seed.proof.proofSteps, marks) : seed.proof.proofSteps;
+  const totalMarks = Number.isFinite(marks) ? marks : seed.proof.totalMarks;
+  return {
+    kind: 'learn_proof',
+    given: seed.proof.given,
+    toProve: seed.proof.toProve,
+    construction: seed.proof.construction,
+    proofSteps: steps.map((s) => ({ statement: s.statement, reason: s.reason, mark: s.mark })),
+    conclusion: seed.proof.conclusion,
+    totalMarks,
+    diagramType: seed.proof.diagramType || diagramType,
+    diagramLabels: seed.proof.diagramLabels || diagramLabels,
+  };
+}
+
+function buildLearnMindmapFallback(payload) {
+  const seed = getLearnSeedPack(payload);
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  const nodeId = payload?.mindmapNodeId || payload?.itemId || 'gQ1';
+  const node = seed?.mindmapNodes?.[nodeId] || seed?.mindmapNodes?.gQ1;
+  return {
+    kind: 'learn_mindmap',
+    conceptBullets: node?.bullets || ['Use similarity criteria before CPST.'],
+    examLines: node?.examLines || ['State the criterion and correspondence order.'],
+    workedExample: node?.example || {
+      question: 'Identify the criterion and write one ratio.',
+      steps: ['State the criterion.', 'Write one CPST ratio.'],
+      finalAnswer: 'Criterion stated and one ratio written.',
+    },
+    commonError: node?.commonError || 'Mixing correspondence order.',
+    commonFix: node?.commonFix || 'Re-check correspondence order and the stated criterion.',
+    checkQuestion: node?.checkQuestion || 'Which criterion applies here?',
+    diagramType,
+    diagramLabels,
+  };
+}
+
+function buildLearnSolveWithMeFallback(payload) {
+  const seed = getLearnSeedPack(payload);
+  return {
+    kind: 'question',
+    tutor: seed?.solveWithMe?.question || 'Which two triangles are being compared?',
+    answerFormat: seed?.solveWithMe?.answerFormat || 'Short sentence',
+    diagramType: inferDiagramType(payload),
+    diagramLabels: diagramLabelsForType(inferDiagramType(payload)),
+  };
+}
+
+function buildLearnKeyDefinitionsPrompt(payload) {
+  const subject = payload.subject || 'Maths/Science';
+  const grade = payload.grade != null ? payload.grade : 10;
+  const topicKey = payload.topicKey || payload.topic || '';
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  const nodeTitle = payload.mindmapNodeTitle || payload.itemTitle || '';
+  const nodeText = payload.mindmapNodeText || payload.itemText || '';
+  const hasMindmapContext = Boolean(nodeTitle || nodeText);
+  const requiredList = hasMindmapContext
+    ? [
+        `Concept focus: ${nodeTitle || 'Mindmap node'}`,
+        nodeText ? `Use this hint: ${nodeText}` : 'Use the provided mindmap node context.',
+      ]
+    : [
+        'Similar triangles (definition)',
+        'Corresponding sides/angles (definition + ordering)',
+        'AA similarity (one line)',
+        'SAS similarity (one line)',
+        'SSS similarity (one line)',
+        'CPST meaning (one line)',
+      ];
+
+  const seedContext = buildLearnSeedContext(payload, hasMindmapContext ? 'mindmap' : 'key-definitions');
+
+  return [
+    `You are a CBSE Class ${grade} ${subject} teacher for Learn tab (Board Examples).`,
+    topicKey ? `Topic: ${topicKey}.` : '',
+    nodeTitle ? `Node: ${nodeTitle}.` : '',
+    nodeText ? `Node hint: ${nodeText}` : '',
+    '',
+    'TASK:',
+    hasMindmapContext
+      ? '- Teach the concept in the mindmap node with exam-first clarity.'
+      : '- Teach the exact key definitions listed below with exam-first clarity.',
+    '- Use simple, student-friendly language with CBSE exam lines.',
+    '- Include two worked examples (one basic, one board-style).',
+    '',
+    hasMindmapContext ? 'MUST COVER (concept focus):' : 'MUST COVER (exact list):',
+    ...requiredList.map((x) => `- ${x}`),
+    '',
+    'OUTPUT FORMAT (STRICT): Return ONLY valid JSON. No markdown. No extra keys.',
+    'Schema:',
+    '{',
+    '  "kind": "learn_teach",',
+    '  "teach": {',
+    '    "simpleExplanation": ["..."],',
+    '    "cbseExamSentence": ["..."]',
+    '  },',
+    '  "workedExamples": [',
+    '    {',
+    '      "title": "...",',
+    '      "question": "...",',
+    '      "steps": [ { "text": "...", "marks": number } ],',
+    '      "totalMarks": number,',
+    '      "finalAnswer": "..."',
+    '    }',
+    '  ],',
+    '  "commonMistakes": ["..."],',
+    '  "checkQuestion": "...",',
+    `  "diagramType": "${diagramType}",`,
+    `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+    '}',
+    '',
+    'RULES:',
+    '- teach.simpleExplanation must have >= 4 bullets.',
+    '- teach.cbseExamSentence must have >= 2 lines.',
+    '- workedExamples must be exactly 2 items.',
+    '- Each worked example must include steps, marks per step, totalMarks, and finalAnswer.',
+    '- totalMarks must equal the sum of step marks.',
+    '- commonMistakes must have >= 1 items.',
+    '- checkQuestion must be a single question.',
+    '- Diagram is required (use diagramType + diagramLabels as provided).',
+    '- No MCQ prompts.',
+    '- No placeholders or generic filler.',
+    '',
+    seedContext ? seedContext : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildLearnProofPrompt(payload) {
+  const subject = payload.subject || 'Maths/Science';
+  const grade = payload.grade != null ? payload.grade : 10;
+  const topicKey = payload.topicKey || payload.topic || '';
+  const questionText = payload.questionText || payload.question || payload.prompt || '';
+  const marks = Number(payload.marks) || undefined;
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  const seedContext = buildLearnSeedContext(payload, 'proof');
+
+  return [
+    `You are a CBSE Class ${grade} ${subject} proof-writing mentor.`,
+    topicKey ? `Topic: ${topicKey}.` : '',
+    '',
+    'TASK:',
+    '- Write a full CBSE proof with Given / To Prove / Construction / Proof / Conclusion.',
+    '- Use strict marking-scheme style steps with reasons.',
+    '',
+    'OUTPUT FORMAT (STRICT): Return ONLY valid JSON. No markdown. No extra keys.',
+    'Schema:',
+    '{',
+    '  "kind": "learn_proof",',
+    '  "given": ["..."],',
+    '  "toProve": ["..."],',
+    '  "construction": ["..."],',
+    '  "proofSteps": [ { "statement": "...", "reason": "...", "mark": number } ],',
+    '  "conclusion": ["..."],',
+    '  "totalMarks": number,',
+    `  "diagramType": "${diagramType}",`,
+    `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+    '}',
+    '',
+    'RULES:',
+    '- construction can be empty but must be present.',
+    '- totalMarks must equal the sum of proofSteps.mark.',
+    '- Diagram is required (use diagramType + diagramLabels as provided).',
+    '- No placeholders or generic filler.',
+    '',
+    seedContext ? seedContext : '',
+    '',
+    'QUESTION:',
+    questionText,
+    '',
+    marks ? `MARKS: ${marks}` : 'MARKS: UNKNOWN',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildLearnMindmapPrompt(payload) {
+  const subject = payload.subject || 'Maths/Science';
+  const grade = payload.grade != null ? payload.grade : 10;
+  const topicKey = payload.topicKey || payload.topic || '';
+  const nodeTitle = payload.mindmapNodeTitle || payload.itemTitle || 'Mindmap node';
+  const nodeText = payload.mindmapNodeText || payload.itemText || '';
+  const diagramType = inferDiagramType(payload);
+  const diagramLabels = diagramLabelsForType(diagramType);
+  const seedContext = buildLearnSeedContext(payload, 'mindmap');
+
+  return [
+    `You are a CBSE Class ${grade} ${subject} teacher for Learn tab (Mindmap).`,
+    topicKey ? `Topic: ${topicKey}.` : '',
+    `Node: ${nodeTitle}.`,
+    nodeText ? `Node hint: ${nodeText}` : '',
+    '',
+    'OUTPUT FORMAT (STRICT): Return ONLY valid JSON. No markdown. No extra keys.',
+    'Schema:',
+    '{',
+    '  "kind": "learn_mindmap",',
+    '  "conceptBullets": ["..."],',
+    '  "examLines": ["..."],',
+    '  "workedExample": { "question": "...", "steps": ["..."], "finalAnswer": "..." },',
+    '  "commonError": "...",',
+    '  "commonFix": "...",',
+    '  "checkQuestion": "...",',
+    `  "diagramType": "${diagramType}",`,
+    `  "diagramLabels": ${JSON.stringify(diagramLabels)}`,
+    '}',
+    '',
+    'RULES:',
+    '- conceptBullets must have >= 5 items.',
+    '- examLines must have >= 2 items.',
+    '- workedExample must include question, steps (>=1), and finalAnswer.',
+    '- commonError and commonFix required.',
+    '- checkQuestion required.',
+    '- Diagram is required.',
+    '- No placeholders or generic filler.',
+    '',
+    seedContext ? seedContext : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 
@@ -1541,6 +2295,8 @@ async function handleRequest(req, res) {
     const isCompetencyExplain = isLearnCompetencyPayload(payload);
     const isMindmapTeach = isLearnMindmapPayload(payload);
     const isProofWriting = isProofWritingPayload(payload);
+    const isLearnKeyDefinitions = isLearnKeyDefinitionsPayload(payload);
+    const solveStyle = String(payload?.solveStyle || '').toLowerCase();
     const isTrianglesEvaluation = isTrianglesEvaluationRequest(payload, reqJson?.messages);
 
     if (!mode) return sendJson(res, 400, { error: 'Missing "mode" in request body' });
@@ -1554,8 +2310,14 @@ async function handleRequest(req, res) {
     if (mode === 'topic_solve') normalisedMode = 'solve';
     if (mode === 'solve_with_me') normalisedMode = 'solve_with_me';
     if (mode === 'board_steps_ms') normalisedMode = 'board_steps_ms';
-    if (isMisconceptionExplain || isCompetencyExplain || isMindmapTeach) normalisedMode = 'explain';
+    if (mode === 'learn_teach') normalisedMode = 'learn_teach';
+    if (mode === 'learn_proof') normalisedMode = 'learn_proof';
+    if (mode === 'learn_mindmap') normalisedMode = 'learn_mindmap';
+    if (isMindmapTeach) normalisedMode = 'learn_mindmap';
+    if (isMisconceptionExplain || isCompetencyExplain) normalisedMode = 'explain';
     if (isTrianglesEvaluation) normalisedMode = 'solve_with_me';
+    if (isLearnKeyDefinitions && solveStyle === 'board') normalisedMode = 'learn_teach';
+    if (isProofWriting && solveStyle === 'board') normalisedMode = 'learn_proof';
 
     // Build system prompt from persona (if provided as object)
     let systemPrompt = '';
@@ -1581,6 +2343,18 @@ async function handleRequest(req, res) {
         case 'explain':
           systemPrompt =
             'You are a CBSE Class 10 concept explainer. Explain topics in simple steps, aligning with board exam style.';
+          break;
+        case 'learn_teach':
+          systemPrompt =
+            'You are a strict CBSE Class 10 teacher. Return only the required JSON schema for key definitions.';
+          break;
+        case 'learn_mindmap':
+          systemPrompt =
+            'You are a strict CBSE Class 10 teacher. Return only the required JSON schema for mindmap teaching.';
+          break;
+        case 'learn_proof':
+          systemPrompt =
+            'You are a strict CBSE Class 10 proof-writing teacher. Return only the required JSON schema.';
           break;
         case 'coach':
         case 'mindset':
@@ -1624,6 +2398,15 @@ async function handleRequest(req, res) {
         case 'board_steps_ms':
           userPrompt = buildBoardStepsMSPrompt(payload);
           break;
+        case 'learn_teach':
+          userPrompt = buildLearnKeyDefinitionsPrompt(payload);
+          break;
+        case 'learn_mindmap':
+          userPrompt = buildLearnMindmapPrompt(payload);
+          break;
+        case 'learn_proof':
+          userPrompt = buildLearnProofPrompt(payload);
+          break;
         case 'explain':
           userPrompt = isMisconceptionExplain
             ? buildMisconceptionExplainPrompt(payload)
@@ -1660,11 +2443,13 @@ async function handleRequest(req, res) {
       const safeMarks = Number.isFinite(marksNum) && marksNum > 0 ? marksNum : 5;
 
       const maxOutputTokens =
-        normalisedMode === 'board_steps_ms'
-          ? Math.min(4096, Math.max(1400, 800 + Math.round(safeMarks * 180)))
-          : normalisedMode === 'solve_with_me'
-            ? 1400
-            : 900;
+        normalisedMode === 'board_steps_ms' || normalisedMode === 'learn_proof'
+          ? Math.min(4096, Math.max(1600, 900 + Math.round(safeMarks * 180)))
+          : normalisedMode === 'learn_teach'
+            ? 1600
+            : normalisedMode === 'solve_with_me'
+              ? 1400
+              : 900;
 
       const contents = [
         { role: 'user', parts: [{ text: `${systemPrompt}
@@ -1674,43 +2459,79 @@ ${userPrompt}` }] },
 
       const reply = await callGemini(GEMINI_MODEL, contents, {
         maxOutputTokens,
-        temperature: normalisedMode === 'board_steps_ms' ? 0.25 : 0.35,
+        temperature:
+          normalisedMode === 'board_steps_ms' || normalisedMode === 'learn_proof'
+            ? 0.2
+            : normalisedMode === 'learn_teach'
+              ? 0.25
+              : 0.35,
       });
 
       let finalText = reply.text;
       let structured = null;
 
-        if (normalisedMode === 'board_steps_ms' || normalisedMode === 'solve_with_me') {
+        const structuredModes = ['board_steps_ms', 'solve_with_me', 'learn_teach', 'learn_proof', 'learn_mindmap'];
+        if (structuredModes.includes(normalisedMode)) {
           structured = tryParseJsonStrict(finalText);
+          const isFirstTurn =
+            normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
+              ? reqJson.messages.length <= 1
+              : false;
+          let check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+          const isLearnStructured =
+            normalisedMode === 'learn_teach' ||
+            normalisedMode === 'learn_proof' ||
+            normalisedMode === 'learn_mindmap' ||
+            (normalisedMode === 'solve_with_me' && isTrianglesLearnPayload(payload));
 
-          if (!isValidMentorProtocol(structured, normalisedMode)) {
+          if (!check.ok) {
             const clipped = String(finalText || '').slice(0, 8000);
-            const repairPrompt = [
-              'You returned invalid or incomplete JSON for the required protocol.',
-            'Return ONLY valid JSON (no markdown, no extra text).',
-            (normalisedMode === 'solve_with_me'
-              ? 'Required JSON shape: { "kind": "question" | "hint" | "final", "tutor": string, "mcq"?: object, "finalAnswer"?: string, "boardWriteup"?: string }.'
-              : `Required kind: ${normalisedMode}.`),
-            '',
-            'Broken output (may be truncated):',
-            clipped,
-            '',
-            'Now return the corrected JSON ONLY.',
-          ].join('\n');
+            const repairPrompt = buildRepairPromptForMode(normalisedMode, payload, clipped, check.issues);
+            const repairContents = [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
+            ];
 
-          const repairContents = [
-            { role: 'user', parts: [{ text: `${systemPrompt}
-
-${repairPrompt}` }] },
-          ];
-
-          const repaired = await callGemini(GEMINI_MODEL, repairContents, {
-            maxOutputTokens,
-            temperature: 0.2,
+            const repaired = await callGemini(GEMINI_MODEL, repairContents, {
+              maxOutputTokens,
+              temperature: 0.2,
             });
 
             finalText = repaired.text;
             structured = tryParseJsonStrict(finalText);
+            check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+          }
+
+          if (!check.ok && isLearnStructured) {
+            const strictPrompt = buildRepairPromptForMode(
+              normalisedMode,
+              payload,
+              String(finalText || '').slice(0, 8000),
+              check.issues
+            );
+            const strictContents = [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${strictPrompt}` }] },
+            ];
+            const strictReply = await callGemini(GEMINI_MODEL, strictContents, {
+              maxOutputTokens,
+              temperature: 0.1,
+            });
+            finalText = strictReply.text;
+            structured = tryParseJsonStrict(finalText);
+            check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+          }
+
+          if (!check.ok) {
+            if (isLearnStructured) {
+              if (normalisedMode === 'learn_teach') structured = buildLearnTeachFallback(payload);
+              else if (normalisedMode === 'learn_proof') structured = buildLearnProofFallback(payload);
+              else if (normalisedMode === 'learn_mindmap') structured = buildLearnMindmapFallback(payload);
+              else if (normalisedMode === 'solve_with_me') structured = buildLearnSolveWithMeFallback(payload);
+            } else {
+              console.warn('[mentor] schema mismatch:', check.issues);
+              return sendJson(res, 422, {
+                error: 'Mentor response did not match schema. Retry.',
+              });
+            }
           }
 
           if (isTrianglesEvaluation) {
@@ -1730,43 +2551,19 @@ ${repairPrompt}` }] },
             }
             if (!evalCheck.ok) {
               structured = buildTrianglesEvaluationFallback(payload);
-              finalText = JSON.stringify(structured);
-            }
-          } else if (isProofWriting) {
-            const isFirstTurn =
-              normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
-                ? reqJson.messages.length <= 1
-                : false;
-            let proofCheck =
-              normalisedMode === 'board_steps_ms'
-                ? validateProofBoardSteps(structured, payload)
-                : validateProofSolveWithMe(structured, payload, isFirstTurn);
-
-            if (!proofCheck.ok) {
-              const repairPrompt = buildProofRepairPrompt(normalisedMode, payload, proofCheck.issues);
-              const repairContents = [
-                { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
-              ];
-              const repaired = await callGemini(GEMINI_MODEL, repairContents, {
-                maxOutputTokens,
-                temperature: 0.2,
-              });
-              finalText = repaired.text;
-              structured = tryParseJsonStrict(finalText);
-              proofCheck =
-                normalisedMode === 'board_steps_ms'
-                  ? validateProofBoardSteps(structured, payload)
-                  : validateProofSolveWithMe(structured, payload, isFirstTurn);
-            }
-
-            if (!proofCheck.ok) {
-              structured =
-                normalisedMode === 'board_steps_ms'
-                  ? buildProofFallbackBoardSteps(payload)
-                  : buildProofFallbackSolveWithMe(payload);
-              finalText = JSON.stringify(structured);
             }
           }
+
+          if (normalisedMode === 'board_steps_ms') {
+            structured = normalizeBoardSteps(structured);
+            structured = ensureDiagramFields(structured, payload);
+          }
+
+          if (normalisedMode === 'solve_with_me') {
+            structured = ensureDiagramFields(structured, payload);
+          }
+
+          finalText = JSON.stringify(structured);
         }
 
       if (isMisconceptionExplain) {
@@ -1831,7 +2628,7 @@ ${repairPrompt}` }] },
           }
         }
         structured = null;
-      } else if (isMindmapTeach) {
+      } else if (isMindmapTeach && normalisedMode === 'explain') {
         finalText = sanitizeExplainOutput(finalText);
         if (!hasMindmapTeachSections(finalText)) {
           const repairPrompt = [
@@ -1859,7 +2656,10 @@ ${repairPrompt}` }] },
           });
           finalText = sanitizeExplainOutput(repaired.text);
           if (!hasMindmapTeachSections(finalText)) {
-            finalText = fallbackMindmapTeachResponse(payload);
+            console.warn('[mentor] mindmap schema mismatch');
+            return sendJson(res, 422, {
+              error: 'Mentor response did not match schema. Retry.',
+            });
           }
         }
         structured = null;
@@ -1869,10 +2669,7 @@ ${repairPrompt}` }] },
         finalText = ensureDiagramLineInText(finalText, payload);
       }
 
-      if (structured && (normalisedMode === 'board_steps_ms' || normalisedMode === 'solve_with_me')) {
-        if (structured.kind === 'board_steps_ms') {
-          structured = normalizeBoardSteps(structured);
-        }
+      if (structured && normalisedMode === 'solve_with_me') {
         structured = ensureDiagramFields(structured, payload);
         finalText = JSON.stringify(structured);
       }

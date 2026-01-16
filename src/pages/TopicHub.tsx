@@ -1,4 +1,4 @@
-﻿﻿// src/pages/TopicHub.tsx
+﻿// src/pages/TopicHub.tsx
 // TopicHub (MAIN-safe):
 // - Works for BOTH /topic-hub/:grade/:subject and /topic-hub/:grade/:subject/:topicKey
 // - If topicKey is missing -> redirects to a sane default (never blank)
@@ -16,13 +16,15 @@ import { generatePracticeSet } from "../data/practiceSetGenerator";
 import { useVibeMode } from "../context/vibeModeContext";
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
+import TutorDrawerV2 from "../components/tutor/TutorDrawerV2";
 
 type SubjectKey = "maths" | "science";
 type ModeKey = "zombie" | "beast";
-type RequestedMentorMode = "explain" | "board_steps" | "solve_with_me";
+type RequestedMentorMode = "explain" | "board_steps" | "solve_with_me" | "learn_mindmap";
 type ExplainType = "misconception" | "competency" | "mindmap_node" | "general";
 
 type MentorChatMsg = { role: "user" | "assistant"; content: string };
+type TutorTab = "teach" | "examples";
 
 function safeArray<T = any>(x: any): T[] {
   return Array.isArray(x) ? (x as T[]) : [];
@@ -92,6 +94,29 @@ function asSubjectKey(raw: string): SubjectKey {
   return v === "science" ? "science" : "maths";
 }
 
+type TutorConceptCard = { means: string; when: string[]; exam: string; trap: string };
+
+function toTutorConceptCard(x: unknown): TutorConceptCard | null {
+  if (!x || typeof x !== "object") return null;
+  const obj = x as Record<string, unknown>;
+  const means = typeof obj.means === "string" ? obj.means : null;
+  const exam = typeof obj.exam === "string" ? obj.exam : null;
+  const trap = typeof obj.trap === "string" ? obj.trap : null;
+  const whenRaw = obj.when;
+  const when =
+    Array.isArray(whenRaw) && whenRaw.every((v) => typeof v === "string")
+      ? (whenRaw as string[])
+      : null;
+
+  if (!means || !exam || !trap || !when) return null;
+  return { means, when, exam, trap };
+}
+
+function toNullableString(x: unknown): string | null {
+  return typeof x === "string" ? x : null;
+}
+
+
 export default function TopicHub() {
   const params = useParams();
   const [sp] = useSearchParams();
@@ -160,6 +185,9 @@ export default function TopicHub() {
     mindmapNodeText?: string;
   } | null>(null);
   const [mentorSolveStyle, setMentorSolveStyle] = useState<"socratic" | "board">("socratic");
+  const [tutorDrawerOpen, setTutorDrawerOpen] = useState(false);
+  const [tutorTab, setTutorTab] = useState<TutorTab>("teach");
+  const [tutorNodeIndex, setTutorNodeIndex] = useState(0);
 
   const closeMentorDrawer = () => {
     setMentorDrawerOpen(false);
@@ -223,6 +251,7 @@ export default function TopicHub() {
     [title]
   );
 
+
 if (!v2) {
     return (
       <div className="page" style={{
@@ -233,7 +262,7 @@ if (!v2) {
     }}>
         <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 16px" }}>
           <div style={{ opacity: 0.7, marginBottom: 10 }}>
-            Class {grade} • {subject.toUpperCase()}
+            Class {grade}  -  {subject.toUpperCase()}
           </div>
 
           <h1 style={{ fontSize: 44, margin: "8px 0 8px" }}>{topicKey}</h1>
@@ -270,7 +299,7 @@ if (!v2) {
   const definitions = safeArray<V2Definition>((v2 as any).definitions);
   const markingTips = safeArray<string>((v2 as any).markingTips);
   const scoreTips = safeArray<string>((v2 as any).scoreTips);
-// Board-pattern anchors (A–E) pulled from the canonical question bank for this topic.
+// Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
 const [exampleSection, setExampleSection] = useState<"A" | "B" | "C" | "D" | "E">("A");
 
 const exampleAnchors = useMemo(() => {
@@ -376,7 +405,7 @@ const buildFallbackWorkedExampleQuestion = useCallback(
       const marksBySectionLocal: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 };
       const marks = marksBySectionLocal[section] ?? 2;
 
-      const header = `Class ${grade} ${subjectTitle} • ${title}`;
+      const header = `Class ${grade} ${subjectTitle}  -  ${title}`;
       const diagramLine = isDiagramTopic
         ? `Diagram: Draw a neat labelled diagram wherever applicable.`
         : "";
@@ -390,10 +419,10 @@ const buildFallbackWorkedExampleQuestion = useCallback(
             return `${header}
 
 Pattern A (${marks}-mark/MCQ style):
-In ΔABC and ΔPQR, ∠A = ∠P and ∠B = ∠Q. What can you conclude?
+In ?ABC and ?PQR, ?A = ?P and ?B = ?Q. What can you conclude?
 
-A) ΔABC ≅ ΔPQR
-B) ΔABC ~ ΔPQR
+A) ?ABC ? ?PQR
+B) ?ABC ~ ?PQR
 C) Areas of triangles are equal
 D) Nothing definite can be said
 
@@ -404,20 +433,20 @@ Rules: Pick ONE correct option.`;
 ${diagramLine}
 
 Pattern B (${marks} marks, short answer):
-In ΔABC, D lies on AB and E lies on AC. If DE ∥ BC, AD = 3 cm, DB = 6 cm and EC = 8 cm, find AE.`;
+In ?ABC, D lies on AB and E lies on AC. If DE ? BC, AD = 3 cm, DB = 6 cm and EC = 8 cm, find AE.`;
           case "C":
             return `${header}
 
 Pattern C (${marks} marks):
-(i) In ΔABC, ∠A = 50°, ∠B = 60°. In ΔPQR, ∠P = 50°, ∠Q = 60°. Prove ΔABC ~ ΔPQR.
-(ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ΔABC and ΔPQR.`;
+(i) In ?ABC, ?A = 50°, ?B = 60°. In ?PQR, ?P = 50°, ?Q = 60°. Prove ?ABC ~ ?PQR.
+(ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ?ABC and ?PQR.`;
           case "D":
             return `${header}
 
 ${diagramLine}
 
 Pattern D (${marks} marks, typical board steps):
-In ΔABC, D is a point on AB and E is a point on AC such that DE ∥ BC.
+In ?ABC, D is a point on AB and E is a point on AC such that DE ? BC.
 Given AD = 2 cm, DB = 3 cm and AC = 10 cm.
 Find AE and EC.`;
           case "E":
@@ -426,7 +455,7 @@ Find AE and EC.`;
 ${diagramLine}
 
 Pattern E (${marks} marks, mixed concept):
-In a right triangle ΔABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
+In a right triangle ?ABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
 (i) Prove that AB² = BD · BC and AC² = CD · BC.
 (ii) If BD = 9 cm and BC = 25 cm, find AB.`;
           default:
@@ -537,6 +566,62 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const formulae = safeArray<any>((v2 as any).formulae || (v2 as any).formulas || (v2 as any).formulaSheet);
   const videos = safeArray<any>((v2 as any).videos || (v2 as any).videoLinks || (v2 as any).youtube);
   const guidedMindmap = topicKey === "triangles" ? trianglesGuidedMindmap : null;
+  const guidedOrder = guidedMindmap?.recommendedOrder || [];
+  const guidedNodes = guidedMindmap?.nodes || [];
+  const guidedNodeById = useMemo(() => {
+    const map = new Map<string, (typeof guidedNodes)[number]>();
+    guidedNodes.forEach((n) => map.set(String(n.id), n));
+    return map;
+  }, [guidedNodes]);
+  const guidedNodeTitleById = useMemo(() => {
+    const out: Record<string, string> = {};
+    guidedNodes.forEach((n) => {
+      out[String(n.id)] = String(n.title || n.id);
+    });
+    return out;
+  }, [guidedNodes]);
+  const guidedCoreByNodeId: Record<string, unknown> = guidedMindmap?.coreByNodeId || {};
+  const guidedCoreIdByNodeId: Record<string, unknown> = guidedMindmap?.coreIdByNodeId || {};
+  const currentTutorNodeId = guidedOrder[tutorNodeIndex] || guidedOrder[0];
+  const currentTutorNode = currentTutorNodeId ? guidedNodeById.get(currentTutorNodeId) : null;
+  const currentTutorCore = currentTutorNodeId ? guidedCoreByNodeId[currentTutorNodeId] : null;
+  const currentTutorCoreId = currentTutorNodeId ? guidedCoreIdByNodeId[currentTutorNodeId] : null;
+
+  const mapProofFocusToNodeId = useCallback((focus?: string) => {
+    const f = String(focus || "").toLowerCase();
+    if (f.includes("bpt")) return "gBPT";
+    if (f.includes("pyth")) return "gPyth";
+    if (f.includes("area")) return "gArea";
+    if (f.includes("cpst")) return "gCPST";
+    if (f.includes("aa")) return "gAA";
+    if (f.includes("sas")) return "gSAS";
+    if (f.includes("sss")) return "gSSS";
+    return "gQ1";
+  }, []);
+
+  const closeTutorDrawer = useCallback(() => {
+    setTutorDrawerOpen(false);
+  }, []);
+
+  const resolveTutorNodeIndex = useCallback(
+    (nodeId?: string | null) => {
+      if (!nodeId) return 0;
+      const idx = guidedOrder.findIndex((id) => id === nodeId);
+      return idx >= 0 ? idx : 0;
+    },
+    [guidedOrder]
+  );
+
+  const openTutorDrawer = useCallback(
+    (opts?: { tab?: TutorTab; nodeId?: string | null }) => {
+      const nextTab = opts?.tab || "teach";
+      const nodeIndex = resolveTutorNodeIndex(opts?.nodeId || currentTutorNodeId);
+      setTutorTab(nextTab);
+      setTutorNodeIndex(nodeIndex);
+      setTutorDrawerOpen(true);
+    },
+    [currentTutorNodeId, resolveTutorNodeIndex]
+  );
 
 const showInZombie = (sectionId: string) => {
     if (mode === "beast") return true;
@@ -578,7 +663,7 @@ const showInZombie = (sectionId: string) => {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <Link className="pill" to={`/trends/${grade}/${subject}`}>
-              ← Trends
+              ? Trends
             </Link>
 
             <div
@@ -616,7 +701,7 @@ const showInZombie = (sectionId: string) => {
 
           <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontSize: 14, opacity: 0.75 }}>
-              Class {grade} • {subject.toUpperCase()}
+              Class {grade}  -  {subject.toUpperCase()}
             </div>
 
             <div
@@ -657,6 +742,36 @@ const showInZombie = (sectionId: string) => {
 
         {/* Content */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
+          {isLearn && isTrianglesTopic ? (
+            <div
+              style={{
+                borderRadius: 18,
+                padding: "14px 14px",
+                background: "rgba(255,255,255,0.65)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>Let me teach you</div>
+                <div style={{ fontSize: 13, opacity: 0.75 }}>
+                  Start from basics and move step-by-step with the guided mindmap.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
+              >
+                Let me teach you
+              </button>
+            </div>
+          ) : null}
 {isLearn && showInZombie("summary") && overview.length > 0 && (
             <AccordionCard id="summary" title="Summary" defaultOpen>
               {overview.map((p, idx) => (
@@ -686,22 +801,27 @@ const showInZombie = (sectionId: string) => {
                 <button
                   type="button"
                   className="pill"
-                  onClick={() =>
+                  onClick={() => {
+                    if (isTrianglesTopic) {
+                      openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
+                      return;
+                    }
                     openMentorDrawer({
-                      title: `${title} • Key definitions`,
-                      question: `Explain the key definitions in ${title} (Class ${grade} ${subjectTitle}).
-
-- Write each definition in NCERT/CBSE exam language (what the student should write).
-- Give 2 examples for each: one easy + one board-style.
-- If the topic is geometry, include a labelled diagram description and reference it clearly.
-- End with 3 common mistakes + the quick fix.`,
+                      title: `${title}   Key definitions`,
+                      question: `Teach the key definitions in ${title} (Class ${grade} ${subjectTitle}).
+Cover exactly:
+1) Similar triangles (definition)
+2) Corresponding sides/angles (definition + ordering)
+3) Similarity criteria: AA, SAS, SSS (one line each)
+4) CPST meaning (one line)
+Use CBSE exam language and include a labelled diagram.`,
                       solveStyle: "socratic",
                       section: "learn",
                       subSection: "key-definitions",
-                    })
-                  }
+                    });
+                  }}
                 >
-                  Ask Mentor →
+                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
                 </button>
               </div>
 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
@@ -735,34 +855,9 @@ const showInZombie = (sectionId: string) => {
                 <GuidedMindmapPanel
                   data={guidedMindmap}
                   onAskMentor={(node) => {
-                  const coreText = node.core
-                    ? [
-                        `What it means: ${node.core.means}`,
-                        node.core.when.length ? `When used: ${node.core.when.join("; ")}` : "",
-                        `Exam line: ${node.core.exam}`,
-                        `Trap: ${node.core.trap}`,
-                      ]
-                        .filter(Boolean)
-                        .join("\n")
-                    : node.text || "";
-                  openMentorDrawer({
-                    title: `Mindmap — ${node.title}`,
-                    question: `Teach from the mindmap node "${node.title}".`,
-                    solveStyle: "socratic",
-                    section: "learn",
-                    subSection: "mindmap",
-                    requestedMode: "explain",
-                    explainType: "mindmap_node",
-                    itemId: node.id,
-                    itemTitle: node.title,
-                    itemText: node.text || node.core?.means || "",
-                    contextText: coreText,
-                    mindmapNodeId: node.id,
-                    mindmapNodeTitle: node.title,
-                    mindmapCoreId: node.coreId,
-                    mindmapNodeText: node.text || node.core?.means || "",
-                  });
-                }}
+                    if (!node?.id) return;
+                    openTutorDrawer({ tab: "teach", nodeId: node.id });
+                  }}
                 />
               </AccordionCard>
             ) : null}
@@ -793,43 +888,19 @@ const showInZombie = (sectionId: string) => {
                           type="button"
                           className="pill"
                           style={{ padding: "7px 10px", fontSize: 13 }}
-                          onClick={() =>
-                            openMentorDrawer({
-                              title: `Proof writing  ${t.title}`,
-                              question: t.question,
-                              solveStyle: "socratic",
-                              requestedMode: "solve_with_me",
-                              marks: t.marks,
-                              section: "learn",
-                              subSection: "proof-writing",
-                              theoremFocus: [t.focus],
-                              contextText: t.hints.join(" "),
-                            })
-                          }
-                          title="Practice step-by-step with Mentor"
+                          onClick={() => openTutorDrawer({ tab: "teach", nodeId: mapProofFocusToNodeId(t.focus) })}
+                          title="Open Tutor in teaching mode"
                         >
-                          Practice (Solve With Me) 
+                          Teach this proof
                         </button>
                         <button
                           type="button"
                           className="pill"
                           style={{ padding: "7px 10px", fontSize: 13 }}
-                          onClick={() =>
-                            openMentorDrawer({
-                              title: `Proof writing  ${t.title}  Board steps`,
-                              question: t.question,
-                              solveStyle: "board",
-                              requestedMode: "board_steps",
-                              marks: t.marks,
-                              section: "learn",
-                              subSection: "proof-writing",
-                              theoremFocus: [t.focus],
-                              contextText: t.hints.join(" "),
-                            })
-                          }
-                          title="See CBSE board-scoring steps with marks"
+                          onClick={() => openTutorDrawer({ tab: "examples", nodeId: mapProofFocusToNodeId(t.focus) })}
+                          title="See board-style examples"
                         >
-                          Board Steps 
+                          Board example
                         </button>
                       </div>
                       <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7, whiteSpace: "pre-wrap" }}>
@@ -848,9 +919,13 @@ const showInZombie = (sectionId: string) => {
                 <button
                   type="button"
                   className="pill"
-                  onClick={() =>
+                  onClick={() => {
+                    if (isTrianglesTopic) {
+                      openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
+                      return;
+                    }
                     openMentorDrawer({
-                      title: `${title} • Common misconceptions`,
+                      title: `${title} - Common misconceptions`,
                       question: `Act like a CBSE Class ${grade} teacher. For ${title}:
 
 1) List the TOP 5 common misconceptions students have.
@@ -859,10 +934,10 @@ const showInZombie = (sectionId: string) => {
 4) If geometry, include a labelled diagram description wherever it helps.
 5) End with a 30-second revision checklist.`,
                       solveStyle: "socratic",
-                    })
-                  }
+                    });
+                  }}
                 >
-                  Ask Mentor →
+                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
                 </button>
               </div>
 <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -913,9 +988,13 @@ const showInZombie = (sectionId: string) => {
                   className="pill"
                   style={{ padding: "7px 10px", fontSize: 13 }}
                   onClick={() => {
+                    if (isTrianglesTopic) {
+                      openTutorDrawer({ tab: "examples", nodeId: guidedOrder[0] });
+                      return;
+                    }
                     const joined = scoreTips.slice(0, 10).map((x, i) => `${i + 1}. ${String(x || "")}`).join("\n");
                     openMentorDrawer({
-                      title: `Score tips · ${title}`,
+                      title: `Score tips - ${title}`,
                       question:
                         `You are a CBSE Class ${grade} ${subjectTitle} mentor.\n` +
                         `Using these score tips, teach me how to write answers for FULL marks.\n\n` +
@@ -931,13 +1010,13 @@ const showInZombie = (sectionId: string) => {
                   }}
                   title="Ask mentor to explain how to use these score tips and show a board-style example with marks"
                 >
-                  Ask Mentor →
+                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
                 </button>
               </div>
             </AccordionCard>
           )}
      {isGrind && showInZombie("worked-examples") && (
-  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A–E)">
+  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A-E)">
     {(() => {
       const anchors = exampleAnchors as any;
       const exampleSections: Array<"A" | "B" | "C" | "D" | "E"> = ["A", "B", "C", "D", "E"];
@@ -990,7 +1069,7 @@ const showInZombie = (sectionId: string) => {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontWeight: 900 }}>
-                Example • Pattern {exampleSection}{" "}
+                Example  -  Pattern {exampleSection}{" "}
                 <span style={{ fontWeight: 700, opacity: 0.65 }}>
                   {isAnchor ? "(from bank)" : "(auto sample)"}
                 </span>
@@ -1017,7 +1096,7 @@ const showInZombie = (sectionId: string) => {
                 }
                 title="Go to Practice page filtered to this Board pattern"
               >
-                Practice this type →
+                Practice this type ?
               </button>
 
               <button
@@ -1025,7 +1104,7 @@ const showInZombie = (sectionId: string) => {
                 className="pill"
                 onClick={() =>
                   openMentorDrawer({
-                    title: `Pattern ${exampleSection} • ${title}`,
+                    title: `Pattern ${exampleSection}  -  ${title}`,
                     question:
                       `Solve this exact example in exam-ready steps.\n\n` +
                       `Pattern: ${exampleSection}\n` +
@@ -1044,13 +1123,13 @@ const showInZombie = (sectionId: string) => {
                 }
                 title="Open Mentor drawer (switch between Board Steps / Solve With Me inside the drawer)"
               >
-                Ask Mentor →
+                Ask Mentor ?
               </button>
             </div>
 
             {!isAnchor ? (
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                Note: this is an auto-sample because your bank doesn’t have a stored anchor for
+                Note: this is an auto-sample because your bank doesn't have a stored anchor for
                 Pattern {exampleSection} yet. The Mentor can still solve it properly.
               </div>
             ) : null}
@@ -1067,7 +1146,7 @@ const showInZombie = (sectionId: string) => {
               >
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 900 }}>
-                    Example · Pattern {exampleSection} {typeof marks === "number" ? `· ${marks} marks` : ""}
+                    Example - Pattern {exampleSection} {typeof marks === "number" ? ` - ${marks} marks` : ""}
                   </div>
                   <div style={{ opacity: 0.7, fontSize: 12 }}>
                     {isAnchor ? "From your curated bank" : "Sample (fallback)"}
@@ -1125,9 +1204,13 @@ const showInZombie = (sectionId: string) => {
                         className="pill"
                         style={{ padding: "7px 10px", fontSize: 13 }}
                         onClick={() => {
+                          if (isTrianglesTopic) {
+                            openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
+                            return;
+                          }
                           if (!list.length) return;
                           openMentorDrawer({
-                            title: `NCERT competency · ${cid}`,
+                            title: `NCERT competency - ${cid}`,
                             question:
                               `Explain the NCERT competency ${cid} for Class ${grade} ${subjectTitle}.\n` +
                               `Competency: ${desc}\n\n` +
@@ -1141,12 +1224,12 @@ const showInZombie = (sectionId: string) => {
                         }}
                         title="Ask mentor to explain the selected competency with an example and a common mistake"
                       >
-                        Ask Mentor →
+                        {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
                       </button>
 
                       <div style={{ fontSize: 12, opacity: 0.75 }}>
                         Selected: <b>{cid}</b>
-                        {bloom ? <span> • {bloom}</span> : null}
+                        {bloom ? <span>  -  {bloom}</span> : null}
                       </div>
                     </div>
 
@@ -1171,7 +1254,7 @@ const showInZombie = (sectionId: string) => {
                           >
                             <b>{id}:</b> {String(c?.description || "")}
                             {c?.bloomLevel ? (
-                              <span style={{ opacity: 0.7 }}> • {String(c.bloomLevel)}</span>
+                              <span style={{ opacity: 0.7 }}>  -  {String(c.bloomLevel)}</span>
                             ) : null}
                           </li>
                         );
@@ -1192,13 +1275,13 @@ const showInZombie = (sectionId: string) => {
                   className="pill"
                   onClick={() =>
                     openMentorDrawer({
-                      title: `${title} • Lab / activities`,
+                      title: `${title}  -  Lab / activities`,
                       question: `Help me prepare for lab/activities in ${title}. Give the objective, steps, observations, and 2 viva questions with answers.`,
                       solveStyle: "board",
                     })
                   }
                 >
-                  Ask Mentor →
+                  Ask Mentor ?
                 </button>
               </div>
 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
@@ -1263,7 +1346,7 @@ const showInZombie = (sectionId: string) => {
             <>
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
-                  Quick revision kit for <b>{title}</b> — mindmap, formula sheet, and top videos.
+                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <button
@@ -1271,13 +1354,13 @@ const showInZombie = (sectionId: string) => {
                     className="pill"
                     onClick={() =>
                       openMentorDrawer({
-                        title: `${title} • Resources`,
+                        title: `${title}  -  Resources`,
                         question: `Make me a 10-minute revision plan for ${title}. Keep it CBSE-focused and marks-friendly.`,
                         solveStyle: "socratic",
                       })
                     }
                   >
-                    Ask Mentor →
+                    Ask Mentor ?
                   </button>
                 </div>
               </AccordionCard>
@@ -1285,7 +1368,7 @@ const showInZombie = (sectionId: string) => {
               <AccordionCard id="mindmap" title="Mindmap" defaultOpen>
                 {!mindMap ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
-                    Mindmap coming soon for this topic. (We’ll auto-fill as the bank grows.)
+                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
                   </div>
                 ) : (
                   <MindMapCanvas
@@ -1342,7 +1425,7 @@ const showInZombie = (sectionId: string) => {
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title} • Formula`,
+                                  title: `${title}  -  Formula`,
                                   question: `Teach me the formula: ${label}. Also show 2 solved CBSE-style examples where it is used.`,
                                   solveStyle: "socratic",
                                 })
@@ -1365,7 +1448,7 @@ const showInZombie = (sectionId: string) => {
                                 target="_blank"
                                 rel="noreferrer"
                               >
-                                Open PDF ↗
+                                Open PDF ?
                               </a>
                             ) : null}
                           </div>
@@ -1397,7 +1480,7 @@ const showInZombie = (sectionId: string) => {
                           <div style={{ fontWeight: 950 }}>{titleTxt}</div>
                           {url ? (
                             <a href={url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8 }}>
-                              Open video ↗
+                              Open video ?
                             </a>
                           ) : (
                             <div style={{ marginTop: 8, fontSize: 13, opacity: 0.8 }}>Video link missing.</div>
@@ -1410,7 +1493,7 @@ const showInZombie = (sectionId: string) => {
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title} • Video recap`,
+                                  title: `${title}  -  Video recap`,
                                   question: `Summarize the key takeaways for ${title} as a 1-page CBSE revision note. Add 3 mini-questions with answers.`,
                                   solveStyle: "socratic",
                                 })
@@ -1431,6 +1514,24 @@ const showInZombie = (sectionId: string) => {
 
         </div>
       </div>
+      <TutorDrawerV2
+        open={tutorDrawerOpen && isTrianglesTopic}
+        onClose={closeTutorDrawer}
+        tab={tutorTab}
+        setTab={setTutorTab}
+        nodeIndex={tutorNodeIndex}
+        setNodeIndex={setTutorNodeIndex}
+        nodeId={currentTutorNodeId}
+        node={currentTutorNode ? { title: String(currentTutorNode.title), text: currentTutorNode.text } : null}
+        core={toTutorConceptCard(currentTutorCore)}
+        coreId={toNullableString(currentTutorCoreId)}
+        order={guidedOrder}
+        nodeTitles={guidedNodeTitleById}
+        grade={grade}
+        subjectTitle={subjectTitle}
+        topicKey={topicKey}
+        mode={mode}
+      />
           <MentorSolveDrawer
         open={mentorDrawerOpen}
         onClose={closeMentorDrawer}
@@ -1767,16 +1868,14 @@ if (!obj) {
       }
     }
 
-    const note =
-      "⚠️ Mentor returned an incomplete structured response (looks like Board Steps). Please click **Board Steps** again.";
+    const note = "Mentor response incomplete. Please retry.";
     return (keep ? keep + "\n\n" : "") + note;
   }
 
   return stripped;
 }
 
-
-  // Board steps (one-shot) — show full marking scheme in an exam-friendly format.
+  // Board steps (one-shot) - show full marking scheme in an exam-friendly format.
   if (obj.kind === "board_steps_ms") {
     const total = Number(obj.totalMarks) || undefined;
     const steps = Array.isArray(obj.steps) ? obj.steps : [];
@@ -1786,14 +1885,14 @@ if (!obj) {
       return acc + (Number.isFinite(m) ? m : 0);
     }, 0);
     const headerSuffix = total
-      ? ` (Total: ${total} marks · Steps: ${sumMarks} marks)`
+      ? ` (Total: ${total} marks - Steps: ${sumMarks} marks)`
       : sumMarks
       ? ` (Steps: ${sumMarks} marks)`
       : "";
-    lines.push(`🧾 Board Steps + Marking Scheme${headerSuffix}`);
+    lines.push(`?? Board Steps + Marking Scheme${headerSuffix}`);
 
     if (total != null && Number.isFinite(total) && sumMarks && total !== sumMarks) {
-      lines.push(`⚠️ Marking check: step-marks sum to ${sumMarks}, expected ${total}. (Continue with step-wise marks as shown.)`);
+      lines.push(`?? Marking check: step-marks sum to ${sumMarks}, expected ${total}. (Continue with step-wise marks as shown.)`);
     }
 
     steps.forEach((s: any, idx: number) => {
@@ -1801,17 +1900,17 @@ if (!obj) {
       const text = s && s.text ? String(s.text) : "";
       lines.push("");
       lines.push(`${idx + 1}) [${m}] ${text}`);
-      if (s?.whyThisGetsMarks) lines.push(`   • Why: ${String(s.whyThisGetsMarks)}`);
-      if (s?.commonMistake) lines.push(`   • Common mistake: ${String(s.commonMistake)}`);
+      if (s?.whyThisGetsMarks) lines.push(`    -  Why: ${String(s.whyThisGetsMarks)}`);
+      if (s?.commonMistake) lines.push(`    -  Common mistake: ${String(s.commonMistake)}`);
     });
 
     if (obj.finalAnswer) {
       lines.push("");
-      lines.push(`✅ Final Answer: ${String(obj.finalAnswer)}`);
+      lines.push(`? Final Answer: ${String(obj.finalAnswer)}`);
     }
     if (Array.isArray(obj.warnings) && obj.warnings.length) {
       lines.push("");
-      lines.push("⚠️ Notes:");
+      lines.push("?? Notes:");
       obj.warnings.slice(0, 6).forEach((w: any) => lines.push(`- ${String(w)}`));
     }
     return prefix + lines.join("\n");
@@ -1819,8 +1918,8 @@ if (!obj) {
 
   // Default: Solve With Me protocol (question/hint/final)
   const lines: string[] = [];
-  if (obj.kind === "hint") lines.push("💡 Hint:");
-  if (obj.kind === "final") lines.push("✅ Final:");
+  if (obj.kind === "hint") lines.push("?? Hint:");
+  if (obj.kind === "final") lines.push("? Final:");
 
   lines.push(String(obj.tutor || ""));
 
@@ -1873,6 +1972,158 @@ const renderAssistantContent = (raw: string) => {
 
   const diagramMeta = extractDiagramMetaFromObject(obj);
   const diagramType = diagramMeta.diagramType || "TRIANGLE_GENERIC";
+
+  if (obj.kind === "learn_teach") {
+    const teach = obj.teach || {};
+    const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
+    const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
+    const worked = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
+    const mistakes = Array.isArray(obj.commonMistakes) ? obj.commonMistakes : [];
+    const lines: string[] = [];
+
+    if (simple.length) {
+      lines.push("Simple explanation:");
+      simple.forEach((s: any) => lines.push(`- ${String(s)}`));
+    }
+    if (exam.length) {
+      lines.push("");
+      lines.push("CBSE exam lines:");
+      exam.forEach((s: any, idx: number) => lines.push(`${idx + 1}) ${String(s)}`));
+    }
+
+    worked.forEach((ex: any, idx: number) => {
+      lines.push("");
+      lines.push(`Worked Example ${idx + 1}: ${String(ex?.title || "Example")}`);
+      if (ex?.question) lines.push(`Question: ${String(ex.question)}`);
+      if (Array.isArray(ex?.steps)) {
+        lines.push("Steps:");
+        ex.steps.forEach((step: any, sIdx: number) => {
+          const mark = step?.marks != null ? Number(step.marks) : 0;
+          lines.push(`${sIdx + 1}) [${mark}] ${String(step?.text || "")}`);
+        });
+      }
+      if (ex?.totalMarks != null) lines.push(`Total Marks: ${String(ex.totalMarks)}`);
+      if (ex?.finalAnswer) lines.push(`Final Answer: ${String(ex.finalAnswer)}`);
+    });
+
+    if (mistakes.length) {
+      lines.push("");
+      lines.push("Common mistakes:");
+      mistakes.forEach((m: any) => lines.push(`- ${String(m)}`));
+    }
+    if (obj.checkQuestion) {
+      lines.push("");
+      lines.push(`Check question: ${String(obj.checkQuestion)}`);
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        <DiagramBlock
+          diagramType={diagramType}
+          diagramLabels={diagramMeta.diagramLabels}
+          diagramSpec={diagramMeta.diagramSpec}
+          note="CBSE diagram block"
+        />
+        <div style={{ whiteSpace: "pre-wrap" }}>{lines.join("\n")}</div>
+      </div>
+    );
+  }
+
+  if (obj.kind === "learn_proof") {
+    const lines: string[] = [];
+    const given = Array.isArray(obj.given) ? obj.given : [];
+    const toProve = Array.isArray(obj.toProve) ? obj.toProve : [];
+    const construction = Array.isArray(obj.construction) ? obj.construction : [];
+    const steps = Array.isArray(obj.proofSteps) ? obj.proofSteps : [];
+    const conclusion = Array.isArray(obj.conclusion) ? obj.conclusion : [];
+
+    lines.push("Given:");
+    given.forEach((g: any) => lines.push(`- ${String(g)}`));
+    lines.push("");
+    lines.push("To Prove:");
+    toProve.forEach((t: any) => lines.push(`- ${String(t)}`));
+    lines.push("");
+    lines.push("Construction:");
+    if (construction.length) {
+      construction.forEach((c: any) => lines.push(`- ${String(c)}`));
+    } else {
+      lines.push("- Not required.");
+    }
+    lines.push("");
+    lines.push("Proof:");
+    steps.forEach((s: any, idx: number) => {
+      const mark = s?.mark != null ? Number(s.mark) : 0;
+      lines.push(`${idx + 1}) [${mark}] ${String(s?.statement || "")}`);
+      if (s?.reason) lines.push(`   Reason: ${String(s.reason)}`);
+    });
+    lines.push("");
+    lines.push("Conclusion:");
+    conclusion.forEach((c: any) => lines.push(`- ${String(c)}`));
+    if (obj.totalMarks != null) {
+      lines.push("");
+      lines.push(`Total Marks: ${String(obj.totalMarks)}`);
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        <DiagramBlock
+          diagramType={diagramType}
+          diagramLabels={diagramMeta.diagramLabels}
+          diagramSpec={diagramMeta.diagramSpec}
+          note="CBSE diagram block"
+        />
+        <div style={{ whiteSpace: "pre-wrap" }}>{lines.join("\n")}</div>
+      </div>
+    );
+  }
+
+  if (obj.kind === "learn_mindmap") {
+    const lines: string[] = [];
+    const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
+    const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
+    const worked = obj.workedExample || {};
+    const steps = Array.isArray(worked.steps) ? worked.steps : [];
+
+    lines.push("Concept bullets:");
+    bullets.forEach((b: any) => lines.push(`- ${String(b)}`));
+    if (examLines.length) {
+      lines.push("");
+      lines.push("CBSE exam lines:");
+      examLines.forEach((l: any, idx: number) => lines.push(`${idx + 1}) ${String(l)}`));
+    }
+    lines.push("");
+    lines.push("Worked example:");
+    if (worked.question) lines.push(`Question: ${String(worked.question)}`);
+    if (steps.length) {
+      lines.push("Steps:");
+      steps.forEach((s: any, idx: number) => lines.push(`${idx + 1}) ${String(s)}`));
+    }
+    if (worked.finalAnswer) lines.push(`Final Answer: ${String(worked.finalAnswer)}`);
+    if (obj.commonError) {
+      lines.push("");
+      lines.push(`Common error: ${String(obj.commonError)}`);
+    }
+    if (obj.commonFix) {
+      lines.push("");
+      lines.push(`Common fix: ${String(obj.commonFix)}`);
+    }
+    if (obj.checkQuestion) {
+      lines.push("");
+      lines.push(`Check question: ${String(obj.checkQuestion)}`);
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        <DiagramBlock
+          diagramType={diagramType}
+          diagramLabels={diagramMeta.diagramLabels}
+          diagramSpec={diagramMeta.diagramSpec}
+          note="CBSE diagram block"
+        />
+        <div style={{ whiteSpace: "pre-wrap" }}>{lines.join("\n")}</div>
+      </div>
+    );
+  }
 
   if (obj.kind === "board_steps_ms") {
     const total = Number(obj.totalMarks) || undefined;
@@ -1962,10 +2213,20 @@ const renderAssistantContent = (raw: string) => {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const requestedMode = seedExample?.requestedMode;
-  const isExplainOnly = requestedMode === "explain";
+  const isExplainOnly = requestedMode === "explain" || requestedMode === "learn_mindmap";
+  const isLearnSection = seedExample?.section === "learn";
+  const subSectionKey = String(seedExample?.subSection || "").toLowerCase();
+  const isLearnKeyDefinitions = isLearnSection && subSectionKey.includes("key-definitions");
+  const isLearnProof = isLearnSection && subSectionKey.includes("proof");
   const resolvedMode =
     requestedMode === "explain"
       ? "explain"
+      : requestedMode === "learn_mindmap"
+      ? "learn_mindmap"
+      : isLearnKeyDefinitions && solveStyle === "board"
+      ? "learn_teach"
+      : isLearnProof && solveStyle === "board"
+      ? "learn_proof"
       : solveStyle === "board"
       ? "board_steps_ms"
       : "solve_with_me";
@@ -1988,6 +2249,42 @@ const renderAssistantContent = (raw: string) => {
     selectedMode: resolvedMode,
     lastMentorResponse: getLastAssistantMessage(history),
   });
+  const buildLessonPlanMessage = () => {
+    if (!seedExample || !isLearnSection) {
+      return `Problem (${seedExample?.title}): ${seedExample?.question || ""}`;
+    }
+    if (requestedMode === "learn_mindmap") {
+      return [
+        "Lesson Plan (Mindmap Teaching)",
+        "- Key idea in bullets.",
+        "- CBSE exam lines.",
+        "- One mini example + check question.",
+      ].join("\n");
+    }
+    if (isExplainOnly) {
+      return [
+        "Lesson Plan (Board Steps Teaching)",
+        "- CBSE-ready steps with marks.",
+        "- Clear exam lines with reasons.",
+        "- Diagram labels used correctly.",
+        "Goal: 1 clean line per key step.",
+      ].join("\n");
+    }
+    if (solveStyle === "board") {
+      return [
+        "Lesson Plan (Board Steps Teaching)",
+        "- CBSE-ready steps with marks.",
+        "- Clear exam lines with reasons.",
+        "- Diagram labels used correctly.",
+        "Goal: 1 clean line per key step.",
+      ].join("\n");
+    }
+    return [
+      "Socratic Solve With Me Session",
+      "- I ask 1 question -> you answer",
+      "- I correct + continue",
+    ].join("\n");
+  };
   const inputPlaceholder = isExplainOnly
     ? "Ask a doubt about this explanation."
     : solveStyle === "board"
@@ -2011,7 +2308,7 @@ const renderAssistantContent = (raw: string) => {
     const apiMode = resolvedMode;
     const firstUser: MentorChatMsg = {
       role: "user",
-      content: `Problem (${seedExample.title}): ${seedExample.question}`,
+      content: buildLessonPlanMessage(),
     };
     setMessages([firstUser]);
     setInput("");
@@ -2024,15 +2321,18 @@ const renderAssistantContent = (raw: string) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: apiMode,
-          payload: {
-            subject: subjectTitle,
-            grade: Number(grade),
-            topicKey,
-            questionText: seedExample.question,
-            marks: seedExample.marks,
-            section: seedExample.section,
-            subSection: seedExample.subSection,
-            solveStyle,
+            payload: {
+              subject: subjectTitle,
+              grade: Number(grade),
+              topicKey,
+              chapter: topicKey,
+              cardName: seedExample.title,
+              selectedMode: resolvedMode,
+              questionText: seedExample.question,
+              marks: seedExample.marks,
+              section: seedExample.section,
+              subSection: seedExample.subSection,
+              solveStyle,
             vibe: mode,
             requestedMode: seedExample.requestedMode,
             explainType: seedExample.explainType,
@@ -2055,24 +2355,28 @@ const renderAssistantContent = (raw: string) => {
       const data = await res.json();
       const text = data?.data?.text ? String(data.data.text) : "";
       if (!res.ok) {
-        throw new Error(data?.error || data?.details || "Mentor request failed");
+        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
+        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "…" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
-      setErrorText(err?.message || "Failed to get mentor response");
+      console.warn("Mentor request error", err);
+      setErrorText(
+        isLearnSection ? "Mentor is having trouble right now. Please retry." : err?.message || "Mentor request failed."
+      );
     } finally {
       setLoading(false);
     }
-  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext]);
+  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection]);
 
   useEffect(() => {
     if (open) {
       if (messages.length === 0) {
         if (seedExample?.requestedMode === "board_steps" && solveStyle !== "board") return;
         if (seedExample?.requestedMode === "solve_with_me" && solveStyle !== "socratic") return;
+        resetAndKickoff();
       }
-      resetAndKickoff();
     } else {
       setMessages([]);
       setInput("");
@@ -2098,13 +2402,16 @@ const renderAssistantContent = (raw: string) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: resolvedMode,
-          payload: {
-            subject: subjectTitle,
-            grade: Number(grade),
-            topicKey,
-            questionText: (seedExample?.question || "") + "\n\nIMPORTANT: If you output JSON, do NOT wrap it in ``` code fences.",
-            solveStyle,
-            vibe: mode,
+            payload: {
+              subject: subjectTitle,
+              grade: Number(grade),
+              topicKey,
+              chapter: topicKey,
+              cardName: seedExample?.title,
+              selectedMode: resolvedMode,
+              questionText: (seedExample?.question || "") + "\n\nIMPORTANT: If you output JSON, do NOT wrap it in ``` code fences.",
+              solveStyle,
+              vibe: mode,
             section: seedExample?.section,
             subSection: seedExample?.subSection,
             marksTarget: seedExample?.marks,
@@ -2129,16 +2436,33 @@ const renderAssistantContent = (raw: string) => {
       const data = await res.json();
       const text = data?.data?.text ? String(data.data.text) : "";
       if (!res.ok) {
-        throw new Error(data?.error || data?.details || "Mentor request failed");
+        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
+        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "…" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
-      setErrorText(err?.message || "Failed to get mentor response");
+      console.warn("Mentor request error", err);
+      setErrorText(
+        isLearnSection ? "Mentor is having trouble right now. Please retry." : err?.message || "Mentor request failed."
+      );
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, subjectTitle, grade, topicKey, solveStyle, seedExample, mode, resolvedMode, buildDoubtContext]);
+  }, [
+    input,
+    loading,
+    messages,
+    subjectTitle,
+    grade,
+    topicKey,
+    solveStyle,
+    seedExample,
+    mode,
+    resolvedMode,
+    buildDoubtContext,
+    isLearnSection,
+  ]);
 
   if (!open) return null;
 
@@ -2223,13 +2547,13 @@ const renderAssistantContent = (raw: string) => {
               }}
               title="Close"
             >
-              ✕
+              ?
             </button>
           </div>
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> ·{" "}
+          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> -{" "}
           {seedExample?.title || "Worked example"}
         </div>
 
@@ -2275,7 +2599,7 @@ const renderAssistantContent = (raw: string) => {
 
           {loading ? (
             <div style={{ fontSize: 13, opacity: 0.7, padding: 6 }}>
-              Mentor is typing…
+              Mentor is typing...
             </div>
           ) : null}
 
@@ -2290,7 +2614,23 @@ const renderAssistantContent = (raw: string) => {
                 fontSize: 13,
               }}
             >
-              {errorText}
+              <div>{errorText}</div>
+              <button
+                type="button"
+                onClick={resetAndKickoff}
+                style={{
+                  marginTop: 8,
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,0,0,0.14)",
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  background: "white",
+                }}
+              >
+                Retry
+              </button>
             </div>
           ) : null}
         </div>
@@ -2347,7 +2687,7 @@ const renderAssistantContent = (raw: string) => {
             </>
           ) : (
             <>
-              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that’s how CBSE awards marks.
+              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that's how CBSE awards marks.
             </>
           )}
         </div>
@@ -2387,7 +2727,7 @@ function AccordionCard(props: { id: string; title: string; children: any; defaul
         }}
       >
         <span>{title}</span>
-        <span style={{ opacity: 0.6, fontWeight: 900 }}>▾</span>
+        <span style={{ opacity: 0.6, fontWeight: 900 }}>?</span>
       </summary>
 
       <div style={{ marginTop: 12, fontSize: 15 }}>{children}</div>
@@ -2475,7 +2815,7 @@ function MindMapCanvas(props: {
     const n = byId.get(nodeId);
     if (!n || !onAskMentor) return;
     onAskMentor(
-      `Mindmap • ${n.label}`,
+      `Mindmap  -  ${n.label}`,
       `Teach me "${n.label}" from the mindmap. Explain in CBSE-friendly steps with 2 examples and 3 quick practice questions.`
     );
   };
@@ -2520,7 +2860,7 @@ function MindMapCanvas(props: {
                 fontWeight="900"
                 fill="rgba(0,0,0,0.82)"
               >
-                {n.label.length > 18 ? `${n.label.slice(0, 18)}…` : n.label}
+                {n.label.length > 18 ? `${n.label.slice(0, 18)}...` : n.label}
               </text>
             </g>
           ))}
@@ -2781,7 +3121,7 @@ function GuidedMindmapPanel(props: {
                 })
               }
             >
-              Teach from this node →
+              Teach from this node ?
             </button>
           </div>
         ) : null}
@@ -2793,3 +3133,18 @@ function GuidedMindmapPanel(props: {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

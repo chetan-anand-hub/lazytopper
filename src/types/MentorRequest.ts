@@ -17,7 +17,10 @@ export type MentorMode =
   | "topic_explain"
   | "topic_exam_tips"
   | "solve_with_me"
-  | "board_steps_ms";
+  | "board_steps_ms"
+  | "learn_teach"
+  | "learn_proof"
+  | "learn_mindmap";
 
 export interface PageContext {
   grade: "Class 10";

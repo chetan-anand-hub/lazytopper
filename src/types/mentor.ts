@@ -36,7 +36,10 @@ export type MentorMode =
   | 'topic_explain'
   | 'topic_exam_tips'
   | 'solve_with_me'
-  | 'board_steps_ms';
+  | 'board_steps_ms'
+  | 'learn_teach'
+  | 'learn_proof'
+  | 'learn_mindmap';
 
 /**
  * Configuration for a single mentor mode.  Defines how the backend should
@@ -371,10 +374,73 @@ export interface BoardStepsStructured {
 }
 
 /**
+ * Learn-tab teaching payload for key definitions.
+ */
+export interface LearnTeachStructured {
+  kind: 'learn_teach';
+  teach: {
+    simpleExplanation: string[];
+    cbseExamSentence: string[];
+  };
+  workedExamples: Array<{
+    title: string;
+    question: string;
+    steps: Array<{ text: string; marks: number }>;
+    totalMarks: number;
+    finalAnswer: string;
+  }>;
+  commonMistakes: string[];
+  checkQuestion: string;
+  diagramType?: string;
+  diagramLabels?: Record<string, string>;
+  diagram?: MentorDiagramSpec;
+  anchors?: MentorDiagramAnchor[];
+  diagramSteps?: MentorDiagramStepLink[];
+}
+
+/**
+ * Learn-tab proof writing payload for CBSE format.
+ */
+export interface LearnProofStructured {
+  kind: 'learn_proof';
+  given: string[];
+  toProve: string[];
+  construction: string[];
+  proofSteps: Array<{ statement: string; reason: string; mark: number }>;
+  conclusion: string[];
+  totalMarks: number;
+  diagramType?: string;
+  diagramLabels?: Record<string, string>;
+  diagram?: MentorDiagramSpec;
+  anchors?: MentorDiagramAnchor[];
+  diagramSteps?: MentorDiagramStepLink[];
+}
+
+export interface LearnMindmapStructured {
+  kind: 'learn_mindmap';
+  conceptBullets: string[];
+  examLines: string[];
+  workedExample: { question: string; steps: string[]; finalAnswer: string };
+  commonError: string;
+  commonFix: string;
+  checkQuestion: string;
+  diagramType?: string;
+  diagramLabels?: Record<string, string>;
+  diagram?: MentorDiagramSpec;
+  anchors?: MentorDiagramAnchor[];
+  diagramSteps?: MentorDiagramStepLink[];
+}
+
+/**
  * Union of all structured protocols we currently support.
  * (Other modes generally return plain text only.)
  */
-export type MentorStructured = SolveWithMeStructured | BoardStepsStructured;
+export type MentorStructured =
+  | SolveWithMeStructured
+  | BoardStepsStructured
+  | LearnTeachStructured
+  | LearnProofStructured
+  | LearnMindmapStructured;
 
 /**
  * Mentor gateway response data payload.

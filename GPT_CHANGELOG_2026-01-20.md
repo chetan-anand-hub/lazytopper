@@ -17,3 +17,11 @@ Before/After behavior:
 Migration notes:
 - No data migrations required.
 - Backend now accepts optional payload.doubtContext and may return diagramType/diagramLabels in mentor JSON.
+
+---
+
+Learn DoD Run2 + Security updates:
+- Added Learn-mode structured schemas with multi-pass repair + seed fallback to avoid student-facing schema errors.
+- Made Learn mentor headers mode-specific (Lesson Plan) and added explicit card context in mentor payloads.
+- Expanded deterministic triangle diagrams and added a zoom toggle.
+- Hardened secret handling: updated `.gitignore`, placeholder-only `server/.env.example`, and added security notes.

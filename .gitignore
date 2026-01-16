@@ -6,6 +6,8 @@ build
 # Env files
 .env
 .env.*
+**/.env
+**/.env.*
 *.log
 
 # OS junk
@@ -29,6 +31,12 @@ server/.env
 server/.env.*
 .env
 .env.*
+**/.env
+**/.env.*
+*.key
+*.pem
+*.p12
+*.keystore
 
 !server/.env.example
 _rollback/
