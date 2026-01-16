@@ -18,6 +18,28 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const ts = require('typescript');
+
+require.extensions['.ts'] = (module, filename) => {
+  try {
+    const source = fs.readFileSync(filename, 'utf8');
+    const transpiled = ts.transpileModule(source, {
+      compilerOptions: {
+        module: 'CommonJS',
+        target: 'ES2020',
+        esModuleInterop: true,
+      },
+      fileName: path.basename(filename),
+    });
+    module._compile(transpiled.outputText, filename);
+  } catch (err) {
+    throw err;
+  }
+};
+
+const { buildTrianglesGrindContractPrompt } = require(
+  path.join(__dirname, '../src/prompts/grind/trianglesGrindContract.ts')
+);
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -192,6 +214,18 @@ function buildExplainUserPrompt(payload) {
     parts.push(String(questionText).trim());
   }
   return parts.filter(Boolean).join(' ');
+}
+
+function buildGrindTrianglesUserPrompt(payload) {
+  const nodeTitle = (payload?.mindmapNodeTitle && String(payload.mindmapNodeTitle).trim()) || 'the selected grind node';
+  const grade = payload?.grade != null ? String(payload.grade) : 'unknown grade';
+  const subject = payload?.subject ? String(payload.subject).trim() : 'Maths/Science';
+  const contextLines = [
+    `Prepare a ${subject} grind contract for Class ${grade} focused on "${nodeTitle}".`,
+    payload?.doubtContext ? String(payload.doubtContext).trim() : '',
+    payload?.mindmapNodeText ? `Node notes: ${String(payload.mindmapNodeText).trim()}` : '',
+  ].filter(Boolean);
+  return contextLines.join('\n\n');
 }
 
 function isLearnMisconceptionPayload(payload) {
@@ -2329,6 +2363,10 @@ async function handleRequest(req, res) {
       }
     }
 
+    if (mode === 'grind_triangles_v1') {
+      systemPrompt = buildTrianglesGrindContractPrompt(payload);
+    }
+
     // Fallback defaults
     if (!systemPrompt) {
       switch (normalisedMode) {
@@ -2419,6 +2457,9 @@ async function handleRequest(req, res) {
         case 'coach':
         case 'mindset':
           userPrompt = buildCoachUserPrompt(payload);
+          break;
+        case 'grind_triangles_v1':
+          userPrompt = buildGrindTrianglesUserPrompt(payload);
           break;
         default:
           return sendJson(res, 400, { error: `Unsupported mode: ${mode}` });
