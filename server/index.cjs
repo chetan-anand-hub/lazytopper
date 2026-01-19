@@ -2392,7 +2392,6 @@ async function handleRequest(req, res) {
     if (isMisconceptionExplain || isCompetencyExplain) normalisedMode = 'explain';
     if (isTrianglesEvaluation) {
       normalisedMode = 'solve_with_me';
-      handlerUsed = 'triangles_evaluation';
     }
     if (isLearnKeyDefinitions && solveStyle === 'board') normalisedMode = 'learn_teach';
     if (isProofWriting && solveStyle === 'board') normalisedMode = 'learn_proof';
@@ -2410,7 +2409,9 @@ async function handleRequest(req, res) {
       }
     }
 
-    if (mode === 'grind_triangles_v1') {
+    const isGrindContractMode =
+      normalisedMode === 'grind_triangles_v1' || mode === 'grind_triangles_v1';
+    if (isGrindContractMode) {
       systemPrompt = buildTrianglesGrindContractPrompt(payload);
       handlerUsed = 'triangles_grind_contract';
     }

@@ -4025,6 +4025,22 @@ function GrindDrawerV1(props: {
     ].filter(Boolean).join('\n');
     const nodeText = String(activeNode?.text || activeNode?.description || '');
     const selectedNodeId = String(activeNode?.nodeId || nodeId || '');
+    const subtopicCandidate =
+      activeNode?.subtopicKey || activeNode?.conceptKey || activeNode?.chapter || topicKey || '';
+    const subtopicKey = String(subtopicCandidate || '').trim();
+    const difficultyRaw =
+      typeof activeNode?.difficulty === 'string' && activeNode.difficulty.trim()
+        ? activeNode.difficulty.trim()
+        : '';
+    const difficultyValue = difficultyRaw ? difficultyRaw.toLowerCase() : 'medium';
+    const marksCandidate =
+      activeNode?.rubric?.totalMarksTypical ??
+      activeNode?.rubric?.total_marks ??
+      activeNode?.marks ??
+      activeNode?.examWeight ??
+      null;
+    const marksValue = Number(marksCandidate);
+    const includeMarks = Number.isFinite(marksValue) && marksValue > 0;
 
     try {
       const body = {
@@ -4044,6 +4060,9 @@ function GrindDrawerV1(props: {
           doubtContext: context,
           contextText: context,
           questionText: q,
+          difficulty: difficultyValue,
+          ...(subtopicKey ? { subtopicKey } : {}),
+          ...(includeMarks ? { marks: marksValue } : {}),
         },
         messages: [{ role: 'user', content: `Student doubt: ${q}` }],
       };
