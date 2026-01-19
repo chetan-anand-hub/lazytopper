@@ -287,6 +287,37 @@ function isLearnCompetencyPayload(payload) {
   return false;
 }
 
+const STRUCTURED_MODES = ['board_steps_ms', 'solve_with_me', 'learn_teach', 'learn_proof', 'learn_mindmap'];
+const MODE_ALIASES = {
+  planner: 'plan',
+  examcoach: 'coach',
+  topic_explain: 'explain',
+  topic_exam_tips: 'coach',
+  topic_solve: 'solve',
+  solve_with_me: 'solve_with_me',
+  board_steps_ms: 'board_steps_ms',
+  board_steps: 'board_steps_ms',
+  learn_teach: 'learn_teach',
+  learn_proof: 'learn_proof',
+  learn_mindmap: 'learn_mindmap',
+  explain: 'explain',
+  coach: 'coach',
+  plan: 'plan',
+  solve: 'solve',
+};
+
+function normalizeIncomingMode(rawMode) {
+  if (!rawMode && rawMode !== 0) return '';
+  const value = String(rawMode || '').trim();
+  if (!value) return '';
+  const key = value.toLowerCase();
+  return MODE_ALIASES[key] || value;
+}
+
+function isStructuredMode(mode) {
+  return STRUCTURED_MODES.includes(mode);
+}
+
 function isLearnKeyDefinitionsPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
   const section = String(payload.section || '').toLowerCase();
@@ -1253,7 +1284,8 @@ function buildProofFallbackBoardSteps(payload) {
       { text: 'Conclusion: Hence proved as required.', marks: lastStep, whyThisGetsMarks: 'Closes the proof.', commonMistake: 'No conclusion line.' },
     ],
     finalAnswer: 'Use the structured proof above; retry for a full solution.',
-    warnings: ['Proof format fallback used. Retry if you need a full worked proof.'],
+    warnings: ['Proof format fallback used. Retry if you need a full worked proof.', 'Schema fallback response used.'],
+    fallback_used: true,
   };
 }
 
@@ -1263,6 +1295,8 @@ function buildProofFallbackSolveWithMe(payload) {
     tutor:
       'Start with the Given and To Prove. What are the two triangles/segments involved, and what exactly must be proved?',
     answerFormat: 'Short sentence',
+    fallback_used: true,
+    fallback_note: 'Schema fallback was used for solve_with_me.',
   };
 }
 
@@ -1850,6 +1884,7 @@ function buildLearnTeachFallback(payload) {
       checkQuestion: 'Which criterion applies here?',
       diagramType,
       diagramLabels,
+      fallback_used: true,
     };
   }
   if (hasMindmapContext) {
@@ -1885,6 +1920,7 @@ function buildLearnTeachFallback(payload) {
       checkQuestion: node?.checkQuestion || seed.keyDefinitions.checkQuestion,
       diagramType,
       diagramLabels,
+      fallback_used: true,
     };
   }
   return {
@@ -1898,6 +1934,7 @@ function buildLearnTeachFallback(payload) {
     checkQuestion: seed.keyDefinitions.checkQuestion,
     diagramType: seed.keyDefinitions.diagramType || diagramType,
     diagramLabels: seed.keyDefinitions.diagramLabels || diagramLabels,
+    fallback_used: true,
   };
 }
 
@@ -1919,6 +1956,7 @@ function buildLearnProofFallback(payload) {
       totalMarks: 2,
       diagramType,
       diagramLabels,
+      fallback_used: true,
     };
   }
   const marksRaw = payload?.marks ?? payload?.totalMarks ?? payload?.total_marks;
@@ -1935,6 +1973,7 @@ function buildLearnProofFallback(payload) {
     totalMarks,
     diagramType: seed.proof.diagramType || diagramType,
     diagramLabels: seed.proof.diagramLabels || diagramLabels,
+    fallback_used: true,
   };
 }
 
@@ -1958,6 +1997,7 @@ function buildLearnMindmapFallback(payload) {
     checkQuestion: node?.checkQuestion || 'Which criterion applies here?',
     diagramType,
     diagramLabels,
+    fallback_used: true,
   };
 }
 
@@ -1969,7 +2009,19 @@ function buildLearnSolveWithMeFallback(payload) {
     answerFormat: seed?.solveWithMe?.answerFormat || 'Short sentence',
     diagramType: inferDiagramType(payload),
     diagramLabels: diagramLabelsForType(inferDiagramType(payload)),
+    fallback_used: true,
   };
+}
+
+function buildStructuredFallback(mode, payload, opts = {}) {
+  if (mode === 'board_steps_ms') return buildProofFallbackBoardSteps(payload);
+  if (mode === 'solve_with_me') {
+    return opts.learn ? buildLearnSolveWithMeFallback(payload) : buildProofFallbackSolveWithMe(payload);
+  }
+  if (mode === 'learn_teach') return buildLearnTeachFallback(payload);
+  if (mode === 'learn_proof') return buildLearnProofFallback(payload);
+  if (mode === 'learn_mindmap') return buildLearnMindmapFallback(payload);
+  return null;
 }
 
 function buildLearnKeyDefinitionsPrompt(payload) {
@@ -2335,23 +2387,18 @@ async function handleRequest(req, res) {
 
     if (!mode) return sendJson(res, 400, { error: 'Missing "mode" in request body' });
 
-    let normalisedMode = mode;
-    if (mode === 'planner') normalisedMode = 'plan';
-    if (mode === 'examCoach') normalisedMode = 'coach';
-    // TopicHub / MentorPanel aliases
-    if (mode === 'topic_explain') normalisedMode = 'explain';
-    if (mode === 'topic_exam_tips') normalisedMode = 'coach';
-    if (mode === 'topic_solve') normalisedMode = 'solve';
-    if (mode === 'solve_with_me') normalisedMode = 'solve_with_me';
-    if (mode === 'board_steps_ms') normalisedMode = 'board_steps_ms';
-    if (mode === 'learn_teach') normalisedMode = 'learn_teach';
-    if (mode === 'learn_proof') normalisedMode = 'learn_proof';
-    if (mode === 'learn_mindmap') normalisedMode = 'learn_mindmap';
+    let normalisedMode = normalizeIncomingMode(mode) || mode;
     if (isMindmapTeach) normalisedMode = 'learn_mindmap';
     if (isMisconceptionExplain || isCompetencyExplain) normalisedMode = 'explain';
-    if (isTrianglesEvaluation) normalisedMode = 'solve_with_me';
+    if (isTrianglesEvaluation) {
+      normalisedMode = 'solve_with_me';
+      handlerUsed = 'triangles_evaluation';
+    }
     if (isLearnKeyDefinitions && solveStyle === 'board') normalisedMode = 'learn_teach';
     if (isProofWriting && solveStyle === 'board') normalisedMode = 'learn_proof';
+
+    let handlerUsed = persona && typeof persona === 'object' ? 'persona_prompt' : `prompt_builder:${normalisedMode}`;
+    if (isTrianglesEvaluation) handlerUsed = 'triangles_evaluation';
 
     // Build system prompt from persona (if provided as object)
     let systemPrompt = '';
@@ -2365,6 +2412,7 @@ async function handleRequest(req, res) {
 
     if (mode === 'grind_triangles_v1') {
       systemPrompt = buildTrianglesGrindContractPrompt(payload);
+      handlerUsed = 'triangles_grind_contract';
     }
 
     // Fallback defaults
@@ -2510,102 +2558,108 @@ ${userPrompt}` }] },
 
       let finalText = reply.text;
       let structured = null;
+      let repairUsed = false;
+      let fallbackUsed = false;
+      const schemaUsedTrace = isStructuredMode(normalisedMode) ? `schema_${normalisedMode}` : 'text';
 
-        const structuredModes = ['board_steps_ms', 'solve_with_me', 'learn_teach', 'learn_proof', 'learn_mindmap'];
-        if (structuredModes.includes(normalisedMode)) {
+      if (isStructuredMode(normalisedMode)) {
+        structured = tryParseJsonStrict(finalText);
+        const isFirstTurn =
+          normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
+            ? reqJson.messages.length <= 1
+            : false;
+        let check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+        const isLearnStructured =
+          normalisedMode === 'learn_teach' ||
+          normalisedMode === 'learn_proof' ||
+          normalisedMode === 'learn_mindmap' ||
+          (normalisedMode === 'solve_with_me' && isTrianglesLearnPayload(payload));
+
+        if (!check.ok) {
+          repairUsed = true;
+          const clipped = String(finalText || '').slice(0, 8000);
+          const repairPrompt = buildRepairPromptForMode(normalisedMode, payload, clipped, check.issues);
+          const repairContents = [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
+          ];
+          const repaired = await callGemini(GEMINI_MODEL, repairContents, {
+            maxOutputTokens,
+            temperature: 0.2,
+          });
+          finalText = repaired.text;
           structured = tryParseJsonStrict(finalText);
-          const isFirstTurn =
-            normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
-              ? reqJson.messages.length <= 1
-              : false;
-          let check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
-          const isLearnStructured =
-            normalisedMode === 'learn_teach' ||
-            normalisedMode === 'learn_proof' ||
-            normalisedMode === 'learn_mindmap' ||
-            (normalisedMode === 'solve_with_me' && isTrianglesLearnPayload(payload));
+          check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+        }
 
-          if (!check.ok) {
-            const clipped = String(finalText || '').slice(0, 8000);
-            const repairPrompt = buildRepairPromptForMode(normalisedMode, payload, clipped, check.issues);
-            const repairContents = [
-              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
-            ];
+        if (!check.ok && isLearnStructured) {
+          repairUsed = true;
+          const strictPrompt = buildRepairPromptForMode(
+            normalisedMode,
+            payload,
+            String(finalText || '').slice(0, 8000),
+            check.issues
+          );
+          const strictContents = [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\n${strictPrompt}` }] },
+          ];
+          const strictReply = await callGemini(GEMINI_MODEL, strictContents, {
+            maxOutputTokens,
+            temperature: 0.1,
+          });
+          finalText = strictReply.text;
+          structured = tryParseJsonStrict(finalText);
+          check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
+        }
 
-            const repaired = await callGemini(GEMINI_MODEL, repairContents, {
-              maxOutputTokens,
-              temperature: 0.2,
-            });
-
-            finalText = repaired.text;
-            structured = tryParseJsonStrict(finalText);
-            check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
-          }
-
-          if (!check.ok && isLearnStructured) {
-            const strictPrompt = buildRepairPromptForMode(
-              normalisedMode,
-              payload,
-              String(finalText || '').slice(0, 8000),
-              check.issues
-            );
-            const strictContents = [
-              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${strictPrompt}` }] },
-            ];
-            const strictReply = await callGemini(GEMINI_MODEL, strictContents, {
-              maxOutputTokens,
-              temperature: 0.1,
-            });
-            finalText = strictReply.text;
-            structured = tryParseJsonStrict(finalText);
-            check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
-          }
-
-          if (!check.ok) {
-            if (isLearnStructured) {
-              if (normalisedMode === 'learn_teach') structured = buildLearnTeachFallback(payload);
-              else if (normalisedMode === 'learn_proof') structured = buildLearnProofFallback(payload);
-              else if (normalisedMode === 'learn_mindmap') structured = buildLearnMindmapFallback(payload);
-              else if (normalisedMode === 'solve_with_me') structured = buildLearnSolveWithMeFallback(payload);
-            } else {
-              console.warn('[mentor] schema mismatch:', check.issues);
+        if (!check.ok) {
+          if (isLearnStructured) {
+            structured = buildStructuredFallback(normalisedMode, payload, { learn: true });
+          } else {
+            console.warn('[mentor] schema mismatch, falling back:', normalisedMode, check.issues);
+            structured = buildStructuredFallback(normalisedMode, payload);
+            if (!structured) {
               return sendJson(res, 422, {
                 error: 'Mentor response did not match schema. Retry.',
               });
             }
           }
-
-          if (isTrianglesEvaluation) {
-            let evalCheck = validateTrianglesEvaluation(structured);
-            if (!evalCheck.ok) {
-              const repairPrompt = buildTrianglesEvaluationRepairPrompt(payload, evalCheck.issues);
-              const repairContents = [
-                { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
-              ];
-              const repaired = await callGemini(GEMINI_MODEL, repairContents, {
-                maxOutputTokens,
-                temperature: 0.2,
-              });
-              finalText = repaired.text;
-              structured = tryParseJsonStrict(finalText);
-              evalCheck = validateTrianglesEvaluation(structured);
-            }
-            if (!evalCheck.ok) {
-              structured = buildTrianglesEvaluationFallback(payload);
-            }
-          }
-
-          if (normalisedMode === 'board_steps_ms') {
-            structured = normalizeBoardSteps(structured);
-            structured = ensureDiagramFields(structured, payload);
-          }
-
-          if (normalisedMode === 'solve_with_me') {
-            structured = ensureDiagramFields(structured, payload);
-          }
-
-          finalText = JSON.stringify(structured);
+          fallbackUsed = true;
+          check = { ok: true, issues: [] };
         }
+
+        if (isTrianglesEvaluation) {
+          let evalCheck = validateTrianglesEvaluation(structured);
+          if (!evalCheck.ok) {
+            repairUsed = true;
+            const repairPrompt = buildTrianglesEvaluationRepairPrompt(payload, evalCheck.issues);
+            const repairContents = [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${repairPrompt}` }] },
+            ];
+            const repaired = await callGemini(GEMINI_MODEL, repairContents, {
+              maxOutputTokens,
+              temperature: 0.2,
+            });
+            finalText = repaired.text;
+            structured = tryParseJsonStrict(finalText);
+            evalCheck = validateTrianglesEvaluation(structured);
+          }
+          if (!evalCheck.ok) {
+            structured = buildTrianglesEvaluationFallback(payload);
+            fallbackUsed = true;
+          }
+        }
+
+        if (normalisedMode === 'board_steps_ms') {
+          structured = normalizeBoardSteps(structured);
+          structured = ensureDiagramFields(structured, payload);
+        }
+
+        if (normalisedMode === 'solve_with_me') {
+          structured = ensureDiagramFields(structured, payload);
+        }
+
+        finalText = JSON.stringify(structured);
+      }
 
       if (isMisconceptionExplain) {
         finalText = sanitizeExplainOutput(finalText);
@@ -2715,11 +2769,21 @@ ${userPrompt}` }] },
         finalText = JSON.stringify(structured);
       }
 
+      const validStructured =
+        structured && isValidMentorProtocol(structured, normalisedMode) ? structured : null;
+      const trace = {
+        normalized_mode: normalisedMode,
+        handler_used: handlerUsed,
+        schema_used: schemaUsedTrace,
+        repair_used: repairUsed,
+      };
+      if (fallbackUsed) trace.fallback_used = true;
       return sendJson(res, 200, {
         ok: true,
         data: {
           text: finalText,
-          structured: structured && isValidMentorProtocol(structured, normalisedMode) ? structured : null,
+          structured: validStructured,
+          trace,
         },
       });
     } catch (err) {
