@@ -44,3 +44,7 @@ _handoff/
 git/
 powershell/
 docs/session/_untracked_notes/
+
+# Playwright outputs
+test-results/
+playwright-report/
