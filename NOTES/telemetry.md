@@ -1,6 +1,6 @@
 # BSRE Telemetry Counters
 
-- **Module:** `server/telemetry.js`
+- **Module:** `server/telemetry.cjs`
 - **Counters tracked:**
   - `bsre_eval_called` – incremented before invoking the evaluator.
   - `bsre_eval_completed` – incremented after a successful evaluation.

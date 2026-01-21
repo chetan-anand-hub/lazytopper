@@ -41,7 +41,7 @@ const { buildTrianglesGrindContractPrompt } = require(
   path.join(__dirname, '../src/prompts/grind/trianglesGrindContract.ts')
 );
 
-const telemetry = require('./telemetry');
+const telemetry = require('./telemetry.cjs');
 const trianglesRubricsData = require(
   path.join(__dirname, '../src/data/bsre/triangles_bsre_rubrics_v1.json')
 );
