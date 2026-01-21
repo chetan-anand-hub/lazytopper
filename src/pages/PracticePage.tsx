@@ -1265,6 +1265,8 @@ function MentorSolveDrawer(props: {
             section: seed?.section,
             solveStyle: "socratic",
             vibe: "zombie",
+            studentAttempt: trimmed,
+            studentAnswer: trimmed,
           },
           messages: nextHistory,
         }),

@@ -3241,6 +3241,8 @@ const renderAssistantContent = (raw: string) => {
             mindmapNodeTitle: seedExample?.mindmapNodeTitle,
             mindmapCoreId: seedExample?.mindmapCoreId,
             mindmapNodeText: seedExample?.mindmapNodeText,
+            studentAttempt: trimmed,
+            studentAnswer: trimmed,
             doubtContext: buildDoubtContext(nextHistory),
           },
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
