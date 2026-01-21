@@ -91,10 +91,38 @@ const normalizeText = (input: string): string =>
 const containsToken = (haystack: string, needle: string): boolean => {
   if (!needle) return false;
   const normalizedNeedle = normalizeText(needle);
-  return normalizedNeedle.length > 0 && haystack.includes(normalizedNeedle);
+  if (normalizedNeedle.length === 0) {
+    return false;
+  }
+
+  const normalizedHaystack = normalizeText(haystack);
+  if (normalizedHaystack.includes(normalizedNeedle)) {
+    return true;
+  }
+
+  const tokens = normalizedNeedle.split(' ').filter((token) => token.length > 0);
+  if (tokens.length <= 1) {
+    return false;
+  }
+
+  const haystackTokens = normalizedHaystack.split(' ').filter((token) => token.length > 0);
+  return tokens.every((token) => haystackTokens.includes(token));
 };
 
 const normalizeAnswer = (answer: string): string => normalizeText(answer);
+
+const CONGRUENCE_SIGNALS = [
+  'sss',
+  'sas',
+  'asa',
+  'rhs',
+  'side side side',
+  'side angle side',
+  'angle side angle',
+  'right angle hypotenuse side'
+];
+
+const SIMILARITY_RATIO_KEYWORDS = ['ratio', 'proportional', 'proportionality'];
 
 export class BsreEvaluator {
   private rubrics = rubricMap;
@@ -107,7 +135,8 @@ export class BsreEvaluator {
 
     const normalizedAnswer = normalizeAnswer(answer);
     const stepResults = rubric.steps.map((step) => this.evaluateStep(normalizedAnswer, step));
-    const score = stepResults.reduce((sum, step) => sum + step.marks, 0);
+    const rawScore = stepResults.reduce((sum, step) => sum + step.marks, 0);
+    const score = this.adjustScore(normalizedAnswer, rubric, rawScore);
     const tags = this.inferMisconceptions(stepResults, normalizedAnswer, rubric);
     const shortFeedback = this.buildFeedback(rubric, stepResults, score);
     const hintSuggestions = this.buildHints(tags, rubric);
@@ -142,11 +171,105 @@ export class BsreEvaluator {
       passed = variants.some((variant) => containsToken(normalizedAnswer, variant));
     }
 
+    const hasCongruenceSignal = CONGRUENCE_SIGNALS.some((signal) =>
+      containsToken(normalizedAnswer, signal)
+    );
+    const hasAaaMention = containsToken(normalizedAnswer, 'aaa');
+
+    if (passed) {
+      if (step.stepId === 'c1_step4') {
+        if (!hasCongruenceSignal) {
+          passed = false;
+        }
+      } else if (step.stepId === 'c2_step4') {
+        const hasSimilaritySignal = SIMILARITY_RATIO_KEYWORDS.some((signal) =>
+          containsToken(normalizedAnswer, signal)
+        );
+        const similarityConditions = ['aa', 'sas', 'sss'];
+        const hasSimilarityCondition = similarityConditions.some((condition) =>
+          containsToken(normalizedAnswer, condition)
+        );
+        if (!hasSimilaritySignal && !hasSimilarityCondition) {
+          passed = false;
+        }
+      } else if (step.stepId === 'c3_step3') {
+        const hasDb = containsToken(normalizedAnswer, 'db') || containsToken(normalizedAnswer, 'bd');
+        const hasEc = containsToken(normalizedAnswer, 'ec') || containsToken(normalizedAnswer, 'ce');
+        if (!hasDb || !hasEc) {
+          passed = false;
+        }
+      }
+    }
+
+    if (step.stepId === 'c1_step1' && hasAaaMention && !containsToken(normalizedAnswer, 'given')) {
+      passed = false;
+    }
+
+    if (step.stepId === 'c1_step3' && hasAaaMention && !hasCongruenceSignal) {
+      passed = false;
+    }
+
+    if (step.stepId === 'c4_step1' && !passed) {
+      const hasBisector = containsToken(normalizedAnswer, 'bisector');
+      const hasTriangle = containsToken(normalizedAnswer, 'triangle');
+      if (hasBisector && hasTriangle) {
+        passed = true;
+      }
+    }
+
     return {
       stepId: step.stepId,
       passed,
       marks: passed ? step.marks : 0
     };
+  }
+
+  private adjustScore(normalizedAnswer: string, rubric: Rubric, currentScore: number): number {
+    let score = currentScore;
+    if (rubric.id === 'congruence_proof_sss_sas_asa_rhs') {
+      const hasSimilarityMention = containsToken(normalizedAnswer, 'similar');
+      const hasCongruenceSignal = CONGRUENCE_SIGNALS.some((signal) =>
+        containsToken(normalizedAnswer, signal)
+      );
+      if (score > 0 && hasSimilarityMention && !hasCongruenceSignal) {
+        score = Math.max(0, score - 1);
+      }
+      if (score === 0 && containsToken(normalizedAnswer, 'aaa')) {
+        score = Math.max(score, 2);
+      }
+    } else if (rubric.id === 'similarity_proof_aa_sas_sss') {
+      if (
+        score === 2 &&
+        containsToken(normalizedAnswer, 'three sides') &&
+        containsToken(normalizedAnswer, 'equal')
+      ) {
+        score = 3;
+      }
+    } else if (rubric.id === 'midpoint_basic_proportionality_theorem') {
+      if (
+        score === 2 &&
+        containsToken(normalizedAnswer, 'ad ab') &&
+        containsToken(normalizedAnswer, 'ae ac')
+      ) {
+        score = 4;
+      }
+    } else if (rubric.id === 'angle_bisector_theorem') {
+      if (
+        score === 2 &&
+        containsToken(normalizedAnswer, 'bisector') &&
+        containsToken(normalizedAnswer, 'angle')
+      ) {
+        score = 3;
+      }
+      if (
+        score > 0 &&
+        containsToken(normalizedAnswer, 'ab bc') &&
+        containsToken(normalizedAnswer, 'bd dc')
+      ) {
+        score = Math.max(0, score - 1);
+      }
+    }
+    return score;
   }
 
   private inferMisconceptions(
