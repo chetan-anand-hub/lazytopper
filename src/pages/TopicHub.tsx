@@ -17,6 +17,7 @@ import { useVibeMode } from "../context/vibeModeContext";
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
+import { MENTOR_ENDPOINT } from "../ai/aiClient";
 
 type SubjectKey = "maths" | "science";
 type ModeKey = "zombie" | "beast";
@@ -1811,7 +1812,7 @@ function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(nextTab, undefined, opts?.prompt);
-        const res = await fetch("/api/mentor", {
+        const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -1895,7 +1896,7 @@ function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(tab, doubtContext, prompt);
-        const res = await fetch("/api/mentor", {
+        const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -3130,7 +3131,7 @@ const renderAssistantContent = (raw: string) => {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/mentor", {
+      const res = await fetch(MENTOR_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3211,7 +3212,7 @@ const renderAssistantContent = (raw: string) => {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/mentor", {
+      const res = await fetch(MENTOR_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4069,7 +4070,7 @@ function GrindDrawerV1(props: {
         messages: [{ role: 'user', content: `Student doubt: ${q}` }],
       };
 
-      const res = await fetch('/api/mentor', {
+      const res = await fetch(MENTOR_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

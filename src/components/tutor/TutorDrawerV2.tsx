@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { DiagramBlock } from "../DiagramBlock";
+import { MENTOR_ENDPOINT } from "../../ai/aiClient";
 
 type ModeKey = "zombie" | "beast";
 type TutorTab = "teach" | "examples";
@@ -191,7 +192,7 @@ export default function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(nextTab, undefined, opts?.prompt);
-        const res = await fetch("/api/mentor", {
+        const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -275,7 +276,7 @@ export default function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(tab, doubtContext, prompt);
-        const res = await fetch("/api/mentor", {
+        const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),

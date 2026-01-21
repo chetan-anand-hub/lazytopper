@@ -6,7 +6,7 @@ import { type PracticeQuestion } from "../data/predictionDataService";
 import { generatePracticeSet, inferBoardPatternFromQuestion, normalizeBoardPattern } from "../data/practiceSetGenerator";
 import { promptDPracticePacks } from "../data/promptDPracticePacks";
 import { resolveTopicKey as resolveCanonicalTopicKey, toPracticePackKey } from "../utils/topicResolver";
-import { generateMoreLikeThis } from "../ai/aiClient";
+import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
@@ -1198,7 +1198,7 @@ function MentorSolveDrawer(props: {
     setMessages([firstUser]);
 
     try {
-      const res = await fetch("/api/mentor", {
+      const res = await fetch(MENTOR_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1251,7 +1251,7 @@ function MentorSolveDrawer(props: {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/mentor", {
+      const res = await fetch(MENTOR_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -71,6 +71,7 @@ export interface MoreLikeThisResponse {
 }
 
 const API_BASE = "/api"; // Vite dev proxy or same origin in production
+export const MENTOR_ENDPOINT = `${API_BASE}/mentor`;
 
 async function handleJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -102,7 +103,7 @@ export async function callMentor(
   payload: MentorPayload,
   persona?: MentorPersona
 ): Promise<MentorResponse> {
-  const res = await fetch(`${API_BASE}/mentor`, {
+  const res = await fetch(MENTOR_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
