@@ -10,7 +10,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "node server/index.cjs"
+    "server": "node server/index.cjs",
+    "check:mojibake": "node scripts/check-mojibake.cjs"
   },
   "dependencies": {
     "react": "^19.2.0",
