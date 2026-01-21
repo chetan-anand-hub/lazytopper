@@ -724,6 +724,11 @@ function isTrianglesBsreEnabled() {
   return ['1', 'true', 'yes', 'on'].includes(flag);
 }
 
+function isNoProviderEnabled() {
+  const flag = String(process.env.LT_NO_PROVIDER || '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(flag);
+}
+
 let bsreEvaluatorInstance = null;
 function getBsreEvaluator() {
   if (!bsreEvaluatorInstance) {
@@ -806,13 +811,13 @@ function buildBsreStructured(evaluation, payload) {
   };
 }
 
-function runBsreEvaluation(payload, attempt) {
+function runBsreEvaluation(payload, attempt, rubricIdOverride) {
   const studentAnswer = String(attempt || '').trim();
   if (!studentAnswer) {
     throw new Error('Student attempt is empty.');
   }
 
-  const rubricId = determineBsreRubricId(payload);
+  const rubricId = String(rubricIdOverride || determineBsreRubricId(payload));
   const evaluator = getBsreEvaluator();
   telemetry.increment('bsre_eval_called');
 
@@ -2513,10 +2518,17 @@ async function handleRequest(req, res) {
     const trianglesAttempt = isTrianglesEvaluation
       ? extractStudentAttempt(payload, reqJson?.messages)
       : '';
-    if (isTrianglesEvaluation && isTrianglesBsreEnabled() && trianglesAttempt) {
+    const trianglesFlag = isTrianglesBsreEnabled();
+    const noProvider = isNoProviderEnabled();
+    const shouldRunBsre = isTrianglesEvaluation && trianglesFlag && trianglesAttempt;
+    if (shouldRunBsre) {
+      const bsreRubricId = determineBsreRubricId(payload);
+      console.info(`[BSRE_ENTRY] flag=true rubric=${bsreRubricId} no_provider=${noProvider}`);
+      telemetry.increment('bsre_entry');
+      if (noProvider) telemetry.increment('bsre_no_provider');
       let bsreStructured = null;
       try {
-        bsreStructured = runBsreEvaluation(payload, trianglesAttempt);
+        bsreStructured = runBsreEvaluation(payload, trianglesAttempt, bsreRubricId);
       } catch (err) {
         telemetry.increment('bsre_eval_error');
         console.warn('[bsre] evaluation failed, falling back to Gemini:', err?.message || err);
@@ -2537,6 +2549,9 @@ async function handleRequest(req, res) {
           },
         });
       }
+    } else {
+      console.info(`[LEGACY_ENTRY] flag=${trianglesFlag ? 'true' : 'false'} no_provider=${noProvider}`);
+      telemetry.increment('legacy_entry');
     }
 
     if (!mode) return sendJson(res, 400, { error: 'Missing "mode" in request body' });
@@ -2680,6 +2695,29 @@ async function handleRequest(req, res) {
       ...history,
       { role: 'user', parts: [{ text: String(userPrompt || '').trim() }] },
     ].filter((c) => c && c.parts && c.parts[0] && String(c.parts[0].text || '').trim());
+
+    if (noProvider) {
+      console.info('[NO_PROVIDER_SKIP_PROVIDER]=1');
+      telemetry.increment('provider_skipped');
+      const trace = {
+        normalized_mode: normalisedMode,
+        handler_used: handlerUsed,
+        schema_used: 'text',
+        repair_used: false,
+        fallback_used: true,
+      };
+      return sendJson(res, 200, {
+        ok: true,
+        data: {
+          text: JSON.stringify({
+            message: 'LT_NO_PROVIDER guard active; deterministic response provided.',
+            noProvider: true,
+          }),
+          structured: null,
+          trace,
+        },
+      });
+    }
 
     try {
       const marksRaw = payload && (payload.marks ?? payload.totalMarks ?? payload.total_marks);
