@@ -265,7 +265,7 @@ if (!v2) {
     }}>
         <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 16px" }}>
           <div style={{ opacity: 0.7, marginBottom: 10 }}>
-            Class {grade} Ã¢â‚¬Â¢ {subject.toUpperCase()}
+            Class {grade} • {subject.toUpperCase()}
           </div>
 
           <h1 style={{ fontSize: 44, margin: "8px 0 8px" }}>{topicKey}</h1>
@@ -302,7 +302,7 @@ if (!v2) {
   const definitions = safeArray<V2Definition>((v2 as any).definitions);
   const markingTips = safeArray<string>((v2 as any).markingTips);
   const scoreTips = safeArray<string>((v2 as any).scoreTips);
-// Board-pattern anchors (AÃ¢â‚¬"E) pulled from the canonical question bank for this topic.
+// Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
 const [exampleSection, setExampleSection] = useState<"A" | "B" | "C" | "D" | "E">("A");
 
 const exampleAnchors = useMemo(() => {
@@ -408,7 +408,7 @@ const buildFallbackWorkedExampleQuestion = useCallback(
       const marksBySectionLocal: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 };
       const marks = marksBySectionLocal[section] ?? 2;
 
-      const header = `Class ${grade} ${subjectTitle} Ã¢â‚¬Â¢ ${title}`;
+  const header = `Class ${grade} ${subjectTitle} • ${title}`;
       const diagramLine = isDiagramTopic
         ? `Diagram: Draw a neat labelled diagram wherever applicable.`
         : "";
@@ -441,7 +441,7 @@ In ?ABC, D lies on AB and E lies on AC. If DE ? BC, AD = 3 cm, DB = 6 cm and EC 
             return `${header}
 
 Pattern C (${marks} marks):
-(i) In ?ABC, ?A = 50Ã‚Â°, ?B = 60Ã‚Â°. In ?PQR, ?P = 50Ã‚Â°, ?Q = 60Ã‚Â°. Prove ?ABC ~ ?PQR.
+(i) In ?ABC, ?A = 50°, ?B = 60°. In ?PQR, ?P = 50°, ?Q = 60°. Prove ?ABC ~ ?PQR.
 (ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ?ABC and ?PQR.`;
           case "D":
             return `${header}
@@ -459,7 +459,7 @@ ${diagramLine}
 
 Pattern E (${marks} marks, mixed concept):
 In a right triangle ?ABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
-(i) Prove that ABÃ‚Â² = BD Ã‚Â· BC and ACÃ‚Â² = CD Ã‚Â· BC.
+(i) Prove that AB² = BD · BC and AC² = CD · BC.
 (ii) If BD = 9 cm and BC = 25 cm, find AB.`;
           default:
             break;
@@ -739,7 +739,7 @@ const showInZombie = (sectionId: string) => {
 
           <div style={{ marginTop: 10, display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontSize: 14, opacity: 0.75 }}>
-              Class {grade} Ã¢â‚¬Â¢ {subject.toUpperCase()}
+              Class {grade} • {subject.toUpperCase()}
             </div>
 
             <div
@@ -990,7 +990,7 @@ Use CBSE exam language and include a labelled diagram.`,
                       return;
                     }
                     openMentorDrawer({
-                      title: `${title} Æ’?â€º Common misconceptions`,
+                    title: `${title} - Common misconceptions`,
                       question: `Act like a CBSE Class ${grade} teacher. For ${title}:
 
 1) List the TOP 5 common misconceptions students have.
@@ -1059,7 +1059,7 @@ Use CBSE exam language and include a labelled diagram.`,
                     }
                     const joined = scoreTips.slice(0, 10).map((x, i) => `${i + 1}. ${String(x || "")}`).join("\n");
                     openMentorDrawer({
-                      title: `Score tips Ã‚Â· ${title}`,
+                      title: `Score tips · ${title}`,
                       question:
                         `You are a CBSE Class ${grade} ${subjectTitle} mentor.\n` +
                         `Using these score tips, teach me how to write answers for FULL marks.\n\n` +
@@ -1081,7 +1081,7 @@ Use CBSE exam language and include a labelled diagram.`,
             </AccordionCard>
           )}
      {isGrind && showInZombie("worked-examples") && (
-  <AccordionCard id="worked-examples" title="Worked examples (Board patterns AÃ¢â‚¬"E)">
+  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A-E)">
     {(() => {
       const anchors = exampleAnchors as any;
       const exampleSections: Array<"A" | "B" | "C" | "D" | "E"> = ["A", "B", "C", "D", "E"];
@@ -1134,7 +1134,7 @@ Use CBSE exam language and include a labelled diagram.`,
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontWeight: 900 }}>
-                Example Ã¢â‚¬Â¢ Pattern {exampleSection}{" "}
+                Example • Pattern {exampleSection}{" "}
                 <span style={{ fontWeight: 700, opacity: 0.65 }}>
                   {isAnchor ? "(from bank)" : "(auto sample)"}
                 </span>
@@ -1169,7 +1169,7 @@ Use CBSE exam language and include a labelled diagram.`,
                 className="pill"
                 onClick={() =>
                   openMentorDrawer({
-                    title: `Pattern ${exampleSection} Ã¢â‚¬Â¢ ${title}`,
+                    title: `Pattern ${exampleSection} • ${title}`,
                     question:
                       `Solve this exact example in exam-ready steps.\n\n` +
                       `Pattern: ${exampleSection}\n` +
@@ -1194,7 +1194,7 @@ Use CBSE exam language and include a labelled diagram.`,
 
             {!isAnchor ? (
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                Note: this is an auto-sample because your bank doesnÃ¢â‚¬â„¢t have a stored anchor for
+                Note: this is an auto-sample because your bank doesn't have a stored anchor for
                 Pattern {exampleSection} yet. The Mentor can still solve it properly.
               </div>
             ) : null}
@@ -1211,7 +1211,7 @@ Use CBSE exam language and include a labelled diagram.`,
               >
                 <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 900 }}>
-                    Example Ã‚Â· Pattern {exampleSection} {typeof marks === "number" ? `Ã‚Â· ${marks} marks` : ""}
+                    Example · Pattern {exampleSection} {typeof marks === "number" ? `· ${marks} marks` : ""}
                   </div>
                   <div style={{ opacity: 0.7, fontSize: 12 }}>
                     {isAnchor ? "From your curated bank" : "Sample (fallback)"}
@@ -1275,7 +1275,7 @@ Use CBSE exam language and include a labelled diagram.`,
                           }
                           if (!list.length) return;
                           openMentorDrawer({
-                            title: `NCERT competency Ã‚Â· ${cid}`,
+                            title: `NCERT competency · ${cid}`,
                             question:
                               `Explain the NCERT competency ${cid} for Class ${grade} ${subjectTitle}.\n` +
                               `Competency: ${desc}\n\n` +
@@ -1294,7 +1294,7 @@ Use CBSE exam language and include a labelled diagram.`,
 
                       <div style={{ fontSize: 12, opacity: 0.75 }}>
                         Selected: <b>{cid}</b>
-                        {bloom ? <span> Ã¢â‚¬Â¢ {bloom}</span> : null}
+                        {bloom ? <span> • {bloom}</span> : null}
                       </div>
                     </div>
 
@@ -1319,7 +1319,7 @@ Use CBSE exam language and include a labelled diagram.`,
                           >
                             <b>{id}:</b> {String(c?.description || "")}
                             {c?.bloomLevel ? (
-                              <span style={{ opacity: 0.7 }}> Ã¢â‚¬Â¢ {String(c.bloomLevel)}</span>
+                              <span style={{ opacity: 0.7 }}> • {String(c.bloomLevel)}</span>
                             ) : null}
                           </li>
                         );
@@ -1340,7 +1340,7 @@ Use CBSE exam language and include a labelled diagram.`,
                   className="pill"
                   onClick={() =>
                     openMentorDrawer({
-                      title: `${title} Ã¢â‚¬Â¢ Lab / activities`,
+                      title: `${title} • Lab / activities`,
                       question: `Help me prepare for lab/activities in ${title}. Give the objective, steps, observations, and 2 viva questions with answers.`,
                       solveStyle: "board",
                     })
@@ -1411,7 +1411,7 @@ Use CBSE exam language and include a labelled diagram.`,
             <>
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
-                  Quick revision kit for <b>{title}</b> Ã¢â‚¬" mindmap, formula sheet, and top videos.
+                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <button
@@ -1419,7 +1419,7 @@ Use CBSE exam language and include a labelled diagram.`,
                     className="pill"
                     onClick={() =>
                       openMentorDrawer({
-                        title: `${title} Ã¢â‚¬Â¢ Resources`,
+                        title: `${title} • Resources`,
                         question: `Make me a 10-minute revision plan for ${title}. Keep it CBSE-focused and marks-friendly.`,
                         solveStyle: "socratic",
                       })
@@ -1433,7 +1433,7 @@ Use CBSE exam language and include a labelled diagram.`,
               <AccordionCard id="mindmap" title="Mindmap" defaultOpen>
                 {!mindMap ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
-                    Mindmap coming soon for this topic. (WeÃ¢â‚¬â„¢ll auto-fill as the bank grows.)
+                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
                   </div>
                 ) : (
                   <MindMapCanvas
@@ -1490,7 +1490,7 @@ Use CBSE exam language and include a labelled diagram.`,
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title} Ã¢â‚¬Â¢ Formula`,
+                                  title: `${title} • Formula`,
                                   question: `Teach me the formula: ${label}. Also show 2 solved CBSE-style examples where it is used.`,
                                   solveStyle: "socratic",
                                 })
@@ -1558,7 +1558,7 @@ Use CBSE exam language and include a labelled diagram.`,
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
-                                  title: `${title} Ã¢â‚¬Â¢ Video recap`,
+                                  title: `${title} • Video recap`,
                                   question: `Summarize the key takeaways for ${title} as a 1-page CBSE revision note. Add 3 mini-questions with answers.`,
                                   solveStyle: "socratic",
                                 })
@@ -2238,7 +2238,7 @@ function TutorDrawerV2(props: {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          You're learning: <b>{nodeTitle}</b> â€¢ Step {nodeIndex + 1} of {Math.max(1, order.length)}
+          You're learning: <b>{nodeTitle}</b> • Step {nodeIndex + 1} of {Math.max(1, order.length)}
         </div>
 
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2690,7 +2690,7 @@ if (!obj) {
   return stripped;
 }
 
-  // Board steps (one-shot) Ã¢â‚¬" show full marking scheme in an exam-friendly format.
+  // Board steps (one-shot) - show full marking scheme in an exam-friendly format.
   if (obj.kind === "board_steps_ms") {
     const total = Number(obj.totalMarks) || undefined;
     const steps = Array.isArray(obj.steps) ? obj.steps : [];
@@ -2700,7 +2700,7 @@ if (!obj) {
       return acc + (Number.isFinite(m) ? m : 0);
     }, 0);
     const headerSuffix = total
-      ? ` (Total: ${total} marks Ã‚Â· Steps: ${sumMarks} marks)`
+      ? ` (Total: ${total} marks · Steps: ${sumMarks} marks)`
       : sumMarks
       ? ` (Steps: ${sumMarks} marks)`
       : "";
@@ -2715,8 +2715,8 @@ if (!obj) {
       const text = s && s.text ? String(s.text) : "";
       lines.push("");
       lines.push(`${idx + 1}) [${m}] ${text}`);
-      if (s?.whyThisGetsMarks) lines.push(`   Ã¢â‚¬Â¢ Why: ${String(s.whyThisGetsMarks)}`);
-      if (s?.commonMistake) lines.push(`   Ã¢â‚¬Â¢ Common mistake: ${String(s.commonMistake)}`);
+      if (s?.whyThisGetsMarks) lines.push(`   • Why: ${String(s.whyThisGetsMarks)}`);
+      if (s?.commonMistake) lines.push(`   • Common mistake: ${String(s.commonMistake)}`);
     });
 
     if (obj.finalAnswer) {
@@ -3174,7 +3174,7 @@ const renderAssistantContent = (raw: string) => {
         throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "Ã¢â‚¬Â¦" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -3257,7 +3257,7 @@ const renderAssistantContent = (raw: string) => {
         throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "Ã¢â‚¬Â¦" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -3370,7 +3370,7 @@ const renderAssistantContent = (raw: string) => {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> Ã‚Â·{" "}
+          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> ·{" "}
           {seedExample?.title || "Worked example"}
         </div>
 
@@ -3416,7 +3416,7 @@ const renderAssistantContent = (raw: string) => {
 
           {loading ? (
             <div style={{ fontSize: 13, opacity: 0.7, padding: 6 }}>
-              Mentor is typingÃ¢â‚¬Â¦
+              Mentor is typing...
             </div>
           ) : null}
 
@@ -3504,7 +3504,7 @@ const renderAssistantContent = (raw: string) => {
             </>
           ) : (
             <>
-              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; thatÃ¢â‚¬â„¢s how CBSE awards marks.
+              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that's how CBSE awards marks.
             </>
           )}
         </div>
@@ -3632,7 +3632,7 @@ function MindMapCanvas(props: {
     const n = byId.get(nodeId);
     if (!n || !onAskMentor) return;
     onAskMentor(
-      `Mindmap Ã¢â‚¬Â¢ ${n.label}`,
+      `Mindmap • ${n.label}`,
       `Teach me "${n.label}" from the mindmap. Explain in CBSE-friendly steps with 2 examples and 3 quick practice questions.`
     );
   };
@@ -3677,7 +3677,7 @@ function MindMapCanvas(props: {
                 fontWeight="900"
                 fill="rgba(0,0,0,0.82)"
               >
-                {n.label.length > 18 ? `${n.label.slice(0, 18)}Ã¢â‚¬Â¦` : n.label}
+                {n.label.length > 18 ? `${n.label.slice(0, 18)}...` : n.label}
               </text>
             </g>
           ))}
