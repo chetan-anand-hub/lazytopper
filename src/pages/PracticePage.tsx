@@ -1,4 +1,4 @@
-﻿// src/pages/PracticePage.tsx
+// src/pages/PracticePage.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -312,8 +312,8 @@ function normaliseQuestionText(s: string | undefined | null): string {
   const text = String(s || "");
   return text
     .replace(/\s+/g, " ")
-    .replace(/[”]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/["]/g, '"')
+    .replace(/['']/g, "'")
     .trim();
 }
 
@@ -564,9 +564,9 @@ const packTopicKey = useMemo(() => {
 
   const title = useMemo(() => {
     if (!topicParam || topicParam === "Generic") {
-      return `Practice â€” Class ${grade} ${subjectKey}`;
+      return `Practice - Class ${grade} ${subjectKey}`;
     }
-    return `Practice â€” ${topicParam}`;
+    return `Practice - ${topicParam}`;
   }, [topicParam, grade, subjectKey]);
 
   return (
@@ -601,7 +601,7 @@ const packTopicKey = useMemo(() => {
             cursor: "pointer",
           }}
         >
-          <span>â†</span>
+          <span>←</span>
           <span>{backLabel}</span>
         </button>
 
@@ -626,7 +626,7 @@ const packTopicKey = useMemo(() => {
               marginBottom: 6,
             }}
           >
-            Class {grade} Â· {subjectKey} Â· Practice
+            Class {grade} · {subjectKey} · Practice
           </div>
           <h1
             style={{
@@ -649,8 +649,8 @@ const packTopicKey = useMemo(() => {
             Auto-generated{" "}
             <strong>{questionCount}</strong> questions from your trends engine
             for this topic. Try them like a mini drill: solve on paper first,
-            then tap <strong>â€œShow solutionâ€</strong> or{" "}
-            <strong>â€œSolve With Meâ€</strong> / <strong>â€œBoard Stepsâ€</strong> to reveal help.
+            then tap <strong>"Show solution"</strong> or{" "}
+            <strong>"Solve With Me"</strong> / <strong>"Board Steps"</strong> to reveal help.
           </p>
         </section>
 
@@ -713,7 +713,7 @@ const packTopicKey = useMemo(() => {
             )}
           </div>
 
-          {/* Type (Aâ€“E) filter */}
+          {/* Type (A-E) filter */}
           <div
             style={{
               display: "flex",
@@ -796,7 +796,7 @@ const packTopicKey = useMemo(() => {
                 gap: 6,
               }}
             >
-              <span>ðŸ”</span>
+              <span>🔁</span>
               <span>Regenerate set</span>
             </button>
           </div>
@@ -812,7 +812,7 @@ const packTopicKey = useMemo(() => {
                 marginBottom: 8,
               }}
             >
-              Generating fresh questions for this topicâ€¦
+              Generating fresh questions for this topic...
             </p>
           )}
 
@@ -902,8 +902,8 @@ const packTopicKey = useMemo(() => {
                             {idx + 1}
                           </span>
                           <span>
-                            {q.marks} mark{q.marks !== 1 ? "s" : ""} Â·{" "}
-                            {q.difficulty} Â· {q.section}
+                            {q.marks} mark{q.marks !== 1 ? "s" : ""} ·{" "}
+                            {q.difficulty} · {q.section}
                           </span>
                         </div>
                       </div>
@@ -965,7 +965,7 @@ const packTopicKey = useMemo(() => {
                         }}
                       >
                         <span role="img" aria-label="Show solution">
-                          ðŸ‘€
+                          👀
                         </span>
                         <span>{isOpen ? "Hide solution" : "Show solution"}</span>
                       </button>
@@ -1010,7 +1010,7 @@ const packTopicKey = useMemo(() => {
     title="Solve With Me (mentor asks 1 question at a time)"
   >
     <span role="img" aria-label="Solve with me">
-      ðŸ§ 
+      🧠
     </span>
     <span>Solve With Me</span>
   </button>
@@ -1322,7 +1322,7 @@ function MentorSolveDrawer(props: {
           }}
         >
           <div style={{ fontWeight: 950, fontSize: 14 }}>
-            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} Â· {seed.title}
+            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} · {seed.title}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
@@ -1352,7 +1352,7 @@ function MentorSolveDrawer(props: {
               }}
               title="Close"
             >
-              âœ•
+              ✕
             </button>
           </div>
         </div>
@@ -1426,7 +1426,7 @@ function MentorSolveDrawer(props: {
                 </div>
 
                 <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                  Tip: You can still hit “Reset” to ask the mentor for a question-specific marking breakdown.
+                  Tip: You can still hit "Reset" to ask the mentor for a question-specific marking breakdown.
                 </div>
               </div>
             );
@@ -1454,7 +1454,7 @@ function MentorSolveDrawer(props: {
               </pre>
             ))}
 
-          {loading && <div style={{ marginTop: 10, fontSize: 13, opacity: 0.75 }}>Thinkingâ€¦</div>}
+          {loading && <div style={{ marginTop: 10, fontSize: 13, opacity: 0.75 }}>Thinking...</div>}
 
           {errorText && (
             <div
@@ -1476,7 +1476,7 @@ function MentorSolveDrawer(props: {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={"Answer mentorâ€™s questionâ€¦"}
+                placeholder={"Answer mentor's question..."}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") sendStudentMessage();
                 }}
@@ -1509,7 +1509,7 @@ function MentorSolveDrawer(props: {
             </div>
           ) : (
             <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-              Tip: Copy this step-pattern in your answer sheet â€” thatâ€™s how marks are awarded.
+              Tip: Copy this step-pattern in your answer sheet - that's how marks are awarded.
             </div>
           )}
         </div>

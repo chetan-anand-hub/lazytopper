@@ -1,4 +1,4 @@
-﻿# Codex Report Back v2 (2026-01-21)
+# Codex Report Back v2 (2026-01-21)
 ## 1) Context
 - Prompt: Not provided
 - Timestamp (local): 2026-01-16 09:55
@@ -76,27 +76,27 @@ index dab51ec..010742b 100644
 +      'CPST: corresponding parts of similar triangles are proportional/equal.',
 +    ],
 +    cbseExamSentence: [
-+      'If ΓêáA = ΓêáP and ΓêáB = ΓêáQ, then ╬öABC ~ ╬öPQR by AA.',
++      'If ∠A = ∠P and ∠B = ∠Q, then ΔABC ~ ΔPQR by AA.',
 +      'From similarity, AB/PQ = BC/QR = AC/PR (CPST).',
 +    ],
 +    workedExamples: [
 +      {
 +        title: 'AA similarity',
-+        question: 'If ΓêáA = ΓêáP and ΓêáB = ΓêáQ, prove ╬öABC ~ ╬öPQR.',
++        question: 'If ∠A = ∠P and ∠B = ∠Q, prove ΔABC ~ ΔPQR.',
 +        steps: [
 +          { text: 'Given ΓêáA = ΓêáP and ΓêáB = ΓêáQ.', marks: 1 },
-+          { text: 'Two angles equal ΓçÆ AA similarity.', marks: 1 },
-+          { text: 'So ╬öABC ~ ╬öPQR.', marks: 1 },
++          { text: 'Two angles equal ⇒ AA similarity.', marks: 1 },
++          { text: 'So ΔABC ~ ΔPQR.', marks: 1 },
 +        ],
 +        totalMarks: 3,
-+        finalAnswer: '╬öABC ~ ╬öPQR by AA.',
++        finalAnswer: 'ΔABC ~ ΔPQR by AA.',
 +      },
 +      {
 +        title: 'CPST application',
-+        question: 'If ╬öABC ~ ╬öPQR, AB = 6 cm, PQ = 3 cm, BC = 5 cm, find QR.',
++        question: 'If ΔABC ~ ΔPQR, AB = 6 cm, PQ = 3 cm, BC = 5 cm, find QR.',
 +        steps: [
 +          { text: 'AB/PQ = BC/QR by CPST.', marks: 1 },
-+          { text: '6/3 = 5/QR ΓçÆ 2 = 5/QR.', marks: 1 },
++          { text: '6/3 = 5/QR ⇒ 2 = 5/QR.', marks: 1 },
 +          { text: 'QR = 2.5 cm.', marks: 1 },
 +        ],
 +        totalMarks: 3,
@@ -123,12 +123,12 @@ index dab51ec..010742b 100644
 +      ],
 +      examLines: [
 +        'State the criterion and the correspondence order.',
-+        'Write ╬öABC ~ ╬öPQR before using CPST.',
++        'Write ΔABC ~ ΔPQR before using CPST.',
 +      ],
 +      example: {
 +        question: 'If ΓêáA = ΓêáP and ΓêáB = ΓêáQ, prove similarity and state one ratio.',
-+        steps: ['AA similarity ΓçÆ ╬öABC ~ ╬öPQR.', 'Then AB/PQ = BC/QR.'],
-+        finalAnswer: '╬öABC ~ ╬öPQR and AB/PQ = BC/QR.',
++        steps: ['AA similarity ⇒ ΔABC ~ ΔPQR.', 'Then AB/PQ = BC/QR.'],
++        finalAnswer: 'ΔABC ~ ΔPQR and AB/PQ = BC/QR.',
 +      },
 +      commonError: 'Skipping the correspondence order.',
 +      commonFix: 'Write the angle equalities and the matching order before using CPST.',
@@ -136,12 +136,12 @@ index dab51ec..010742b 100644
 +    },
 +  },
 +  proof: {
-+    given: ['In ╬öABC, DE || BC with D on AB and E on AC.'],
++    given: ['In ΔABC, DE || BC with D on AB and E on AC.'],
 +    toProve: ['AD/DB = AE/EC.'],
 +    construction: ['Not required.'],
 +    proofSteps: [
 +      { statement: 'ΓêáADE = ΓêáABC and ΓêáAED = ΓêáACB.', reason: 'Alternate interior angles', mark: 1 },
-+      { statement: '╬öADE ~ ╬öABC.', reason: 'AA similarity', mark: 1 },
++      { statement: 'ΔADE ~ ΔABC.', reason: 'AA similarity', mark: 1 },
 +      { statement: 'AD/AB = AE/AC.', reason: 'CPST', mark: 1 },
 +      { statement: 'AD/DB = AE/EC.', reason: 'Componendo', mark: 1 },
 +    ],
@@ -152,7 +152,7 @@ index dab51ec..010742b 100644
 +  },
 +  solveWithMe: {
 +    question: 'Which two triangles are being compared for similarity here?',
-+    answerFormat: 'Short sentence (e.g., ╬öADE and ╬öABC).',
++    answerFormat: 'Short sentence (e.g., ΔADE and ΔABC).',
 +  },
 +};
 +
@@ -1259,8 +1259,8 @@ index b6473ee..25151f8 100644
 --- a/src/pages/TopicHub.tsx
 +++ b/src/pages/TopicHub.tsx
 @@ -1 +1 @@
--∩╗┐∩╗┐// src/pages/TopicHub.tsx
-+∩╗┐// src/pages/TopicHub.tsx
+-// src/pages/TopicHub.tsx
++// src/pages/TopicHub.tsx
 @@ -18,0 +19 @@ import { DiagramBlock } from "../components/DiagramBlock";
 +import TutorDrawerV2 from "../components/tutor/TutorDrawerV2";
 @@ -22 +23 @@ type ModeKey = "zombie" | "beast";
@@ -1299,35 +1299,35 @@ index b6473ee..25151f8 100644
 @@ -225,0 +254 @@ export default function TopicHub() {
 +
 @@ -236 +265 @@ if (!v2) {
--            Class {grade} ΓÇó {subject.toUpperCase()}
+-            Class {grade} - {subject.toUpperCase()}
 +            Class {grade}  -  {subject.toUpperCase()}
 @@ -273 +302 @@ if (!v2) {
--// Board-pattern anchors (AΓÇôE) pulled from the canonical question bank for this topic.
+-// Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
 +// Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
 @@ -379 +408 @@ const buildFallbackWorkedExampleQuestion = useCallback(
--      const header = `Class ${grade} ${subjectTitle} ΓÇó ${title}`;
+-      const header = `Class ${grade} ${subjectTitle} - ${title}`;
 +      const header = `Class ${grade} ${subjectTitle}  -  ${title}`;
 @@ -393 +422 @@ Pattern A (${marks}-mark/MCQ style):
--In ╬öABC and ╬öPQR, ΓêáA = ΓêáP and ΓêáB = ΓêáQ. What can you conclude?
+-In ΔABC and ΔPQR, ∠A = ∠P and ∠B = ∠Q. What can you conclude?
 +In ?ABC and ?PQR, ?A = ?P and ?B = ?Q. What can you conclude?
-@@ -395,2 +424,2 @@ In ╬öABC and ╬öPQR, ΓêáA = ΓêáP and ΓêáB = ΓêáQ. What can you conclude?
--A) ╬öABC Γëà ╬öPQR
--B) ╬öABC ~ ╬öPQR
+@@ -395,2 +424,2 @@ In ΔABC and ΔPQR, ∠A = ∠P and ∠B = ∠Q. What can you conclude?
+-A) ΔABC ≅ ΔPQR
+-B) ΔABC ~ ΔPQR
 +A) ?ABC ? ?PQR
 +B) ?ABC ~ ?PQR
 @@ -407 +436 @@ Pattern B (${marks} marks, short answer):
--In ╬öABC, D lies on AB and E lies on AC. If DE ΓêÑ BC, AD = 3 cm, DB = 6 cm and EC = 8 cm, find AE.`;
+-In ΔABC, D lies on AB and E lies on AC. If DE ∥ BC, AD = 3 cm, DB = 6 cm and EC = 8 cm, find AE.`;
 +In ?ABC, D lies on AB and E lies on AC. If DE ? BC, AD = 3 cm, DB = 6 cm and EC = 8 cm, find AE.`;
 @@ -412,2 +441,2 @@ Pattern C (${marks} marks):
--(i) In ╬öABC, ΓêáA = 50┬░, ΓêáB = 60┬░. In ╬öPQR, ΓêáP = 50┬░, ΓêáQ = 60┬░. Prove ╬öABC ~ ╬öPQR.
--(ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ╬öABC and ╬öPQR.`;
+-(i) In ΔABC, ∠A = 50°, ∠B = 60°. In ΔPQR, ∠P = 50°, ∠Q = 60°. Prove ΔABC ~ ΔPQR.
+-(ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ΔABC and ΔPQR.`;
 +(i) In ?ABC, ?A = 50┬░, ?B = 60┬░. In ?PQR, ?P = 50┬░, ?Q = 60┬░. Prove ?ABC ~ ?PQR.
 +(ii) If AB = 5 cm and PQ = 10 cm, find the ratio of areas of ?ABC and ?PQR.`;
 @@ -420 +449 @@ Pattern D (${marks} marks, typical board steps):
--In ╬öABC, D is a point on AB and E is a point on AC such that DE ΓêÑ BC.
+-In ΔABC, D is a point on AB and E is a point on AC such that DE ∥ BC.
 +In ?ABC, D is a point on AB and E is a point on AC such that DE ? BC.
 @@ -429 +458 @@ Pattern E (${marks} marks, mixed concept):
--In a right triangle ╬öABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
+-In a right triangle ΔABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
 +In a right triangle ?ABC right-angled at A, AD is drawn perpendicular to BC (D lies on BC).
 @@ -539,0 +569,56 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
 +  const guidedOrder = guidedMindmap?.recommendedOrder || [];
@@ -1387,10 +1387,10 @@ index b6473ee..25151f8 100644
 +    [currentTutorNodeId, resolveTutorNodeIndex]
 +  );
 @@ -581 +666 @@ const showInZombie = (sectionId: string) => {
--              ΓåÉ Trends
+-              ← Trends
 +              ? Trends
 @@ -619 +704 @@ const showInZombie = (sectionId: string) => {
--              Class {grade} ΓÇó {subject.toUpperCase()}
+-              Class {grade} - {subject.toUpperCase()}
 +              Class {grade}  -  {subject.toUpperCase()}
 @@ -659,0 +745,30 @@ const showInZombie = (sectionId: string) => {
 +          {isLearn && isTrianglesTopic ? (
@@ -1431,14 +1431,14 @@ index b6473ee..25151f8 100644
 +                      return;
 +                    }
 @@ -691,7 +810,8 @@ const showInZombie = (sectionId: string) => {
--                      title: `${title} ΓÇó Key definitions`,
+-                      title: `${title} - Key definitions`,
 -                      question: `Explain the key definitions in ${title} (Class ${grade} ${subjectTitle}).
 -
 -- Write each definition in NCERT/CBSE exam language (what the student should write).
 -- Give 2 examples for each: one easy + one board-style.
 -- If the topic is geometry, include a labelled diagram description and reference it clearly.
 -- End with 3 common mistakes + the quick fix.`,
-+                      title: `${title}   Key definitions`,
++                      title: `${title}   Key definitions`,
 +                      question: `Teach the key definitions in ${title} (Class ${grade} ${subjectTitle}).
 +Cover exactly:
 +1) Similar triangles (definition)
@@ -1452,7 +1452,7 @@ index b6473ee..25151f8 100644
 +                    });
 +                  }}
 @@ -704 +824 @@ const showInZombie = (sectionId: string) => {
--                  Ask Mentor ΓåÆ
+-                  Ask Mentor →
 +                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
 @@ -738,28 +858,3 @@ const showInZombie = (sectionId: string) => {
 -                  const coreText = node.core
@@ -1466,7 +1466,7 @@ index b6473ee..25151f8 100644
 -                        .join("\n")
 -                    : node.text || "";
 -                  openMentorDrawer({
--                    title: `Mindmap ΓÇö ${node.title}`,
+-                    title: `Mindmap - ${node.title}`,
 -                    question: `Teach from the mindmap node "${node.title}".`,
 -                    solveStyle: "socratic",
 -                    section: "learn",
@@ -1489,7 +1489,7 @@ index b6473ee..25151f8 100644
 @@ -796,14 +891,2 @@ const showInZombie = (sectionId: string) => {
 -                          onClick={() =>
 -                            openMentorDrawer({
--                              title: `Proof writing  ${t.title}`,
+-                              title: `Proof writing  ${t.title}`,
 -                              question: t.question,
 -                              solveStyle: "socratic",
 -                              requestedMode: "solve_with_me",
@@ -1504,12 +1504,12 @@ index b6473ee..25151f8 100644
 +                          onClick={() => openTutorDrawer({ tab: "teach", nodeId: mapProofFocusToNodeId(t.focus) })}
 +                          title="Open Tutor in teaching mode"
 @@ -811 +894 @@ const showInZombie = (sectionId: string) => {
--                          Practice (Solve With Me) 
+-                          Practice (Solve With Me) 
 +                          Teach this proof
 @@ -817,14 +900,2 @@ const showInZombie = (sectionId: string) => {
 -                          onClick={() =>
 -                            openMentorDrawer({
--                              title: `Proof writing  ${t.title}  Board steps`,
+-                              title: `Proof writing  ${t.title}  Board steps`,
 -                              question: t.question,
 -                              solveStyle: "board",
 -                              requestedMode: "board_steps",
@@ -1524,7 +1524,7 @@ index b6473ee..25151f8 100644
 +                          onClick={() => openTutorDrawer({ tab: "examples", nodeId: mapProofFocusToNodeId(t.focus) })}
 +                          title="See board-style examples"
 @@ -832 +903 @@ const showInZombie = (sectionId: string) => {
--                          Board Steps 
+-                          Board Steps 
 +                          Board example
 @@ -851 +922,5 @@ const showInZombie = (sectionId: string) => {
 -                  onClick={() =>
@@ -1534,7 +1534,7 @@ index b6473ee..25151f8 100644
 +                      return;
 +                    }
 @@ -853 +928 @@ const showInZombie = (sectionId: string) => {
--                      title: `${title} ΓÇó Common misconceptions`,
+-                      title: `${title} - Common misconceptions`,
 +                      title: `${title} - Common misconceptions`,
 @@ -862,2 +937,2 @@ const showInZombie = (sectionId: string) => {
 -                    })
@@ -1542,7 +1542,7 @@ index b6473ee..25151f8 100644
 +                    });
 +                  }}
 @@ -865 +940 @@ const showInZombie = (sectionId: string) => {
--                  Ask Mentor ΓåÆ
+-                  Ask Mentor →
 +                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
 @@ -915,0 +991,4 @@ const showInZombie = (sectionId: string) => {
 +                    if (isTrianglesTopic) {
@@ -1553,25 +1553,25 @@ index b6473ee..25151f8 100644
 -                      title: `Score tips ┬╖ ${title}`,
 +                      title: `Score tips - ${title}`,
 @@ -934 +1013 @@ const showInZombie = (sectionId: string) => {
--                  Ask Mentor ΓåÆ
+-                  Ask Mentor →
 +                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
 @@ -940 +1019 @@ const showInZombie = (sectionId: string) => {
--  <AccordionCard id="worked-examples" title="Worked examples (Board patterns AΓÇôE)">
+-  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A-E)">
 +  <AccordionCard id="worked-examples" title="Worked examples (Board patterns A-E)">
 @@ -993 +1072 @@ const showInZombie = (sectionId: string) => {
--                Example ΓÇó Pattern {exampleSection}{" "}
+-                Example - Pattern {exampleSection}{" "}
 +                Example  -  Pattern {exampleSection}{" "}
 @@ -1020 +1099 @@ const showInZombie = (sectionId: string) => {
--                Practice this type ΓåÆ
+-                Practice this type →
 +                Practice this type ?
 @@ -1028 +1107 @@ const showInZombie = (sectionId: string) => {
--                    title: `Pattern ${exampleSection} ΓÇó ${title}`,
+-                    title: `Pattern ${exampleSection} - ${title}`,
 +                    title: `Pattern ${exampleSection}  -  ${title}`,
 @@ -1047 +1126 @@ const showInZombie = (sectionId: string) => {
--                Ask Mentor ΓåÆ
+-                Ask Mentor →
 +                Ask Mentor ?
 @@ -1053 +1132 @@ const showInZombie = (sectionId: string) => {
--                Note: this is an auto-sample because your bank doesnΓÇÖt have a stored anchor for
+-                Note: this is an auto-sample because your bank doesn't have a stored anchor for
 +                Note: this is an auto-sample because your bank doesn't have a stored anchor for
 @@ -1070 +1149 @@ const showInZombie = (sectionId: string) => {
 -                    Example ┬╖ Pattern {exampleSection} {typeof marks === "number" ? `┬╖ ${marks} marks` : ""}
@@ -1585,34 +1585,34 @@ index b6473ee..25151f8 100644
 -                            title: `NCERT competency ┬╖ ${cid}`,
 +                            title: `NCERT competency - ${cid}`,
 @@ -1144 +1227 @@ const showInZombie = (sectionId: string) => {
--                        Ask Mentor ΓåÆ
+-                        Ask Mentor →
 +                        {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
 @@ -1149 +1232 @@ const showInZombie = (sectionId: string) => {
--                        {bloom ? <span> ΓÇó {bloom}</span> : null}
+-                        {bloom ? <span> - {bloom}</span> : null}
 +                        {bloom ? <span>  -  {bloom}</span> : null}
 @@ -1174 +1257 @@ const showInZombie = (sectionId: string) => {
--                              <span style={{ opacity: 0.7 }}> ΓÇó {String(c.bloomLevel)}</span>
+-                              <span style={{ opacity: 0.7 }}> - {String(c.bloomLevel)}</span>
 +                              <span style={{ opacity: 0.7 }}>  -  {String(c.bloomLevel)}</span>
 @@ -1195 +1278 @@ const showInZombie = (sectionId: string) => {
--                      title: `${title} ΓÇó Lab / activities`,
+-                      title: `${title} - Lab / activities`,
 +                      title: `${title}  -  Lab / activities`,
 @@ -1201 +1284 @@ const showInZombie = (sectionId: string) => {
--                  Ask Mentor ΓåÆ
+-                  Ask Mentor →
 +                  Ask Mentor ?
 @@ -1266 +1349 @@ const showInZombie = (sectionId: string) => {
--                  Quick revision kit for <b>{title}</b> ΓÇö mindmap, formula sheet, and top videos.
+-                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
 +                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
 @@ -1274 +1357 @@ const showInZombie = (sectionId: string) => {
--                        title: `${title} ΓÇó Resources`,
+-                        title: `${title} - Resources`,
 +                        title: `${title}  -  Resources`,
 @@ -1280 +1363 @@ const showInZombie = (sectionId: string) => {
--                    Ask Mentor ΓåÆ
+-                    Ask Mentor →
 +                    Ask Mentor ?
 @@ -1288 +1371 @@ const showInZombie = (sectionId: string) => {
--                    Mindmap coming soon for this topic. (WeΓÇÖll auto-fill as the bank grows.)
+-                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
 +                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
 @@ -1345 +1428 @@ const showInZombie = (sectionId: string) => {
--                                  title: `${title} ΓÇó Formula`,
+-                                  title: `${title} - Formula`,
 +                                  title: `${title}  -  Formula`,
 @@ -1368 +1451 @@ const showInZombie = (sectionId: string) => {
 -                                Open PDF Γåù
@@ -1621,7 +1621,7 @@ index b6473ee..25151f8 100644
 -                              Open video Γåù
 +                              Open video ?
 @@ -1413 +1496 @@ const showInZombie = (sectionId: string) => {
--                                  title: `${title} ΓÇó Video recap`,
+-                                  title: `${title} - Video recap`,
 +                                  title: `${title}  -  Video recap`,
 @@ -1433,0 +1517,18 @@ const showInZombie = (sectionId: string) => {
 +      <TutorDrawerV2
@@ -1644,35 +1644,35 @@ index b6473ee..25151f8 100644
 +      />
 @@ -1770,2 +1871 @@ if (!obj) {
 -    const note =
--      "ΓÜá∩╕Å Mentor returned an incomplete structured response (looks like Board Steps). Please click **Board Steps** again.";
+-      "⚠️ Mentor returned an incomplete structured response (looks like Board Steps). Please click **Board Steps** again.";
 +    const note = "Mentor response incomplete. Please retry.";
 @@ -1778,2 +1878 @@ if (!obj) {
 -
--  // Board steps (one-shot) ΓÇö show full marking scheme in an exam-friendly format.
+-  // Board steps (one-shot) - show full marking scheme in an exam-friendly format.
 +  // Board steps (one-shot) - show full marking scheme in an exam-friendly format.
 @@ -1789 +1888 @@ if (!obj) {
 -      ? ` (Total: ${total} marks ┬╖ Steps: ${sumMarks} marks)`
 +      ? ` (Total: ${total} marks - Steps: ${sumMarks} marks)`
 @@ -1793 +1892 @@ if (!obj) {
--    lines.push(`≡ƒº╛ Board Steps + Marking Scheme${headerSuffix}`);
+-    lines.push(`🧾 Board Steps + Marking Scheme${headerSuffix}`);
 +    lines.push(`?? Board Steps + Marking Scheme${headerSuffix}`);
 @@ -1796 +1895 @@ if (!obj) {
--      lines.push(`ΓÜá∩╕Å Marking check: step-marks sum to ${sumMarks}, expected ${total}. (Continue with step-wise marks as shown.)`);
+-      lines.push(`⚠️ Marking check: step-marks sum to ${sumMarks}, expected ${total}. (Continue with step-wise marks as shown.)`);
 +      lines.push(`?? Marking check: step-marks sum to ${sumMarks}, expected ${total}. (Continue with step-wise marks as shown.)`);
 @@ -1804,2 +1903,2 @@ if (!obj) {
--      if (s?.whyThisGetsMarks) lines.push(`   ΓÇó Why: ${String(s.whyThisGetsMarks)}`);
--      if (s?.commonMistake) lines.push(`   ΓÇó Common mistake: ${String(s.commonMistake)}`);
+-      if (s?.whyThisGetsMarks) lines.push(`   - Why: ${String(s.whyThisGetsMarks)}`);
+-      if (s?.commonMistake) lines.push(`   - Common mistake: ${String(s.commonMistake)}`);
 +      if (s?.whyThisGetsMarks) lines.push(`    -  Why: ${String(s.whyThisGetsMarks)}`);
 +      if (s?.commonMistake) lines.push(`    -  Common mistake: ${String(s.commonMistake)}`);
 @@ -1810 +1909 @@ if (!obj) {
--      lines.push(`Γ£à Final Answer: ${String(obj.finalAnswer)}`);
+-      lines.push(`✅ Final Answer: ${String(obj.finalAnswer)}`);
 +      lines.push(`? Final Answer: ${String(obj.finalAnswer)}`);
 @@ -1814 +1913 @@ if (!obj) {
--      lines.push("ΓÜá∩╕Å Notes:");
+-      lines.push("⚠️ Notes:");
 +      lines.push("?? Notes:");
 @@ -1822,2 +1921,2 @@ if (!obj) {
--  if (obj.kind === "hint") lines.push("≡ƒÆí Hint:");
--  if (obj.kind === "final") lines.push("Γ£à Final:");
+-  if (obj.kind === "hint") lines.push("💡 Hint:");
+-  if (obj.kind === "final") lines.push("✅ Final:");
 +  if (obj.kind === "hint") lines.push("?? Hint:");
 +  if (obj.kind === "final") lines.push("? Final:");
 @@ -1876,0 +1976,152 @@ const renderAssistantContent = (raw: string) => {
@@ -1909,7 +1909,7 @@ index b6473ee..25151f8 100644
 +        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
 +        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
 @@ -2061 +2362 @@ const renderAssistantContent = (raw: string) => {
--      setMessages((prev) => [...prev, { role: "assistant", content: text || "ΓÇª" }]);
+-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
 +      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
 @@ -2063 +2364,4 @@ const renderAssistantContent = (raw: string) => {
 -      setErrorText(err?.message || "Failed to get mentor response");
@@ -1947,7 +1947,7 @@ index b6473ee..25151f8 100644
 +        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
 +        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
 @@ -2135 +2443 @@ const renderAssistantContent = (raw: string) => {
--      setMessages((prev) => [...prev, { role: "assistant", content: text || "ΓÇª" }]);
+-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
 +      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
 @@ -2137 +2445,4 @@ const renderAssistantContent = (raw: string) => {
 -      setErrorText(err?.message || "Failed to get mentor response");
@@ -1978,7 +1978,7 @@ index b6473ee..25151f8 100644
 -          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> ┬╖{" "}
 +          Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> -{" "}
 @@ -2278 +2602 @@ const renderAssistantContent = (raw: string) => {
--              Mentor is typingΓÇª
+-              Mentor is typing...
 +              Mentor is typing...
 @@ -2293 +2617,17 @@ const renderAssistantContent = (raw: string) => {
 -              {errorText}
@@ -2000,19 +2000,19 @@ index b6473ee..25151f8 100644
 +                Retry
 +              </button>
 @@ -2350 +2690 @@ const renderAssistantContent = (raw: string) => {
--              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; thatΓÇÖs how CBSE awards marks.
+-              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that's how CBSE awards marks.
 +              Tip: In <b>Board Steps</b>, copy the steps + marks pattern; that's how CBSE awards marks.
 @@ -2390 +2730 @@ function AccordionCard(props: { id: string; title: string; children: any; defaul
 -        <span style={{ opacity: 0.6, fontWeight: 900 }}>Γû╛</span>
 +        <span style={{ opacity: 0.6, fontWeight: 900 }}>?</span>
 @@ -2478 +2818 @@ function MindMapCanvas(props: {
--      `Mindmap ΓÇó ${n.label}`,
+-      `Mindmap - ${n.label}`,
 +      `Mindmap  -  ${n.label}`,
 @@ -2523 +2863 @@ function MindMapCanvas(props: {
--                {n.label.length > 18 ? `${n.label.slice(0, 18)}ΓÇª` : n.label}
+-                {n.label.length > 18 ? `${n.label.slice(0, 18)}...` : n.label}
 +                {n.label.length > 18 ? `${n.label.slice(0, 18)}...` : n.label}
 @@ -2784 +3124 @@ function GuidedMindmapPanel(props: {
--              Teach from this node ΓåÆ
+-              Teach from this node →
 +              Teach from this node ?
 @@ -2795,0 +3136,15 @@ function GuidedMindmapPanel(props: {
 +
@@ -2137,10 +2137,10 @@ Untracked files (no prior git version, so no diff):
 - Before: (not present in git) -> After: - [x] North Star written in docs/session/2026-01-21_MASTER_REPORT.md | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Scope box explicitly says: **only Triangles -> Learn tab + drawer** | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Parking Lot file exists and is used for non-blocking ideas | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] “Let me teach you” CTA exists on **Triangles -> Learn** page | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] "Let me teach you" CTA exists on **Triangles -> Learn** page | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] CTA opens Tutor Drawer directly into **Teach tab** | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Default Teach starts at **first node** in 	rianglesGuidedMindmap.recommendedOrder | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] Any old “Ask mentor” buttons in Triangles Learn are repointed to open this same drawer (no extra panels) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] Any old "Ask mentor" buttons in Triangles Learn are repointed to open this same drawer (no extra panels) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Drawer header reads **Tutor** (or locked header copy) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Only **2 tabs** exist: **Teach** | **Board Examples** | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Shared context state exists (chapterId/cardId/nodeId/stepIndex/lastDiagram/lastResponseId) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
@@ -2153,7 +2153,7 @@ Untracked files (no prior git version, so no diff):
 - Before: (not present in git) -> After:   - [x] **Show an example for this** (switches to Examples tab) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Diagram block renders **first** | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] teach.simpleExplanation bullets render | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] teach.cbseExamSentence highlighted as “Exam line” | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] teach.cbseExamSentence highlighted as "Exam line" | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Worked examples show **exactly 2**: | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After:   - [x] Example 1: Basic | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After:   - [x] Example 2: Board-style | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
@@ -2161,9 +2161,9 @@ Untracked files (no prior git version, so no diff):
 - Before: (not present in git) -> After: - [x] Check question renders | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Button: **Back to teaching (Resume Step X)** | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Teach uses current  | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] “Next concept” advances to the next node in recommendedOrder | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] "Next concept" advances to the next node in recommendedOrder | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] (Optional) Jump-to concept dropdown exists (if implemented) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] Current concept title visibly shown (“You’re learning: <node title>”) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] Current concept title visibly shown ("You're learning: <node title>") | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] If schema invalid -> **Friendly error UI** appears (not blank) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Error UI includes **Retry** button | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Retry re-requests **exactly once** (no loops) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
@@ -2197,13 +2197,13 @@ Untracked files (no prior git version, so no diff):
 - Before: (not present in git) -> After: - [x] Diagram-first is enforced for geometry | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Two modes meaningfully different (Teach ≠ Examples) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Two-level progression preserved (Basic + Board-style) | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
-- Before: (not present in git) -> After: - [x] No “A/B/C/D” MCQ text leaks into Learn output | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
+- Before: (not present in git) -> After: - [x] No "A/B/C/D" MCQ text leaks into Learn output | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x] Friendly failures, never empty outputs | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [x]  | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [ ] Manual walkthrough: | Reason: Left unchecked due to lack of verification in this run.
-- Before: (not present in git) -> After:   - [ ] TopicHub -> Triangles -> Learn -> “Let me teach you” | Reason: Left unchecked due to lack of verification in this run.
+- Before: (not present in git) -> After:   - [ ] TopicHub -> Triangles -> Learn -> "Let me teach you" | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After:   - [ ] Teach shows diagram + teach + quick check | Reason: Left unchecked due to lack of verification in this run.
-- Before: (not present in git) -> After:   - [ ] “Show an example for this” -> Examples tab correct content | Reason: Left unchecked due to lack of verification in this run.
+- Before: (not present in git) -> After:   - [ ] "Show an example for this" -> Examples tab correct content | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After:   - [ ] Examples shows 2 examples + marks + mistakes + checkQ | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After:   - [ ] Doubt works and resumes correctly | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After:   - [ ] No request storms | Reason: Left unchecked due to lack of verification in this run.
@@ -2216,7 +2216,7 @@ Untracked files (no prior git version, so no diff):
 - Before: (not present in git) -> After: - [x] Stored at target folder | Reason: Marked as done based on repo state and/or build success; manual walkthrough not verified unless noted.
 - Before: (not present in git) -> After: - [ ] No diagram but explanation renders | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After: - [ ] Examples show ≠ 2 examples | Reason: Left unchecked due to lack of verification in this run.
-- Before: (not present in git) -> After: - [ ] Doubt loses context / can’t resume step | Reason: Left unchecked due to lack of verification in this run.
+- Before: (not present in git) -> After: - [ ] Doubt loses context / can't resume step | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After: - [ ] Request storm / repeated API calls | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After: - [ ] Blank output or silent fail | Reason: Left unchecked due to lack of verification in this run.
 - Before: (not present in git) -> After: - [ ] Build fails | Reason: Left unchecked due to lack of verification in this run.
