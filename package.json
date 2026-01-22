@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "prebuild": "powershell -ExecutionPolicy Bypass -File scripts/clean-windows-metadata.ps1",
-    "predev": "powershell -ExecutionPolicy Bypass -File scripts/clean-windows-metadata.ps1",
+    "prebuild": "node scripts/prebuild.cjs",
+    "predev": "node scripts/prebuild.cjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
