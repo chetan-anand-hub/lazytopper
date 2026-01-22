@@ -48,9 +48,9 @@ index 0000000..8c7b5c9
 --- /dev/null
 +++ b/docs/session/2026-01-21_CHECKLIST.md
 @@ -0,0 +1,130 @@
-+∩â•-┐Last Updated: 2026-01-16 09:24
++Ã¢Ë†Â©Ã¢â€¢-Ã¢"ÂLast Updated: 2026-01-16 09:24
 +
-+# ÃŽ"£Ã  Triangles Learn Tab ÃŽ"Çö Tutor Drawer v2 Session Checklist (21-01-2026)
++# ÃŽ"Ã‚Â£ÃƒÂ  Triangles Learn Tab ÃŽ"Ãƒâ€¡ÃƒÂ¶ Tutor Drawer v2 Session Checklist (21-01-2026)
 +**Last Updated:** 2026-01-16 09:24
 +
 +## 0) Session guardrails (must be visible at top of MASTER_REPORT)
@@ -59,12 +59,12 @@ index 0000000..8c7b5c9
 +- [x] Parking Lot file exists and is used for non-blocking ideas
 +
 +## 1) Repo wiring & entry points
-+- [x] Î"Ç£Let me teach youÎ"Ç¥ CTA exists on **Triangles -> Learn** page
++- [x] ÃŽ"Ãƒâ€¡Ã‚Â£Let me teach youÃŽ"Ãƒâ€¡Ã‚Â¥ CTA exists on **Triangles -> Learn** page
 +- [x] CTA opens Tutor Drawer directly into **Teach tab**
 +- [x] Default Teach starts at **first node** in 	rianglesGuidedMindmap.recommendedOrder
-+- [x] Any old Î"Ç£Ask mentorÎ"Ç¥ buttons in Triangles Learn are repointed to open this same drawer (no extra panels)
++- [x] Any old ÃŽ"Ãƒâ€¡Ã‚Â£Ask mentorÃŽ"Ãƒâ€¡Ã‚Â¥ buttons in Triangles Learn are repointed to open this same drawer (no extra panels)
 +
-+**Acceptance check:** Student clicks once and is *immediately in teaching*, not in Î"Ç£choose mode confusionÎ"Ç¥.
++**Acceptance check:** Student clicks once and is *immediately in teaching*, not in ÃŽ"Ãƒâ€¡Ã‚Â£choose mode confusionÃŽ"Ãƒâ€¡Ã‚Â¥.
 +
 +## 2) Tutor Drawer v2 UI (locked UX)
 +### Structure
@@ -84,7 +84,7 @@ index 0000000..8c7b5c9
 +### Board Examples tab layout
 +- [x] Diagram block renders **first**
 +- [x] teach.simpleExplanation bullets render
-+- [x] teach.cbseExamSentence highlighted as Î"Ç£Exam lineÎ"Ç¥
++- [x] teach.cbseExamSentence highlighted as ÃŽ"Ãƒâ€¡Ã‚Â£Exam lineÃŽ"Ãƒâ€¡Ã‚Â¥
 +- [x] Worked examples show **exactly 2**:
 +  - [x] Example 1: Basic
 +  - [x] Example 2: Board-style
@@ -92,12 +92,12 @@ index 0000000..8c7b5c9
 +- [x] Check question renders
 +- [x] Button: **Back to teaching (Resume Step X)**
 +
-+## 3) Mindmap as the Î"Ç£soulÎ"Ç¥ (Teach progression)
++## 3) Mindmap as the ÃŽ"Ãƒâ€¡Ã‚Â£soulÃŽ"Ãƒâ€¡Ã‚Â¥ (Teach progression)
 +- [x] Teach uses current 
 +odeId from mindmap data
-+- [x] Î"Ç£Next conceptÎ"Ç¥ advances to the next node in recommendedOrder
++- [x] ÃŽ"Ãƒâ€¡Ã‚Â£Next conceptÃŽ"Ãƒâ€¡Ã‚Â¥ advances to the next node in recommendedOrder
 +- [x] (Optional) Jump-to concept dropdown exists (if implemented)
-+- [x] Current concept title visibly shown (Î"Ç£YouÎ"ÇÃ-re learning: <node title>Î"Ç¥)
++- [x] Current concept title visibly shown (ÃŽ"Ãƒâ€¡Ã‚Â£YouÃŽ"Ãƒâ€¡Ãƒ-re learning: <node title>ÃŽ"Ãƒâ€¡Ã‚Â¥)
 +
 +**Acceptance check:** A student can continue step-by-step without needing to interpret the mindmap visually.
 +
@@ -111,7 +111,7 @@ index 0000000..8c7b5c9
 +- [x] If diagram missing/irrelevant -> **Diagram missing/bad** error UI + Retry
 +- [x] No teaching/explanation renders without a diagram block container
 +
-+## 5) Inline Doubts (Option A) Î"Çö embedded in BOTH tabs
++## 5) Inline Doubts (Option A) ÃŽ"Ãƒâ€¡ÃƒÂ¶ embedded in BOTH tabs
 +- [x] Single inline doubt input exists in Teach and Examples
 +- [x] Doubt submit sends full context:
 +  - [x] chapter/topicKey
@@ -142,18 +142,18 @@ index 0000000..8c7b5c9
 +## 7) DoD compliance checkpoints (Triangles Learn)
 +- [x] Teach-first is true (no MCQ-first / blank-first)
 +- [x] Diagram-first is enforced for geometry
-+- [x] Two modes meaningfully different (Teach Î"ëá Examples)
++- [x] Two modes meaningfully different (Teach ÃŽ"ÃƒÂ«ÃƒÂ¡ Examples)
 +- [x] Two-level progression preserved (Basic + Board-style)
-+- [x] No Î"Ç£A/B/C/DÎ"Ç¥ MCQ text leaks into Learn output
++- [x] No ÃŽ"Ãƒâ€¡Ã‚Â£A/B/C/DÃŽ"Ãƒâ€¡Ã‚Â¥ MCQ text leaks into Learn output
 +- [x] Friendly failures, never empty outputs
 +
 +## 8) Build + verification
 +- [x] 
 +pm run build passes
 +- [ ] Manual walkthrough:
-+  - [ ] TopicHub -> Triangles -> Learn -> Î"Ç£Let me teach youÎ"Ç¥
++  - [ ] TopicHub -> Triangles -> Learn -> ÃŽ"Ãƒâ€¡Ã‚Â£Let me teach youÃŽ"Ãƒâ€¡Ã‚Â¥
 +  - [ ] Teach shows diagram + teach + quick check
-+  - [ ] Î"Ç£Show an example for thisÎ"Ç¥ -> Examples tab correct content
++  - [ ] ÃŽ"Ãƒâ€¡Ã‚Â£Show an example for thisÃŽ"Ãƒâ€¡Ã‚Â¥ -> Examples tab correct content
 +  - [ ] Examples shows 2 examples + marks + mistakes + checkQ
 +  - [ ] Doubt works and resumes correctly
 +  - [ ] No request storms
@@ -169,11 +169,11 @@ index 0000000..8c7b5c9
 +- [x] Excludes node_modules/build caches/.git
 +- [x] Stored at target folder
 +
-+## Î"Ç£Stop-the-lineÎ"Ç¥ instant fail flags
++## ÃŽ"Ãƒâ€¡Ã‚Â£Stop-the-lineÃŽ"Ãƒâ€¡Ã‚Â¥ instant fail flags
 +If any of these occur, stop and fix immediately:
 +- [ ] No diagram but explanation renders
-+- [ ] Examples show Î"ëá 2 examples
-+- [ ] Doubt loses context / canÎ"ÇÃ-t resume step
++- [ ] Examples show ÃŽ"ÃƒÂ«ÃƒÂ¡ 2 examples
++- [ ] Doubt loses context / canÃŽ"Ãƒâ€¡Ãƒ-t resume step
 +- [ ] Request storm / repeated API calls
 +- [ ] Blank output or silent fail
 +- [ ] Build fails
@@ -194,7 +194,7 @@ index 0000000..bf9acde
 --- /dev/null
 +++ b/docs/session/2026-01-21_MASTER_REPORT.md
 @@ -0,0 +1,18 @@
-+∩â•-┐# 2026-01-21 Master Report
++Ã¢Ë†Â©Ã¢â€¢-Ã¢"Â# 2026-01-21 Master Report
 +
 +North Star: Ship Tutor Drawer v2 for Triangles -> Learn tab with Teach + Board Examples, diagram-first, inline doubts, and hard gates; build passes.
 +

@@ -1,4 +1,4 @@
-// src/pages/PracticePage.tsx
+﻿// src/pages/PracticePage.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -312,8 +312,8 @@ function normaliseQuestionText(s: string | undefined | null): string {
   const text = String(s || "");
   return text
     .replace(/\s+/g, " ")
-    .replace(/["]/g, '"')
-    .replace(/['']/g, "'")
+    .replace(/[”]/g, '"')
+    .replace(/[‘’]/g, "'")
     .trim();
 }
 
@@ -601,7 +601,7 @@ const packTopicKey = useMemo(() => {
             cursor: "pointer",
           }}
         >
-          <span>←</span>
+          <span>â†</span>
           <span>{backLabel}</span>
         </button>
 
@@ -626,7 +626,7 @@ const packTopicKey = useMemo(() => {
               marginBottom: 6,
             }}
           >
-            Class {grade} · {subjectKey} · Practice
+            Class {grade} Â· {subjectKey} Â· Practice
           </div>
           <h1
             style={{
@@ -796,7 +796,7 @@ const packTopicKey = useMemo(() => {
                 gap: 6,
               }}
             >
-              <span>🔁</span>
+              <span>ðŸ”</span>
               <span>Regenerate set</span>
             </button>
           </div>
@@ -902,8 +902,8 @@ const packTopicKey = useMemo(() => {
                             {idx + 1}
                           </span>
                           <span>
-                            {q.marks} mark{q.marks !== 1 ? "s" : ""} ·{" "}
-                            {q.difficulty} · {q.section}
+                            {q.marks} mark{q.marks !== 1 ? "s" : ""} Â·{" "}
+                            {q.difficulty} Â· {q.section}
                           </span>
                         </div>
                       </div>
@@ -965,7 +965,7 @@ const packTopicKey = useMemo(() => {
                         }}
                       >
                         <span role="img" aria-label="Show solution">
-                          👀
+                          ðŸ‘€
                         </span>
                         <span>{isOpen ? "Hide solution" : "Show solution"}</span>
                       </button>
@@ -1010,7 +1010,7 @@ const packTopicKey = useMemo(() => {
     title="Solve With Me (mentor asks 1 question at a time)"
   >
     <span role="img" aria-label="Solve with me">
-      🧠
+      ðŸ§ 
     </span>
     <span>Solve With Me</span>
   </button>
@@ -1322,7 +1322,7 @@ function MentorSolveDrawer(props: {
           }}
         >
           <div style={{ fontWeight: 950, fontSize: 14 }}>
-            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} · {seed.title}
+            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} Â· {seed.title}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
@@ -1352,7 +1352,7 @@ function MentorSolveDrawer(props: {
               }}
               title="Close"
             >
-              ✕
+              -
             </button>
           </div>
         </div>
@@ -1426,7 +1426,7 @@ function MentorSolveDrawer(props: {
                 </div>
 
                 <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                  Tip: You can still hit "Reset" to ask the mentor for a question-specific marking breakdown.
+                  Tip: You can still hit “Reset” to ask the mentor for a question-specific marking breakdown.
                 </div>
               </div>
             );

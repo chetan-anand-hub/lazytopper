@@ -302,7 +302,7 @@ if (!v2) {
   const definitions = safeArray<V2Definition>((v2 as any).definitions);
   const markingTips = safeArray<string>((v2 as any).markingTips);
   const scoreTips = safeArray<string>((v2 as any).scoreTips);
-// Board-pattern anchors (AÃ¢â‚¬â€œE) pulled from the canonical question bank for this topic.
+// Board-pattern anchors (AÃ¢â‚¬"E) pulled from the canonical question bank for this topic.
 const [exampleSection, setExampleSection] = useState<"A" | "B" | "C" | "D" | "E">("A");
 
 const exampleAnchors = useMemo(() => {
@@ -1081,7 +1081,7 @@ Use CBSE exam language and include a labelled diagram.`,
             </AccordionCard>
           )}
      {isGrind && showInZombie("worked-examples") && (
-  <AccordionCard id="worked-examples" title="Worked examples (Board patterns AÃ¢â‚¬â€œE)">
+  <AccordionCard id="worked-examples" title="Worked examples (Board patterns AÃ¢â‚¬"E)">
     {(() => {
       const anchors = exampleAnchors as any;
       const exampleSections: Array<"A" | "B" | "C" | "D" | "E"> = ["A", "B", "C", "D", "E"];
@@ -1411,7 +1411,7 @@ Use CBSE exam language and include a labelled diagram.`,
             <>
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
-                  Quick revision kit for <b>{title}</b> Ã¢â‚¬â€ mindmap, formula sheet, and top videos.
+                  Quick revision kit for <b>{title}</b> Ã¢â‚¬" mindmap, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <button
@@ -2238,7 +2238,7 @@ function TutorDrawerV2(props: {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          Youâ€™re learning: <b>{nodeTitle}</b> â€¢ Step {nodeIndex + 1} of {Math.max(1, order.length)}
+          You're learning: <b>{nodeTitle}</b> â€¢ Step {nodeIndex + 1} of {Math.max(1, order.length)}
         </div>
 
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2690,7 +2690,7 @@ if (!obj) {
   return stripped;
 }
 
-  // Board steps (one-shot) Ã¢â‚¬â€ show full marking scheme in an exam-friendly format.
+  // Board steps (one-shot) Ã¢â‚¬" show full marking scheme in an exam-friendly format.
   if (obj.kind === "board_steps_ms") {
     const total = Number(obj.totalMarks) || undefined;
     const steps = Array.isArray(obj.steps) ? obj.steps : [];
