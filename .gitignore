@@ -48,3 +48,21 @@ docs/session/_untracked_notes/
 # Playwright outputs
 test-results/
 playwright-report/
+.project_memory/snapshots/
+.project_memory/cache/
+.codex_runs/
+!.project_memory/LATEST.md
+!.project_memory/LATEST.json
+!.project_memory/PROMPT_SEED.md
+# --- Project Memory Blackbox (clean history) ---
+# High-churn / bulk: never commit
+.project_memory/
+docs/session/*_blackbox.md
+.codex_runs/
+RUN_*/
+**/RUN_*/
+LazyTopper_CODEX_RUN_*.zip
+
+# Allow curated, stable notes
+!docs/project_notes/
+!docs/project_notes/**
