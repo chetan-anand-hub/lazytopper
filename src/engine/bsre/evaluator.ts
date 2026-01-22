@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import type {
   EvaluationResult,
   Fixture,
@@ -139,7 +139,7 @@ export class BsreEvaluator {
     const score = this.adjustScore(normalizedAnswer, rubric, rawScore);
     const tags = this.inferMisconceptions(stepResults, normalizedAnswer, rubric);
     const shortFeedback = this.buildFeedback(rubric, stepResults, score);
-    const hintSuggestions = this.buildHints(tags, rubric);
+    const hintSuggestions = this.buildHints(tags);
 
     return {
       rubricId: rubric.id,
@@ -307,7 +307,7 @@ export class BsreEvaluator {
     return `Scored ${score}/${totalMarks}. Need to satisfy steps: ${missing}.`;
   }
 
-  private buildHints(tags: Set<string>, rubric: Rubric): string[] {
+  private buildHints(tags: Set<string>): string[] {
     if (tags.size === 0) {
       return ['H0 - Start by restating the given triangles and the target conclusion.'];
     }
