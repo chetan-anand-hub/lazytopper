@@ -8,12 +8,29 @@
     "predev": "node scripts/prebuild.cjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "blackbox": "node scripts/blackbox.mjs",
+    "contextpack": "node scripts/contextpack.mjs",
+    "rules:digest": "node scripts/rulesDigest.mjs",
+    "blackbox:stage": "node scripts/stageTracker.mjs",
+    "blackbox:full": "npm run blackbox -- --full && npm run rules:digest && npm run blackbox:stage && npm run contextpack",
+    "blackbox:ci": "npm run blackbox:full && npm run build",
+    "hooks:enable": "git config core.hooksPath scripts/githooks",
+    "hooks:disable": "git config --unset core.hooksPath",
+    "precommit:check": "npm run blackbox && npm run contextpack",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server/index.cjs",
-    "check:mojibake": "node scripts/check-mojibake.cjs"
+    "check:mojibake": "node scripts/check-mojibake.cjs",
+    "pmem:end-session": "node tools/pmem/pmem-runner.cjs end-session",
+    "pmem:open-session": "node tools/pmem/pmem-runner.cjs open-session",
+    "pmem:export-crashpack": "node tools/pmem/pmem-runner.cjs export-crashpack",
+    "pmem:mark-critical": "node tools/pmem/pmem-runner.cjs mark-critical",
+    "pmem:compile-ext": "node tools/pmem/pmem-runner.cjs compile-ext",
+    "pmem:npm-run-ext": "node tools/pmem/pmem-runner.cjs npm-run-ext"
   },
   "dependencies": {
+    "html-to-image": "^1.10.7",
+    "mammoth": "^1.11.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5"
@@ -32,6 +49,7 @@
     "madge": "^8.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.3",
-    "vite": "^7.2.2"
+    "vite": "^7.2.2",
+    "yaml": "^2.8.2"
   }
 }

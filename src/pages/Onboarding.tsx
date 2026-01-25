@@ -1,21 +1,25 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useProfile } from "../context/ProfileContext";
+import { cbseDates, formatCbseDate } from "../config/cbseDates";
 
-// Central place to keep / update board exam dates
-// TODO: update these when CBSE announces official dates.
-const BOARD_EXAM_DATES: Record<"10" | "12", string> = {
-  "10": "2026-03-01",
-  "12": "2026-03-01",
-};
-
-function getDaysLeft(targetDateStr: string): number {
+function getDaysLeft(targetDateStr?: string | null): number {
   const today = new Date();
+  if (!targetDateStr) {
+    return 90;
+  }
   const target = new Date(targetDateStr + "T00:00:00");
+  if (Number.isNaN(target.getTime())) {
+    return 90;
+  }
   const diffMs = target.getTime() - today.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   // If date has passed, give a default 90 days placeholder
   return diffDays > 0 ? diffDays : 90;
+}
+
+function getBoardExamDateForClass(studentClass: "10" | "12") {
+  return studentClass === "10" ? cbseDates.class10?.boardExam : cbseDates.class12?.boardExam;
 }
 
 export default function Onboarding() {
@@ -28,10 +32,10 @@ export default function Onboarding() {
   );
 
   const [autoDaysLeft, setAutoDaysLeft] = useState<number>(() =>
-    getDaysLeft(BOARD_EXAM_DATES["10"])
+    getDaysLeft(getBoardExamDateForClass("10"))
   );
   const [days, setDays] = useState<string>(() =>
-    String(getDaysLeft(BOARD_EXAM_DATES["10"]))
+    String(getDaysLeft(getBoardExamDateForClass("10")))
   );
 
   const [target, setTarget] = useState("");
@@ -44,7 +48,7 @@ export default function Onboarding() {
 
   // recompute days left whenever class changes
   useEffect(() => {
-    const d = getDaysLeft(BOARD_EXAM_DATES[studentClass]);
+    const d = getDaysLeft(getBoardExamDateForClass(studentClass));
     setAutoDaysLeft(d);
     setDays(String(d));
   }, [studentClass]);
@@ -111,7 +115,7 @@ export default function Onboarding() {
 
         <p className="subtitle" style={{ marginTop: 12 }}>
           Approx. board exam date for Class {studentClass}:{" "}
-          <strong>{BOARD_EXAM_DATES[studentClass]}</strong> <br />
+          <strong>{formatCbseDate(getBoardExamDateForClass(studentClass))}</strong> <br />
           That’s around{" "}
           <strong>
             {autoDaysLeft} {autoDaysLeft === 1 ? "day" : "days"}
