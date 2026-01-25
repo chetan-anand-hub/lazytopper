@@ -1,6 +1,7 @@
 ﻿blackbox:
   title: "Blackbox Automation Stages"
   allowedSystemTouchPrefixes:
+- docs/project_notes/
     - "scripts/"
     - ".github/workflows/"
     - "docs/project_memory/"
@@ -38,3 +39,4 @@
         - file: "scripts/stageTracker.mjs"
         - file: ".project_memory/blackbox/stage_status.json"
         - file: ".project_memory/blackbox/stage_status.md"
+
