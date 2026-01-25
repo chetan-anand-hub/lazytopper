@@ -66,3 +66,10 @@ LazyTopper_CODEX_RUN_*.zip
 # Allow curated, stable notes
 !docs/project_notes/
 !docs/project_notes/**
+# --- Local debug / evidence (do not commit) ---
+debugDiaryChain.js
+tempDiaryDebug.js
+todo_scan.txt
+
+# --- Windows metadata ---
+**/desktop.ini
