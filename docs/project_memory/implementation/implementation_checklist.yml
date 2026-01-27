@@ -1,7 +1,6 @@
 ﻿blackbox:
   title: "Blackbox Automation Stages"
   allowedSystemTouchPrefixes:
-- docs/project_notes/
     - "scripts/"
     - ".github/workflows/"
     - "docs/project_memory/"
