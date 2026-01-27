@@ -77,3 +77,9 @@ todo_scan.txt
 # local-only dev logs (ignored forever)
 docs/project_notes/issues.md
 
+
+# local-only dev log (ignore even though docs/project_notes is allowed)
+docs/project_notes/issues.md
+
+docs/project_notes/issues_backup_*.md
+
