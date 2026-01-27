@@ -73,3 +73,7 @@ todo_scan.txt
 
 # --- Windows metadata ---
 **/desktop.ini
+
+# local-only dev logs (ignored forever)
+docs/project_notes/issues.md
+
