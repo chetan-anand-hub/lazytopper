@@ -1,0 +1,24 @@
+﻿progress:
+  tracks:
+    lazytopper:
+      current: "R8"
+      states:
+        R8: "DOING"
+        R8-3: "TODO"
+        R9: "TODO"
+        R10: "TODO"
+        R11: "TODO"
+        R12: "TODO"
+        R13: "TODO"
+        R14: "TODO"
+        R15: "TODO"
+        R16: "TODO"
+        R17: "TODO"
+    blackbox:
+      states:
+        S0: "DONE"
+        S1: "DONE"
+        S2: "DONE"
+        S3: "DONE"
+        S4: "DONE"
+        S5: "DONE"

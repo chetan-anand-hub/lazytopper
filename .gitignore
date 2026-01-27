@@ -83,3 +83,11 @@ docs/project_notes/issues.md
 
 docs/project_notes/issues_backup_*.md
 
+
+# --- local tracker UI (do not commit) ---
+.project_memory/tracker_ui/
+
+
+# generated tracker outputs (json/md)
+.project_memory/tracker/
+
