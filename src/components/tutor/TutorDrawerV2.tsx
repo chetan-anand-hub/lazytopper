@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { DiagramBlock } from "../DiagramBlock";
 import { MENTOR_ENDPOINT } from "../../ai/aiClient";
+import { extractDiagramMeta, validateTutorStructured } from "../../contracts/tutorContracts.ts";
 
 type ModeKey = "zombie" | "beast";
 type TutorTab = "teach" | "examples";
@@ -85,43 +86,6 @@ export default function TutorDrawerV2(props: {
     }
   };
 
-  const extractDiagramMeta = (obj: any) => {
-    const diagramType =
-      String(obj?.diagramType || obj?.diagram?.diagramType || obj?.diagram?.type || "").trim() ||
-      "";
-    const diagramLabels = obj?.diagramLabels || obj?.diagram?.diagramLabels || obj?.diagram?.labels || null;
-    const diagramSpec = obj?.diagram || obj?.diagramSpec || null;
-    return { diagramType, diagramLabels, diagramSpec };
-  };
-
-  const validateTeach = (obj: any, diagramType: string, diagramSpec: any) => {
-    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
-    const bullets = Array.isArray(obj?.conceptBullets) ? obj.conceptBullets : [];
-    const examLines = Array.isArray(obj?.examLines) ? obj.examLines : [];
-    const worked = obj?.workedExample || {};
-    const steps = Array.isArray(worked.steps) ? worked.steps : [];
-    if (bullets.length < 5) return "Teach response incomplete. Please retry.";
-    if (examLines.length < 2) return "Teach response incomplete. Please retry.";
-    if (!String(worked.question || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!steps.length) return "Teach response incomplete. Please retry.";
-    if (!String(worked.finalAnswer || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.commonError || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.commonFix || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.checkQuestion || "").trim()) return "Teach response incomplete. Please retry.";
-    return null;
-  };
-
-  const validateExamples = (obj: any, diagramType: string, diagramSpec: any) => {
-    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
-    const teach = obj?.teach || {};
-    const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
-    const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
-    const worked = Array.isArray(obj?.workedExamples) ? obj.workedExamples : [];
-    if (simple.length < 4) return "Examples response incomplete. Please retry.";
-    if (exam.length < 2) return "Examples response incomplete. Please retry.";
-    if (worked.length !== 2) return "Board Examples must include exactly 2 worked examples.";
-    return null;
-  };
 
   const formatDoubtStructured = (obj: any) => {
     if (!obj || typeof obj !== "object") return "";
@@ -204,13 +168,12 @@ export default function TutorDrawerV2(props: {
         const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
         if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
+        const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
         const meta = extractDiagramMeta(structured);
-        const validation =
-          nextTab === "teach"
-            ? validateTeach(structured, meta.diagramType, meta.diagramSpec)
-            : validateExamples(structured, meta.diagramType, meta.diagramSpec);
-        if (validation) {
-          setErrors((prev) => ({ ...prev, [key]: validation }));
+        const check = validateTutorStructured(modeApi, structured, body.payload);
+        if (!check.ok) {
+          const msg = check.issues[0] || "Mentor response incomplete. Please retry.";
+          setErrors((prev) => ({ ...prev, [key]: msg }));
           return;
         }
 

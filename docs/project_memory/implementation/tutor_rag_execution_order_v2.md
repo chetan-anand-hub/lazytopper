@@ -24,3 +24,6 @@ Pass criteria: build + tracker + doctor succeed before any tutor RAG work.
 - Detours: D*
 - Tutor RAG blocks: B*
 - Tracker must keep these as separate tracks to avoid conflict
+
+## B1 deliverable definition
+Canonical tutor contracts live in `src/contracts/tutorContracts.ts` and are enforced on the server (fallback on invalid output).

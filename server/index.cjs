@@ -50,6 +50,9 @@ const trianglesRubricMap = new Map(
     .map((rubric) => [String(rubric?.id || ''), rubric])
     .filter(([id]) => Boolean(id))
 );
+const { validateTutorStructured, buildTutorFallback } = require(
+  path.join(__dirname, '../src/contracts/tutorContracts.ts')
+);
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -1369,15 +1372,9 @@ function validateStructuredForMode(obj, mode, payload, opts) {
     }
   } else if (mode === 'board_steps_ms') {
     if (!isValidMentorProtocol(obj, mode)) issues.push('Invalid board_steps_ms protocol.');
-  } else if (mode === 'learn_teach') {
-    const teachCheck = validateLearnTeach(obj, payload);
-    if (!teachCheck.ok) issues.push(...teachCheck.issues);
-  } else if (mode === 'learn_mindmap') {
-    const mindmapCheck = validateLearnMindmap(obj);
-    if (!mindmapCheck.ok) issues.push(...mindmapCheck.issues);
-  } else if (mode === 'learn_proof') {
-    const proofCheck = validateLearnProof(obj);
-    if (!proofCheck.ok) issues.push(...proofCheck.issues);
+  } else if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'learn_proof') {
+    const check = validateTutorStructured(mode, obj, payload);
+    if (!check.ok) issues.push(...check.issues);
   }
   return { ok: issues.length === 0, issues };
 }
@@ -2149,9 +2146,9 @@ function buildStructuredFallback(mode, payload, opts = {}) {
   if (mode === 'solve_with_me') {
     return opts.learn ? buildLearnSolveWithMeFallback(payload) : buildProofFallbackSolveWithMe(payload);
   }
-  if (mode === 'learn_teach') return buildLearnTeachFallback(payload);
-  if (mode === 'learn_proof') return buildLearnProofFallback(payload);
-  if (mode === 'learn_mindmap') return buildLearnMindmapFallback(payload);
+  if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'learn_proof') {
+    return buildTutorFallback(mode, payload);
+  }
   return null;
 }
 

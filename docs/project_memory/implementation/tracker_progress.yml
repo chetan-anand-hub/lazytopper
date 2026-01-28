@@ -36,7 +36,7 @@
       current: "B0"
       states:
         B0: "TODO" # Tooling Health Pre-Block (build + tracker + doctor)
-        B1: "TODO" # Contract canonicalization (Triangles)
+        B1: "DONE" # Triangles tutor contracts canonicalized; server validates + fallback; commit: TBD
         B2: "TODO" # Attempt loop + BSRE
         B3: "TODO" # Hint ladder runtime (H0→H3)
         B4: "TODO" # Mistake map + remediation drills
