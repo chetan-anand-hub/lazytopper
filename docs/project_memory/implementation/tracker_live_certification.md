@@ -37,3 +37,6 @@ Pre-flight:
 
 Nomenclature rule: R* roadmap vs B* tutor_rag blocks; no collisions.
 YAML rule: use single quotes or forward slashes for Windows paths.
+
+## Scope Guard
+Run `npm run scope:guard` before committing tooling tasks.
