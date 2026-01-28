@@ -53,6 +53,9 @@ const trianglesRubricMap = new Map(
 const { validateTutorStructured, buildTutorFallback, validateAttemptLoop } = require(
   path.join(__dirname, '../src/contracts/tutorContracts.ts')
 );
+const { initHintState, computeNextHint } = require(
+  path.join(__dirname, '../src/tutor/hintLadder.ts')
+);
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -1024,6 +1027,7 @@ function attemptStatusToConfidence(status) {
 }
 
 function buildAttemptLoopHeuristic(payload, attempt) {
+  const requestNextHint = Boolean(payload?.requestNextHint || payload?.request_next_hint);
   const raw = String(attempt || '').trim();
   const status = classifyAttemptStatus(raw);
   const mistakeTags = status === 'correct'
@@ -1053,6 +1057,22 @@ function buildAttemptLoopHeuristic(payload, attempt) {
     unclear: 'Attempt is missing or too short to evaluate reliably.',
   };
 
+  const context = {
+    status,
+    mistakeTags,
+    attemptText: raw,
+    topicKey: payload?.topicKey,
+    questionText: payload?.questionText || payload?.question || payload?.prompt || '',
+    theoremFocus: payload?.theoremFocus,
+  };
+  let hintState = initHintState();
+  if (payload?.hintLadderState && typeof payload.hintLadderState === 'object') {
+    hintState = payload.hintLadderState;
+  }
+  if (status !== 'correct' && requestNextHint) {
+    hintState = computeNextHint(hintState, context, true);
+  }
+
   return {
     student_attempt: {
       raw_text: raw || '(empty attempt)',
@@ -1064,6 +1084,7 @@ function buildAttemptLoopHeuristic(payload, attempt) {
       missing_prereqs: missingPrereqs,
     },
     next_action: nextAction,
+    hint_ladder: status === 'correct' ? null : hintState,
     bsre: {
       brief: briefMap[status] || briefMap.unclear,
       steps: [

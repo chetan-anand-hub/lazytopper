@@ -111,7 +111,7 @@ export default function TutorDrawerV2(props: {
     return "";
   };
 
-  const buildPayload = (nextTab: TutorTab, doubtContext?: any, prompt?: string) => {
+  const buildPayload = (nextTab: TutorTab, doubtContext?: any, prompt?: string, requestNextHint?: boolean, hintLadderState?: any) => {
     const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
     return {
       mode: modeApi,
@@ -135,13 +135,15 @@ export default function TutorDrawerV2(props: {
         stepIndex: nodeIndex,
         vibe: mode,
         doubtContext,
+        requestNextHint,
+        hintLadderState,
       },
       messages: prompt ? [{ role: "user", content: prompt }] : undefined,
     };
   };
 
   const requestTutor = useCallback(
-    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string }) => {
+    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string; requestNextHint?: boolean }) => {
       if (!open || !nodeId) return;
       const key = `${nextTab}:${nodeId}`;
       if (!opts?.force && responses[key]) return;
@@ -155,7 +157,8 @@ export default function TutorDrawerV2(props: {
       abortRef.current = controller;
 
       try {
-        const body = buildPayload(nextTab, undefined, opts?.prompt);
+        const hintLadderState = opts?.requestNextHint ? responses[key]?.structured?.attempt_loop?.hint_ladder : undefined;
+        const body = buildPayload(nextTab, undefined, opts?.prompt, opts?.requestNextHint, hintLadderState);
         const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -238,7 +241,7 @@ export default function TutorDrawerV2(props: {
       };
 
       try {
-        const body = buildPayload(tab, doubtContext, prompt);
+        const body = buildPayload(tab, doubtContext, prompt, false, undefined);
         const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -316,6 +319,7 @@ export default function TutorDrawerV2(props: {
 
   const renderAttemptFeedback = (obj: any) => {
     const loop = obj?.attempt_loop;
+    const hint = loop?.hint_ladder;
     if (!loop || typeof loop !== "object") return null;
     const diagnosis = loop.diagnosis || {};
     const nextAction = loop.next_action || {};
@@ -335,6 +339,22 @@ export default function TutorDrawerV2(props: {
           <div style={{ marginTop: 6 }}><b>{actionType || "Next"}:</b> {prompt}</div>
         ) : null}
         {brief ? <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>{brief}</div> : null}
+        {hint ? (
+          <div style={{ marginTop: 8, fontSize: 12 }}>Hint level: <b>{hint.level}</b>/{hint.max_level}</div>
+        ) : null}
+        {hint?.last_hint?.text ? (
+          <div style={{ marginTop: 6, fontSize: 12 }}>{hint.last_hint.text}</div>
+        ) : null}
+        {hint?.next_hint_available ? (
+          <button
+            type="button"
+            className="pill"
+            style={{ marginTop: 8 }}
+            onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
+          >
+            Get next hint
+          </button>
+        ) : null}
       </div>
     );
   };

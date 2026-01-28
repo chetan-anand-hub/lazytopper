@@ -51,6 +51,39 @@ export function validateAttemptLoop(loop: any) {
   }
   if (!String(nextAction.prompt || "").trim()) issues.push("attempt_loop.next_action.prompt missing.");
 
+  const hint = loop.hint_ladder;
+  if (hint != null) {
+    const lvl = Number(hint.level);
+    const max = Number(hint.max_level);
+    if (!Number.isFinite(lvl) || lvl < 0 || lvl > 5) issues.push("attempt_loop.hint_ladder.level must be 0..5.");
+    if (max !== 5) issues.push("attempt_loop.hint_ladder.max_level must be 5.");
+    if (hint.last_hint != null) {
+      if (!hint.last_hint || typeof hint.last_hint !== "object") {
+        issues.push("attempt_loop.hint_ladder.last_hint invalid.");
+      } else {
+        const lhLevel = Number(hint.last_hint.level);
+        if (!Number.isFinite(lhLevel) || lhLevel < 0 || lhLevel > 5) {
+          issues.push("attempt_loop.hint_ladder.last_hint.level must be 0..5.");
+        }
+        if (!String(hint.last_hint.text || "").trim()) issues.push("attempt_loop.hint_ladder.last_hint.text missing.");
+      }
+    }
+    if (typeof hint.next_hint_available !== "boolean") {
+      issues.push("attempt_loop.hint_ladder.next_hint_available must be boolean.");
+    }
+    if (!Array.isArray(hint.history)) {
+      issues.push("attempt_loop.hint_ladder.history must be array.");
+    } else {
+      hint.history.forEach((h: any, idx: number) => {
+        const hLevel = Number(h?.level);
+        if (!Number.isFinite(hLevel) || hLevel < 0 || hLevel > 5) {
+          issues.push(`attempt_loop.hint_ladder.history[${idx}].level must be 0..5.`);
+        }
+        if (!String(h?.text || "").trim()) issues.push(`attempt_loop.hint_ladder.history[${idx}].text missing.`);
+      });
+    }
+  }
+
   const bsre = loop.bsre || {};
   if (!String(bsre.brief || "").trim()) issues.push("attempt_loop.bsre.brief missing.");
   if (!Array.isArray(bsre.steps)) issues.push("attempt_loop.bsre.steps missing.");
@@ -271,6 +304,13 @@ function buildAttemptLoopFallback(payload?: any) {
       missing_prereqs: missingPrereqs,
     },
     next_action: nextAction,
+    hint_ladder: {
+      level: 0,
+      max_level: 5,
+      last_hint: null,
+      next_hint_available: true,
+      history: [],
+    },
     bsre: {
       brief: isShort
         ? "Attempt missing or too short to grade; start by stating the givens and the criterion."

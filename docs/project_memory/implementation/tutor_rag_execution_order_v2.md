@@ -31,4 +31,8 @@ Canonical tutor contracts live in `src/contracts/tutorContracts.ts` and are enfo
 - Tutor responses include an optional attempt_loop (diagnosis + next_action + bsre).
 - Server attaches deterministic attempt_loop for Triangles attempts and falls back safely.
 - UI shows a compact Attempt Feedback panel when attempt_loop is present.
+## B3 deliverable definition
+- Hint ladder runtime adds levels L0?L5 and requestNextHint behavior.
+- attempt_loop.hint_ladder tracks current level, last hint, and history.
+- UI exposes Hint Level + Get next hint button when available.
 
