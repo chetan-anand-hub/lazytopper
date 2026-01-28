@@ -74,14 +74,25 @@ function main() {
   const bbStages = (bbChecklist?.stages || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
   const ltStages = (ltRoadmap?.stages   || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
   const detoursStages = (detoursRoadmap?.stages || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
+  const tutorRagStages = [
+    { id: "B0", title: "Tooling Health Pre-Block (build + tracker + doctor)" },
+    { id: "B1", title: "Contract canonicalization (Triangles)" },
+    { id: "B2", title: "Attempt loop + BSRE" },
+    { id: "B3", title: "Hint ladder runtime (H0→H3)" },
+    { id: "B4", title: "Mistake map + remediation drills" },
+    { id: "B5", title: "Mastery gate + spaced review" },
+    { id: "B6", title: "Public ship MVP (deploy + feedback loop)" },
+  ];
 
   const bbStates = progress?.tracks?.blackbox?.states || {};
   const ltStates = progress?.tracks?.lazytopper?.states || {};
   const detoursStates = progress?.tracks?.detours?.states || {};
+  const tutorRagStates = progress?.tracks?.tutor_rag?.states || {};
 
   const tracks = [
     buildTrack("lazytopper", ltRoadmap?.title || "LazyTopper", ltStages, ltStates),
     buildTrack("detours", detoursRoadmap?.title || "Detours / Experiments", detoursStages, detoursStates),
+    buildTrack("tutor_rag", "Tutor RAG (Human Tutor)", tutorRagStages, tutorRagStates),
     buildTrack("blackbox", bbChecklist?.title || "Blackbox", bbStages, bbStates),
   ];
 
