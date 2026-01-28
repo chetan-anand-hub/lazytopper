@@ -56,6 +56,9 @@ const { validateTutorStructured, buildTutorFallback, validateAttemptLoop } = req
 const { initHintState, computeNextHint } = require(
   path.join(__dirname, '../src/tutor/hintLadder.ts')
 );
+const { scoreRubric } = require(
+  path.join(__dirname, '../src/tutor/rubricScore.ts')
+);
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -1073,6 +1076,13 @@ function buildAttemptLoopHeuristic(payload, attempt) {
     hintState = computeNextHint(hintState, context, true);
   }
 
+  const rubric = scoreRubric({
+    status,
+    mistakeTags,
+    attemptText: raw,
+    theoremFocus: payload?.theoremFocus,
+  });
+
   return {
     student_attempt: {
       raw_text: raw || '(empty attempt)',
@@ -1085,6 +1095,7 @@ function buildAttemptLoopHeuristic(payload, attempt) {
     },
     next_action: nextAction,
     hint_ladder: status === 'correct' ? null : hintState,
+    rubric,
     bsre: {
       brief: briefMap[status] || briefMap.unclear,
       steps: [

@@ -320,6 +320,7 @@ export default function TutorDrawerV2(props: {
   const renderAttemptFeedback = (obj: any) => {
     const loop = obj?.attempt_loop;
     const hint = loop?.hint_ladder;
+    const rubric = loop?.rubric;
     if (!loop || typeof loop !== "object") return null;
     const diagnosis = loop.diagnosis || {};
     const nextAction = loop.next_action || {};
@@ -354,6 +355,20 @@ export default function TutorDrawerV2(props: {
           >
             Get next hint
           </button>
+        ) : null}
+        {rubric ? (
+          <div style={{ marginTop: 10, fontSize: 12, borderTop: '1px dashed rgba(0,0,0,0.12)', paddingTop: 8 }}>
+            <div><b>Score:</b> {rubric.total_score}/100 ({rubric.band})</div>
+            <div style={{ marginTop: 4 }}>
+              Concept: {rubric.dimensions?.concept_selection}/25 | Setup: {rubric.dimensions?.setup_correctness}/20 | Logic: {rubric.dimensions?.logical_progression}/25
+            </div>
+            <div style={{ marginTop: 2 }}>
+              Computation: {rubric.dimensions?.computation_accuracy}/20 | Presentation: {rubric.dimensions?.presentation_exam_style}/10
+            </div>
+            {rubric.recommended_next ? (
+              <div style={{ marginTop: 4 }}><b>Next focus:</b> {rubric.recommended_next.focus_skill}</div>
+            ) : null}
+          </div>
         ) : null}
       </div>
     );

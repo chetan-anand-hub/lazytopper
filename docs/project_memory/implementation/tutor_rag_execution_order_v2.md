@@ -35,4 +35,8 @@ Canonical tutor contracts live in `src/contracts/tutorContracts.ts` and are enfo
 - Hint ladder runtime adds levels L0?L5 and requestNextHint behavior.
 - attempt_loop.hint_ladder tracks current level, last hint, and history.
 - UI exposes Hint Level + Get next hint button when available.
+## B4 deliverable definition
+- Rubric dimensions D1?D5 with total score 0?100 and mastery bands.
+- attempt_loop.rubric attaches dimensions, band, strengths/gaps, recommended next focus.
+- UI displays score, band, and next focus line.
 

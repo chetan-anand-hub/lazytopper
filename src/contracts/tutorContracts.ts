@@ -84,6 +84,36 @@ export function validateAttemptLoop(loop: any) {
     }
   }
 
+  const rubric = loop.rubric;
+  if (rubric != null) {
+    const total = Number(rubric.total_score);
+    if (!Number.isFinite(total) || total < 0 || total > 100) issues.push("attempt_loop.rubric.total_score must be 0..100.");
+    const band = String(rubric.band || "");
+    if (!["BEGINNER", "DEVELOPING", "PROFICIENT", "MASTER"].includes(band)) {
+      issues.push("attempt_loop.rubric.band invalid.");
+    }
+    const dims = rubric.dimensions || {};
+    const d1 = Number(dims.concept_selection);
+    const d2 = Number(dims.setup_correctness);
+    const d3 = Number(dims.logical_progression);
+    const d4 = Number(dims.computation_accuracy);
+    const d5 = Number(dims.presentation_exam_style);
+    if (!Number.isFinite(d1) || d1 < 0 || d1 > 25) issues.push("rubric.dimensions.concept_selection must be 0..25.");
+    if (!Number.isFinite(d2) || d2 < 0 || d2 > 20) issues.push("rubric.dimensions.setup_correctness must be 0..20.");
+    if (!Number.isFinite(d3) || d3 < 0 || d3 > 25) issues.push("rubric.dimensions.logical_progression must be 0..25.");
+    if (!Number.isFinite(d4) || d4 < 0 || d4 > 20) issues.push("rubric.dimensions.computation_accuracy must be 0..20.");
+    if (!Number.isFinite(d5) || d5 < 0 || d5 > 10) issues.push("rubric.dimensions.presentation_exam_style must be 0..10.");
+    if (!Array.isArray(rubric.skill_tags)) issues.push("rubric.skill_tags must be array.");
+    if (!Array.isArray(rubric.strengths)) issues.push("rubric.strengths must be array.");
+    if (!Array.isArray(rubric.gaps)) issues.push("rubric.gaps must be array.");
+    if (!rubric.recommended_next || typeof rubric.recommended_next !== "object") {
+      issues.push("rubric.recommended_next missing.");
+    } else {
+      if (!String(rubric.recommended_next.focus_skill || "").trim()) issues.push("rubric.recommended_next.focus_skill missing.");
+      if (!String(rubric.recommended_next.micro_drill_prompt || "").trim()) issues.push("rubric.recommended_next.micro_drill_prompt missing.");
+    }
+  }
+
   const bsre = loop.bsre || {};
   if (!String(bsre.brief || "").trim()) issues.push("attempt_loop.bsre.brief missing.");
   if (!Array.isArray(bsre.steps)) issues.push("attempt_loop.bsre.steps missing.");
@@ -304,6 +334,24 @@ function buildAttemptLoopFallback(payload?: any) {
       missing_prereqs: missingPrereqs,
     },
     next_action: nextAction,
+    rubric: {
+      total_score: 20,
+      band: "BEGINNER",
+      dimensions: {
+        concept_selection: 5,
+        setup_correctness: 4,
+        logical_progression: 4,
+        computation_accuracy: 4,
+        presentation_exam_style: 3,
+      },
+      skill_tags: ["similarity"],
+      strengths: ["Attempt recorded"],
+      gaps: ["Criterion selection"],
+      recommended_next: {
+        focus_skill: "similarity_criteria",
+        micro_drill_prompt: "State AA/SAS/SSS and identify corresponding parts.",
+      },
+    },
     hint_ladder: {
       level: 0,
       max_level: 5,
