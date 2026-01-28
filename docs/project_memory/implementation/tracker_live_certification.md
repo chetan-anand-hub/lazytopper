@@ -40,3 +40,7 @@ YAML rule: use single quotes or forward slashes for Windows paths.
 
 ## Scope Guard
 Run `npm run scope:guard` before committing tooling tasks.
+
+- PostCSS config JSON MUST be UTF-8 NO BOM.
+- If build throws “Unexpected token '﻿' … not valid JSON”, run BOM scan.
+- Pre-flight includes: npm run build.
