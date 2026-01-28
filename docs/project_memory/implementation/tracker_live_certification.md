@@ -34,3 +34,6 @@ Pre-flight:
 - npm run build
 - npm run tracker
 - npm run tracker:doctor
+
+Nomenclature rule: R* roadmap vs B* tutor_rag blocks; no collisions.
+YAML rule: use single quotes or forward slashes for Windows paths.

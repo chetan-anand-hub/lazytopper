@@ -53,3 +53,6 @@ tracker:
       evidence:
         - file: "docs/project_memory/implementation/tracker_live_certification.md"
         - commit: "40344ea2eb20608b030a26f3c102ca8a9c289fc5"
+    - item: "Tutor RAG blocks integrated into tracker (tutor_rag: B0..B6)"
+      evidence:
+        - commit: "TBD"

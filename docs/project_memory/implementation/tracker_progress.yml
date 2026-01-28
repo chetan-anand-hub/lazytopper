@@ -31,3 +31,14 @@
         D2: "DONE"
         D3: "DONE"
         D4: "DONE"
+
+    tutor_rag:
+      current: "B0"
+      states:
+        B0: "TODO" # Tooling Health Pre-Block (build + tracker + doctor)
+        B1: "TODO" # Contract canonicalization (Triangles)
+        B2: "TODO" # Attempt loop + BSRE
+        B3: "TODO" # Hint ladder runtime (H0→H3)
+        B4: "TODO" # Mistake map + remediation drills
+        B5: "TODO" # Mastery gate + spaced review
+        B6: "TODO" # Public ship MVP (deploy + feedback loop)
