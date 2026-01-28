@@ -23,6 +23,7 @@
                     "tracker":  "node scripts/trackerAll.mjs",
                     "tracker:serve":  "node scripts/trackerServe.mjs",
                     "hooks:enable":  "git config core.hooksPath scripts/githooks",
+                    "tracker:doctor":  "node scripts/trackerDoctor.mjs",
                     "tracker:watch":  "node scripts/trackerWatch.mjs",
                     "predev":  "node scripts/prebuild.cjs",
                     "pmem:npm-run-ext":  "node tools/pmem/pmem-runner.cjs npm-run-ext",

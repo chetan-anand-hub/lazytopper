@@ -15,3 +15,13 @@ Opening the screener via file:// can show FAILED_TO_LOAD; HTTP server mode is au
 
 ## Baseline
 - T010 commit: 3c1591495584dc6f0490c7f0ce80531c3384d3b9
+
+## VS Code usage
+- Run Task: Tracker: Live (background)
+- Run Task: Tracker: Open UI
+
+## Self-check
+- npm run tracker:doctor
+
+## Pitfall
+file:// can show FAILED_TO_LOAD; use HTTP URL.
