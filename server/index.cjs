@@ -50,7 +50,7 @@ const trianglesRubricMap = new Map(
     .map((rubric) => [String(rubric?.id || ''), rubric])
     .filter(([id]) => Boolean(id))
 );
-const { validateTutorStructured, buildTutorFallback } = require(
+const { validateTutorStructured, buildTutorFallback, validateAttemptLoop } = require(
   path.join(__dirname, '../src/contracts/tutorContracts.ts')
 );
 
@@ -1005,6 +1005,81 @@ function extractStudentAttempt(payload, messages) {
   return String(last || '').replace(/^(check|evaluate|mark|grade|score|feedback)\s*[:\-]?\s*/i, '').trim();
 }
 
+function classifyAttemptStatus(attempt) {
+  const raw = String(attempt || '').trim();
+  if (!raw || raw.length < 8) return 'unclear';
+  const lower = raw.toLowerCase();
+  const hasCriterion = /(aa|sas|sss|similar|proportion|corresponding|cpst)\b/i.test(lower);
+  const hasConclusion = /(therefore|hence|thus|conclude|so)\b/i.test(lower);
+  if (hasCriterion && hasConclusion) return 'correct';
+  if (hasCriterion) return 'partially_correct';
+  return 'incorrect';
+}
+
+function attemptStatusToConfidence(status) {
+  if (status === 'correct') return 0.85;
+  if (status === 'partially_correct') return 0.6;
+  if (status === 'incorrect') return 0.35;
+  return 0.15;
+}
+
+function buildAttemptLoopHeuristic(payload, attempt) {
+  const raw = String(attempt || '').trim();
+  const status = classifyAttemptStatus(raw);
+  const mistakeTags = status === 'correct'
+    ? []
+    : status === 'partially_correct'
+      ? ['missing_conclusion']
+      : status === 'unclear'
+        ? ['no_working_shown']
+        : ['missing_similarity_criterion', 'correspondence_mismatch'];
+  const missingPrereqs = status === 'correct'
+    ? []
+    : status === 'unclear'
+      ? ['problem_understanding']
+      : ['similarity_criteria'];
+  const nextAction = status === 'correct'
+    ? { type: 'NEXT_STEP', prompt: 'Proceed to the next step and solve for the unknowns.' }
+    : status === 'partially_correct'
+      ? { type: 'HINT', prompt: 'State the similarity criterion and finish with the final similarity statement.' }
+      : status === 'unclear'
+        ? { type: 'CHECKPOINT', prompt: 'Write the given angles/sides and the target result in one line each.' }
+        : { type: 'REFRAME', prompt: 'Reframe: identify corresponding angles/sides, then apply AA/SAS/SSS.' };
+
+  const briefMap = {
+    correct: 'Attempt is consistent with the similarity criterion; proceed to compute the result.',
+    partially_correct: 'Good start, but the conclusion/criterion is incomplete.',
+    incorrect: 'Attempt misses the similarity criterion or correspondence.',
+    unclear: 'Attempt is missing or too short to evaluate reliably.',
+  };
+
+  return {
+    student_attempt: {
+      raw_text: raw || '(empty attempt)',
+      confidence: attemptStatusToConfidence(status),
+    },
+    diagnosis: {
+      status,
+      mistake_tags: mistakeTags,
+      missing_prereqs: missingPrereqs,
+    },
+    next_action: nextAction,
+    bsre: {
+      brief: briefMap[status] || briefMap.unclear,
+      steps: [
+        'Identify given equal angles or proportional sides.',
+        'State AA/SAS/SSS and fix the correspondence.',
+        'Write the proportionality and solve for unknowns.',
+      ],
+      reasoning_checks: ['Named the criterion', 'Matched corresponding parts', 'Closed with similarity statement'],
+      evaluation: {
+        verdict: status,
+        why: briefMap[status] || briefMap.unclear,
+      },
+    },
+  };
+}
+
 function getProofFocus(payload) {
   const focusRaw = Array.isArray(payload?.theoremFocus)
     ? payload.theoremFocus[0]
@@ -1370,8 +1445,16 @@ function validateStructuredForMode(obj, mode, payload, opts) {
       const proofCheck = validateProofSolveWithMe(obj, payload, isFirstTurn);
       if (!proofCheck.ok) issues.push(...proofCheck.issues);
     }
+    if (obj && obj.attempt_loop) {
+      const loopCheck = validateAttemptLoop(obj.attempt_loop);
+      if (!loopCheck.ok) issues.push(...loopCheck.issues);
+    }
   } else if (mode === 'board_steps_ms') {
     if (!isValidMentorProtocol(obj, mode)) issues.push('Invalid board_steps_ms protocol.');
+    if (obj && obj.attempt_loop) {
+      const loopCheck = validateAttemptLoop(obj.attempt_loop);
+      if (!loopCheck.ok) issues.push(...loopCheck.issues);
+    }
   } else if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'learn_proof') {
     const check = validateTutorStructured(mode, obj, payload);
     if (!check.ok) issues.push(...check.issues);
@@ -2754,6 +2837,11 @@ ${userPrompt}` }] },
 
       if (isStructuredMode(normalisedMode)) {
         structured = tryParseJsonStrict(finalText);
+        const attemptText = extractStudentAttempt(payload, reqJson?.messages);
+        const shouldAttachAttemptLoop = Boolean(attemptText) && isTrianglesTopic(payload);
+        if (structured && shouldAttachAttemptLoop) {
+          structured.attempt_loop = buildAttemptLoopHeuristic(payload, attemptText);
+        }
         const isFirstTurn =
           normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
             ? reqJson.messages.length <= 1

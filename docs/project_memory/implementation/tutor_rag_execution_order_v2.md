@@ -27,3 +27,8 @@ Pass criteria: build + tracker + doctor succeed before any tutor RAG work.
 
 ## B1 deliverable definition
 Canonical tutor contracts live in `src/contracts/tutorContracts.ts` and are enforced on the server (fallback on invalid output).
+## B2 deliverable definition
+- Tutor responses include an optional attempt_loop (diagnosis + next_action + bsre).
+- Server attaches deterministic attempt_loop for Triangles attempts and falls back safely.
+- UI shows a compact Attempt Feedback panel when attempt_loop is present.
+

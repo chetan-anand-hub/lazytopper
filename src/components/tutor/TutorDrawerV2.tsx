@@ -314,6 +314,31 @@ export default function TutorDrawerV2(props: {
     if (next !== nodeIndex) goToNodeIndex(next);
   };
 
+  const renderAttemptFeedback = (obj: any) => {
+    const loop = obj?.attempt_loop;
+    if (!loop || typeof loop !== "object") return null;
+    const diagnosis = loop.diagnosis || {};
+    const nextAction = loop.next_action || {};
+    const tags = Array.isArray(diagnosis.mistake_tags) ? diagnosis.mistake_tags.slice(0, 3) : [];
+    const verdict = String(diagnosis.status || "unclear").toUpperCase();
+    const actionType = String(nextAction.type || "");
+    const prompt = String(nextAction.prompt || "");
+    const brief = loop.bsre?.brief ? String(loop.bsre.brief) : "";
+    return (
+      <div style={{ borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(0,0,0,0.08)", background: "rgba(56,189,248,0.10)" }}>
+        <div style={{ fontWeight: 800 }}>Attempt Feedback</div>
+        <div style={{ marginTop: 6 }}>Diagnosis: <b>{verdict}</b></div>
+        {tags.length ? (
+          <div style={{ marginTop: 6, fontSize: 12 }}>Mistake tags: {tags.join(", ")}</div>
+        ) : null}
+        {actionType || prompt ? (
+          <div style={{ marginTop: 6 }}><b>{actionType || "Next"}:</b> {prompt}</div>
+        ) : null}
+        {brief ? <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>{brief}</div> : null}
+      </div>
+    );
+  };
+
   const renderTeach = () => {
     const obj = currentResponse?.structured || null;
     if (!obj) return null;
@@ -329,6 +354,7 @@ export default function TutorDrawerV2(props: {
           diagramSpec={currentResponse.diagramSpec}
           note="CBSE diagram block"
         />
+        {renderAttemptFeedback(obj)}
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -416,6 +442,7 @@ export default function TutorDrawerV2(props: {
           diagramSpec={currentResponse.diagramSpec}
           note="CBSE diagram block"
         />
+        {renderAttemptFeedback(obj)}
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>

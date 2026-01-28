@@ -1,4 +1,6 @@
 ﻿export type TutorMode = "learn_teach" | "learn_mindmap" | "board_steps_ms" | "solve_with_me" | "learn_proof";
+export type AttemptLoopStatus = "correct" | "partially_correct" | "incorrect" | "unclear";
+export type AttemptLoopNextAction = "HINT" | "REFRAME" | "MICRO_DRILL" | "NEXT_STEP" | "CHECKPOINT";
 
 type DiagramMeta = {
   diagramType: string;
@@ -20,6 +22,54 @@ function hasDiagram(meta: DiagramMeta) {
 
 function containsPlaceholderLanguage(blob: string) {
   return /\bplaceholder\b|\bTODO\b|\bTBD\b|\bfill in\b/i.test(blob || "");
+}
+
+export function validateAttemptLoop(loop: any) {
+  const issues: string[] = [];
+  if (!loop || typeof loop !== "object") return { ok: false, issues: ["attempt_loop must be an object."] };
+
+  const student = loop.student_attempt || {};
+  if (!String(student.raw_text || "").trim()) issues.push("attempt_loop.student_attempt.raw_text missing.");
+  if (student.parsed && typeof student.parsed !== "object") issues.push("attempt_loop.student_attempt.parsed must be object.");
+  if (student.confidence != null) {
+    const conf = Number(student.confidence);
+    if (!Number.isFinite(conf) || conf < 0 || conf > 1) issues.push("attempt_loop.student_attempt.confidence must be 0..1.");
+  }
+
+  const diagnosis = loop.diagnosis || {};
+  const status = String(diagnosis.status || "").toLowerCase();
+  if (!["correct", "partially_correct", "incorrect", "unclear"].includes(status)) {
+    issues.push("attempt_loop.diagnosis.status invalid.");
+  }
+  if (!Array.isArray(diagnosis.mistake_tags)) issues.push("attempt_loop.diagnosis.mistake_tags missing.");
+  if (!Array.isArray(diagnosis.missing_prereqs)) issues.push("attempt_loop.diagnosis.missing_prereqs missing.");
+
+  const nextAction = loop.next_action || {};
+  const actionType = String(nextAction.type || "").toUpperCase();
+  if (!["HINT", "REFRAME", "MICRO_DRILL", "NEXT_STEP", "CHECKPOINT"].includes(actionType)) {
+    issues.push("attempt_loop.next_action.type invalid.");
+  }
+  if (!String(nextAction.prompt || "").trim()) issues.push("attempt_loop.next_action.prompt missing.");
+
+  const bsre = loop.bsre || {};
+  if (!String(bsre.brief || "").trim()) issues.push("attempt_loop.bsre.brief missing.");
+  if (!Array.isArray(bsre.steps)) issues.push("attempt_loop.bsre.steps missing.");
+  if (!Array.isArray(bsre.reasoning_checks)) issues.push("attempt_loop.bsre.reasoning_checks missing.");
+  if (!bsre.evaluation || typeof bsre.evaluation !== "object") {
+    issues.push("attempt_loop.bsre.evaluation missing.");
+  } else {
+    if (!String(bsre.evaluation.verdict || "").trim()) issues.push("attempt_loop.bsre.evaluation.verdict missing.");
+    if (!String(bsre.evaluation.why || "").trim()) issues.push("attempt_loop.bsre.evaluation.why missing.");
+  }
+
+  return { ok: issues.length === 0, issues };
+}
+
+function appendAttemptLoopIssues(obj: any, issues: string[]) {
+  if (!obj || typeof obj !== "object") return;
+  if (!("attempt_loop" in obj)) return;
+  const check = validateAttemptLoop(obj.attempt_loop);
+  if (!check.ok) issues.push(...check.issues);
 }
 
 function validateLearnTeach(obj: any, payload?: any) {
@@ -83,6 +133,7 @@ function validateLearnTeach(obj: any, payload?: any) {
   if (containsPlaceholderLanguage(blob)) {
     issues.push("Placeholder language detected.");
   }
+  appendAttemptLoopIssues(obj, issues);
 
   return { ok: issues.length === 0, issues };
 }
@@ -108,6 +159,7 @@ function validateLearnMindmap(obj: any) {
   if (!meta.diagramLabels || typeof meta.diagramLabels !== "object") issues.push("diagramLabels missing.");
   const blob = JSON.stringify(obj || {});
   if (containsPlaceholderLanguage(blob)) issues.push("Placeholder language detected.");
+  appendAttemptLoopIssues(obj, issues);
   return { ok: issues.length === 0, issues };
 }
 
@@ -140,6 +192,7 @@ function validateLearnProof(obj: any) {
 
   const blob = JSON.stringify(obj || {});
   if (containsPlaceholderLanguage(blob)) issues.push("Placeholder language detected.");
+  appendAttemptLoopIssues(obj, issues);
 
   return { ok: issues.length === 0, issues };
 }
@@ -151,6 +204,7 @@ function validateBoardSteps(obj: any) {
   if (typeof obj.totalMarks !== "number") issues.push("totalMarks missing.");
   const steps = Array.isArray(obj.steps) ? obj.steps : [];
   if (!steps.length) issues.push("steps missing.");
+  appendAttemptLoopIssues(obj, issues);
   return { ok: issues.length === 0, issues };
 }
 
@@ -165,6 +219,7 @@ function validateSolveWithMe(obj: any) {
     }
     if (!String(obj.tutor || "").trim()) issues.push("tutor missing.");
   }
+  appendAttemptLoopIssues(obj, issues);
   return { ok: issues.length === 0, issues };
 }
 
@@ -184,11 +239,67 @@ function defaultDiagram() {
   };
 }
 
+function getAttemptText(payload?: any) {
+  return String(payload?.studentAttempt || payload?.studentAnswer || payload?.student_attempt || "").trim();
+}
+
+function statusToConfidence(status: AttemptLoopStatus) {
+  if (status === "correct") return 0.85;
+  if (status === "partially_correct") return 0.6;
+  if (status === "incorrect") return 0.35;
+  return 0.15;
+}
+
+function buildAttemptLoopFallback(payload?: any) {
+  const raw = getAttemptText(payload);
+  const isShort = raw.length < 8;
+  const status: AttemptLoopStatus = isShort ? "unclear" : "incorrect";
+  const mistakeTags = isShort ? ["no_working_shown"] : ["similarity_criterion_missing"];
+  const missingPrereqs = isShort ? ["problem_understanding"] : ["similarity_criteria"];
+  const nextAction =
+    status === "unclear"
+      ? { type: "CHECKPOINT" as AttemptLoopNextAction, prompt: "Write the given data and the target result in one line each." }
+      : { type: "HINT" as AttemptLoopNextAction, prompt: "State AA/SAS/SSS first, then match corresponding sides." };
+  return {
+    student_attempt: {
+      raw_text: raw || "(empty attempt)",
+      confidence: statusToConfidence(status),
+    },
+    diagnosis: {
+      status,
+      mistake_tags: mistakeTags,
+      missing_prereqs: missingPrereqs,
+    },
+    next_action: nextAction,
+    bsre: {
+      brief: isShort
+        ? "Attempt missing or too short to grade; start by stating the givens and the criterion."
+        : "Attempt needs a clear similarity criterion and correspondence.",
+      steps: [
+        "Identify equal angles or proportional sides from the given data.",
+        "State the similarity criterion (AA/SAS/SSS).",
+        "Write proportional sides and solve for unknowns.",
+      ],
+      reasoning_checks: ["Named the criterion", "Matched corresponding parts", "Wrote the final similarity statement"],
+      evaluation: {
+        verdict: status,
+        why: isShort ? "No usable attempt was provided." : "Criterion/correspondence missing or unclear.",
+      },
+    },
+  };
+}
+
+function attachAttemptLoop(base: any, payload?: any) {
+  const raw = getAttemptText(payload);
+  if (!raw) return base;
+  return { ...base, attempt_loop: buildAttemptLoopFallback(payload) };
+}
+
 export function buildTutorFallback(mode: TutorMode, payload?: any) {
   const { diagramType, diagramLabels } = defaultDiagram();
 
   if (mode === "learn_mindmap") {
-    return {
+    return attachAttemptLoop({
       kind: "learn_mindmap",
       conceptBullets: [
         "Triangles have sides and angles that relate through similarity rules.",
@@ -210,11 +321,11 @@ export function buildTutorFallback(mode: TutorMode, payload?: any) {
       diagramLabels,
       fallback_used: true,
       fallback_note: "Tutor contract fallback used.",
-    };
+    }, payload);
   }
 
   if (mode === "learn_teach") {
-    return {
+    return attachAttemptLoop({
       kind: "learn_teach",
       teach: {
         simpleExplanation: [
@@ -254,11 +365,11 @@ export function buildTutorFallback(mode: TutorMode, payload?: any) {
       diagramLabels,
       fallback_used: true,
       fallback_note: "Tutor contract fallback used.",
-    };
+    }, payload);
   }
 
   if (mode === "learn_proof") {
-    return {
+    return attachAttemptLoop({
       kind: "learn_proof",
       given: ["Given data from the problem."],
       toProve: ["Statement to prove."],
@@ -270,11 +381,11 @@ export function buildTutorFallback(mode: TutorMode, payload?: any) {
       diagramLabels,
       fallback_used: true,
       fallback_note: "Tutor contract fallback used.",
-    };
+    }, payload);
   }
 
   if (mode === "board_steps_ms") {
-    return {
+    return attachAttemptLoop({
       kind: "board_steps_ms",
       totalMarks: 3,
       steps: [
@@ -285,14 +396,14 @@ export function buildTutorFallback(mode: TutorMode, payload?: any) {
       finalAnswer: "Use the structured proof above.",
       fallback_used: true,
       fallback_note: "Tutor contract fallback used.",
-    };
+    }, payload);
   }
 
-  return {
+  return attachAttemptLoop({
     kind: "question",
     tutor: "Let us start by identifying the given and what must be proved.",
     answerFormat: "Short sentence",
     fallback_used: true,
     fallback_note: "Tutor contract fallback used.",
-  };
+  }, payload);
 }
