@@ -10,7 +10,10 @@ if (modeIdx !== -1 && rawArgs[modeIdx + 1]) {
 const ALLOWED_TOOLING = [
   "docs/project_memory/implementation/",
   "scripts/tracker",
+  "scripts/bomGuard.mjs",
+  "scripts/scopeGuard.mjs",
   ".vscode/",
+  "package.json",
 ];
 
 const ALLOWED_TUTOR = [
