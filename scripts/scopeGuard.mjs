@@ -1,10 +1,27 @@
 ﻿import { execSync } from "child_process";
 
-const ALLOWED_PREFIXES = [
+const rawArgs = process.argv.slice(2);
+let mode = "tooling";
+const modeIdx = rawArgs.indexOf("--mode");
+if (modeIdx !== -1 && rawArgs[modeIdx + 1]) {
+  mode = rawArgs[modeIdx + 1];
+}
+
+const ALLOWED_TOOLING = [
   "docs/project_memory/implementation/",
   "scripts/tracker",
   ".vscode/",
 ];
+
+const ALLOWED_TUTOR = [
+  "src/",
+  "server/",
+  "docs/project_memory/implementation/",
+  "scripts/tracker",
+  ".vscode/",
+];
+
+const ALLOWED_PREFIXES = mode === "tutor" ? ALLOWED_TUTOR : ALLOWED_TOOLING;
 
 function listFiles(cmd) {
   try {
@@ -25,11 +42,12 @@ const disallowed = all.filter((p) => !ALLOWED_PREFIXES.some((pre) => p.startsWit
 
 if (disallowed.length) {
   console.log("SCOPE_GUARD_FAIL: disallowed paths detected");
+  console.log(`mode: ${mode}`);
   for (const p of disallowed) console.log(` - ${p}`);
   console.log("Allowed prefixes:");
   for (const pre of ALLOWED_PREFIXES) console.log(` - ${pre}`);
   process.exit(1);
 }
 
-console.log("SCOPE_GUARD_OK");
+console.log(`SCOPE_GUARD_OK (mode=${mode})`);
 process.exit(0);

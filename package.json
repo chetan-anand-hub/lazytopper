@@ -1,4 +1,4 @@
-{
+﻿{
     "name":  "lazytopper",
     "private":  true,
     "version":  "0.0.0",
@@ -23,6 +23,7 @@
                     "tracker":  "node scripts/trackerAll.mjs",
                     "tracker:serve":  "node scripts/trackerServe.mjs",
                     "hooks:enable":  "git config core.hooksPath scripts/githooks",
+                    "scope:guard:tutor":  "node scripts/scopeGuard.mjs --mode tutor",
                     "scope:guard":  "node scripts/scopeGuard.mjs",
                     "tracker:doctor":  "node scripts/trackerDoctor.mjs",
                     "tracker:watch":  "node scripts/trackerWatch.mjs",
