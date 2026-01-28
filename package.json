@@ -5,7 +5,7 @@
     "type":  "module",
     "scripts":  {
                     "pmem:mark-critical":  "node tools/pmem/pmem-runner.cjs mark-critical",
-                    "tracker:open":  "npm run tracker:ui \u0026\u0026 start \"\" \".project_memory\\tracker_ui\\index.html\"",
+                    "tracker:open":  "npm run tracker:live",
                     "pmem:export-crashpack":  "node tools/pmem/pmem-runner.cjs export-crashpack",
                     "pmem:end-session":  "node tools/pmem/pmem-runner.cjs end-session",
                     "blackbox:ci":  "npm run blackbox:full \u0026\u0026 npm run build",
@@ -59,3 +59,4 @@
                             "yaml":  "^2.8.2"
                         }
 }
+
