@@ -22,3 +22,12 @@
         S3: "DONE"
         S4: "DONE"
         S5: "DONE"
+
+    detours:
+      # This is your “branch lane” for side quests not on the main roadmap.
+      # States: TODO | DOING | DONE | BLOCKED | SKIP
+      states:
+        D1: "DONE"
+        D2: "DONE"
+        D3: "DONE"
+        D4: "DONE"

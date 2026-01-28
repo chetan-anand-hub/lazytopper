@@ -91,3 +91,6 @@ docs/project_notes/issues_backup_*.md
 # generated tracker outputs (json/md)
 .project_memory/tracker/
 
+
+# local reports evidence
+Reports/

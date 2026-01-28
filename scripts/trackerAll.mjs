@@ -7,6 +7,7 @@ const ROOT = process.cwd();
 
 const bbChecklistPath = path.join(ROOT, "docs", "project_memory", "implementation", "implementation_checklist.yml");
 const ltRoadmapPath   = path.join(ROOT, "docs", "project_memory", "implementation", "lazytopper_roadmap.yml");
+const detoursRoadmapPath = path.join(ROOT, "docs", "project_memory", "implementation", "detours_roadmap.yml");
 const progressPath    = path.join(ROOT, "docs", "project_memory", "implementation", "tracker_progress.yml");
 
 const OUT_DIR  = path.join(ROOT, ".project_memory", "tracker");
@@ -58,6 +59,7 @@ function buildTrack(trackId, trackTitle, stages, statesMap) {
 function main() {
   const bbChecklist = fs.existsSync(bbChecklistPath) ? loadYaml(bbChecklistPath)?.blackbox : null;
   const ltRoadmap   = fs.existsSync(ltRoadmapPath) ? loadYaml(ltRoadmapPath)?.lazytopper : null;
+  const detoursRoadmap = fs.existsSync(detoursRoadmapPath) ? loadYaml(detoursRoadmapPath)?.detours : null;
   const progress    = fs.existsSync(progressPath) ? loadYaml(progressPath)?.progress : null;
 
   if (!ltRoadmap) {
@@ -71,12 +73,15 @@ function main() {
 
   const bbStages = (bbChecklist?.stages || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
   const ltStages = (ltRoadmap?.stages   || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
+  const detoursStages = (detoursRoadmap?.stages || []).map((s) => ({ id: s.id, title: s.title || s.name || "" }));
 
   const bbStates = progress?.tracks?.blackbox?.states || {};
   const ltStates = progress?.tracks?.lazytopper?.states || {};
+  const detoursStates = progress?.tracks?.detours?.states || {};
 
   const tracks = [
     buildTrack("lazytopper", ltRoadmap?.title || "LazyTopper", ltStages, ltStates),
+    buildTrack("detours", detoursRoadmap?.title || "Detours / Experiments", detoursStages, detoursStates),
     buildTrack("blackbox", bbChecklist?.title || "Blackbox", bbStages, bbStates),
   ];
 
@@ -86,6 +91,7 @@ function main() {
   const allowedPrefixes = [
     ...(ltRoadmap?.allowedSystemTouchPrefixes || []),
     ...(bbChecklist?.allowedSystemTouchPrefixes || []),
+    ...(detoursRoadmap?.allowedSystemTouchPrefixes || []),
   ];
 
   const drift = computeDrift(statusLines, allowedPrefixes);
@@ -143,3 +149,6 @@ function main() {
 }
 
 main();
+
+
+
