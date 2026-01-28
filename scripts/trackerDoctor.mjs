@@ -1,6 +1,9 @@
 ﻿import http from "http";
+import fs from "fs";
+import yaml from "yaml";
 
 const PORTS = [4179, 5173, 4173, 3000];
+const TRACKER_YAML = "docs/project_memory/implementation/tracker_progress.yml";
 
 function get(url) {
   return new Promise((resolve) => {
@@ -26,6 +29,17 @@ async function checkPort(port) {
 }
 
 (async () => {
+  try {
+    const src = fs.readFileSync(TRACKER_YAML, "utf8");
+    yaml.parse(src);
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    console.log(`TRACKER_YAML_INVALID: ${TRACKER_YAML}`);
+    console.log("Fix escaping: use single quotes or forward slashes");
+    console.log(`Details: ${msg}`);
+    process.exit(2);
+  }
+
   for (const port of PORTS) {
     const base = await checkPort(port);
     if (base) {

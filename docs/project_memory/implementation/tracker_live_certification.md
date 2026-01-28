@@ -25,3 +25,12 @@ Opening the screener via file:// can show FAILED_TO_LOAD; HTTP server mode is au
 
 ## Pitfall
 file:// can show FAILED_TO_LOAD; use HTTP URL.
+
+## Tooling blockers (never again)
+- Build/PostCSS: config must match file type and be UTF-8 without BOM.
+- Tracker YAML: paths must use single quotes or forward slashes (avoid \\U escapes).
+
+Pre-flight:
+- npm run build
+- npm run tracker
+- npm run tracker:doctor
