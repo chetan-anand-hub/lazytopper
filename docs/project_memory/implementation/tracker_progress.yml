@@ -40,5 +40,5 @@
         B2: "DONE" # Attempt loop + BSRE (attempt_loop + fallback); commit: TBD
         B3: "DONE" # Hint ladder runtime (L0?L5); commit: TBD
         B4: "DONE" # Rubric scoring + mastery bands; commit: TBD
-        B5: "TODO" # Mastery gate + spaced review
+        B5: "DONE" # Retrieval + sources (local knowledge); commit: TBD
         B6: "TODO" # Public ship MVP (deploy + feedback loop)

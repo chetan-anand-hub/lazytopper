@@ -59,6 +59,9 @@ const { initHintState, computeNextHint } = require(
 const { scoreRubric } = require(
   path.join(__dirname, '../src/tutor/rubricScore.ts')
 );
+const { retrieveTrianglesSources } = require(
+  path.join(__dirname, '../src/tutor/retrieval/trianglesRetriever.ts')
+);
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -1083,6 +1086,12 @@ function buildAttemptLoopHeuristic(payload, attempt) {
     theoremFocus: payload?.theoremFocus,
   });
 
+  const sources = retrieveTrianglesSources({
+    attemptText: raw,
+    mistakeTags,
+    theoremFocus: payload?.theoremFocus,
+  });
+
   return {
     student_attempt: {
       raw_text: raw || '(empty attempt)',
@@ -1096,6 +1105,7 @@ function buildAttemptLoopHeuristic(payload, attempt) {
     next_action: nextAction,
     hint_ladder: status === 'correct' ? null : hintState,
     rubric,
+    sources,
     bsre: {
       brief: briefMap[status] || briefMap.unclear,
       steps: [

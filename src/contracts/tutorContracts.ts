@@ -114,6 +114,21 @@ export function validateAttemptLoop(loop: any) {
     }
   }
 
+  const sources = loop.sources;
+  if (sources != null) {
+    if (!Array.isArray(sources)) {
+      issues.push("attempt_loop.sources must be array.");
+    } else {
+      sources.forEach((s: any, idx: number) => {
+        if (!s || typeof s !== "object") issues.push(`attempt_loop.sources[${idx}] invalid.`);
+        if (!String(s?.id || "").trim()) issues.push(`attempt_loop.sources[${idx}].id missing.`);
+        if (!String(s?.title || "").trim()) issues.push(`attempt_loop.sources[${idx}].title missing.`);
+        if (!String(s?.path || "").trim()) issues.push(`attempt_loop.sources[${idx}].path missing.`);
+        if (!String(s?.excerpt || "").trim()) issues.push(`attempt_loop.sources[${idx}].excerpt missing.`);
+      });
+    }
+  }
+
   const bsre = loop.bsre || {};
   if (!String(bsre.brief || "").trim()) issues.push("attempt_loop.bsre.brief missing.");
   if (!Array.isArray(bsre.steps)) issues.push("attempt_loop.bsre.steps missing.");
@@ -334,6 +349,7 @@ function buildAttemptLoopFallback(payload?: any) {
       missing_prereqs: missingPrereqs,
     },
     next_action: nextAction,
+    sources: [],
     rubric: {
       total_score: 20,
       band: "BEGINNER",

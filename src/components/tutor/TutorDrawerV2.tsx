@@ -321,6 +321,7 @@ export default function TutorDrawerV2(props: {
     const loop = obj?.attempt_loop;
     const hint = loop?.hint_ladder;
     const rubric = loop?.rubric;
+    const sources = Array.isArray(loop?.sources) ? loop.sources : [];
     if (!loop || typeof loop !== "object") return null;
     const diagnosis = loop.diagnosis || {};
     const nextAction = loop.next_action || {};
@@ -358,6 +359,17 @@ export default function TutorDrawerV2(props: {
         ) : null}
         {rubric ? (
           <div style={{ marginTop: 10, fontSize: 12, borderTop: '1px dashed rgba(0,0,0,0.12)', paddingTop: 8 }}>
+            {sources.length ? (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontWeight: 800 }}>Sources</div>
+                {sources.map((s: any, idx: number) => (
+                  <div key={idx} style={{ marginTop: 6 }}>
+                    <div><b>{s.title}</b> <span style={{ opacity: 0.7 }}>({s.path})</span></div>
+                    <div style={{ opacity: 0.8 }}>{s.excerpt}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div><b>Score:</b> {rubric.total_score}/100 ({rubric.band})</div>
             <div style={{ marginTop: 4 }}>
               Concept: {rubric.dimensions?.concept_selection}/25 | Setup: {rubric.dimensions?.setup_correctness}/20 | Logic: {rubric.dimensions?.logical_progression}/25

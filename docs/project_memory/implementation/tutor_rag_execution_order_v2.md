@@ -39,4 +39,8 @@ Canonical tutor contracts live in `src/contracts/tutorContracts.ts` and are enfo
 - Rubric dimensions D1?D5 with total score 0?100 and mastery bands.
 - attempt_loop.rubric attaches dimensions, band, strengths/gaps, recommended next focus.
 - UI displays score, band, and next focus line.
+## B5 deliverable definition
+- Local retrieval from docs/knowledge/triangles with top-3 sources.
+- attempt_loop.sources attaches {id,title,path,excerpt}.
+- UI shows Sources list under Attempt Feedback.
 
