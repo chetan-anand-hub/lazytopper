@@ -8,9 +8,12 @@ if (modeIdx !== -1 && rawArgs[modeIdx + 1]) {
 }
 
 const ALLOWED_TOOLING = [
+  ".gitattributes",
   "docs/project_memory/implementation/",
+  "docs/project_memory/implementation/tooling_rules_ci_lint.md",
   "scripts/tracker",
   "scripts/bomGuard.mjs",
+  "scripts/lintCi.mjs",
   "scripts/scopeGuard.mjs",
   ".vscode/",
   "package.json",

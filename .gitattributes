@@ -2,6 +2,7 @@
 * text=auto
 
 # Force LF for config/docs/scripts that frequently cause phantom diffs
+# (avoid Windows phantom diffs in CI and workflows)
 *.yml  text eol=lf
 *.yaml text eol=lf
 *.md   text eol=lf
