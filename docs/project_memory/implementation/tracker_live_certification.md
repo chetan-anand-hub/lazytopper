@@ -29,6 +29,7 @@ file:// can show FAILED_TO_LOAD; use HTTP URL.
 ## Tooling blockers (never again)
 - Build/PostCSS: config must match file type and be UTF-8 without BOM.
 - Tracker YAML: paths must use single quotes or forward slashes (avoid \\U escapes).
+- Windows artifacts: avoid creating `desktop.ini`/`Thumbs.db`/`.DS_Store`; if possible, don’t open repo folders in Explorer.
 
 Pre-flight:
 - npm run build
