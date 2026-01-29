@@ -36,7 +36,8 @@
     "prebuild": "npm run bom:guard && node scripts/prebuild.cjs",
     "server": "node server/index.cjs",
     "lint": "eslint .",
-    "bom:guard": "node scripts/bomGuard.mjs"
+    "bom:guard": "node scripts/bomGuard.mjs",
+    "tutor:eval": "node scripts/tutorEval.mjs"
   },
   "dependencies": {
     "html-to-image": "^1.10.7",

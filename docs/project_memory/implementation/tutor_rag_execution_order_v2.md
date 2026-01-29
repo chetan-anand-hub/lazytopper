@@ -17,6 +17,10 @@ Pass criteria: build + tracker + doctor succeed before any tutor RAG work.
 ## B5 — Mastery gate + spaced review
 
 ## B6 — Evaluation harness + regression tests (Triangles-first)
+Deliverable:
+- Deterministic evaluation harness for Triangles tutor outputs.
+- Run: `npm run tutor:eval`
+- Outputs: `.project_memory/tutor_eval/eval_report.json` and `.project_memory/tutor_eval/eval_report.md`
 
 ## B7 — Public ship MVP (deploy + feedback loop)
 
