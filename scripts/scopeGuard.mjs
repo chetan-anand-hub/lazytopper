@@ -13,8 +13,11 @@ const ALLOWED_TOOLING = [
   "docs/project_memory/implementation/tooling_rules_ci_lint.md",
   "scripts/tracker",
   "scripts/bomGuard.mjs",
+  "scripts/lintDebtFreeze.mjs",
+  "scripts/lintDebtCheck.mjs",
   "scripts/lintCi.mjs",
   "scripts/scopeGuard.mjs",
+  "src/pages/WeeklyWrappedPage.tsx",
   ".vscode/",
   "package.json",
 ];

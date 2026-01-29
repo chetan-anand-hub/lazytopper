@@ -10,7 +10,7 @@
  * Share workflow captures the carousel as an image and tries native share,
  * clipboard, or download fallbacks, keeping the UI unchanged.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { getAttempts } from '../services/practiceInsights';
@@ -23,7 +23,7 @@ export default function WeeklyWrappedPage() {
   const captureRef = useRef<HTMLDivElement | null>(null);
 
   // Compute the date range for the past 7 days
-  const end = Date.now();
+  const [end] = useState(() => Date.now());
   const start = end - 7 * 24 * 60 * 60 * 1000;
 
   // Load all attempts in this interval
