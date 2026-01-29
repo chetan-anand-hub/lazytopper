@@ -95,6 +95,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_MODEL_ZOMBIE = process.env.GEMINI_MODEL_ZOMBIE || '';
 const GEMINI_MODEL_BEAST = process.env.GEMINI_MODEL_BEAST || '';
+const REPO_ROOT = process.cwd();
+const FEEDBACK_DIR = path.join(REPO_ROOT, '.project_memory', 'ops', 'feedback');
+const FEEDBACK_FILE = path.join(FEEDBACK_DIR, 'triangles_feedback.jsonl');
 
 /**
  * Helper to send JSON with CORS headers.
@@ -163,6 +166,36 @@ function readJson(req) {
       }
     });
   });
+}
+
+function persistTutorFeedback(payload) {
+  const helpful = payload?.helpful;
+  if (typeof helpful !== 'boolean') throw new Error('helpful must be boolean');
+
+  const commentRaw = typeof payload?.comment === 'string' ? payload.comment : '';
+  const comment = commentRaw.slice(0, 1000);
+  const record = {
+    ts: new Date().toISOString(),
+    helpful,
+    comment,
+    context: {
+      topicKey: payload?.topicKey || null,
+      nodeId: payload?.nodeId || null,
+      responseId: payload?.responseId || null,
+      tab: payload?.tab || null,
+      mode: payload?.mode || null,
+      grade: payload?.grade || null,
+      subject: payload?.subject || null,
+    },
+    meta: {
+      userAgent: payload?.userAgent || null,
+      clientTs: payload?.clientTs || null,
+    },
+  };
+
+  fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
+  fs.appendFileSync(FEEDBACK_FILE, JSON.stringify(record) + '\n');
+  return record;
 }
 
 /**
@@ -2595,7 +2628,7 @@ async function handleRequest(req, res) {
   // CORS preflight
   if (
     req.method === 'OPTIONS' &&
-    (req.url === '/api/mentor' || req.url === '/api/more-like-this')
+    (req.url === '/api/mentor' || req.url === '/api/more-like-this' || req.url === '/api/tutor-feedback')
   ) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -2618,6 +2651,23 @@ async function handleRequest(req, res) {
       hasKey: Boolean(GEMINI_API_KEY),
       node: process.version,
     });
+  }
+
+  // Tutor feedback endpoint
+  if (req.method === 'POST' && req.url === '/api/tutor-feedback') {
+    let reqJson;
+    try {
+      reqJson = await readJson(req);
+    } catch (e) {
+      return sendJson(res, 400, { error: 'Invalid JSON' });
+    }
+
+    try {
+      const record = persistTutorFeedback(reqJson);
+      return sendJson(res, 200, { ok: true, record });
+    } catch (e) {
+      return sendJson(res, 400, { error: e?.message || 'Failed to store feedback' });
+    }
   }
 
   // Mentor endpoint

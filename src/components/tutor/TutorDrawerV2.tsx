@@ -49,6 +49,10 @@ export default function TutorDrawerV2(props: {
   const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
   const [doubtError, setDoubtError] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
+  const [feedbackChoice, setFeedbackChoice] = useState<"yes" | "no" | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -291,6 +295,10 @@ export default function TutorDrawerV2(props: {
     setDoubtAnswer(null);
     setDoubtError(null);
     setDoubtInput("");
+    setFeedbackChoice(null);
+    setFeedbackText("");
+    setFeedbackStatus("idle");
+    setFeedbackMessage(null);
   }, [tab, nodeId]);
 
   if (!open) return null;
@@ -771,6 +779,90 @@ export default function TutorDrawerV2(props: {
           >
             Send
           </button>
+        </div>
+
+        <div style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Was this helpful?</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => setFeedbackChoice("yes")}
+              style={{ background: feedbackChoice === "yes" ? "rgba(34,197,94,0.15)" : "white" }}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => setFeedbackChoice("no")}
+              style={{ background: feedbackChoice === "no" ? "rgba(239,68,68,0.15)" : "white" }}
+            >
+              No
+            </button>
+          </div>
+          <textarea
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            placeholder="Optional feedback (what helped / what was missing)"
+            rows={3}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.12)",
+              padding: "8px 10px",
+              fontSize: 13,
+              resize: "vertical",
+              background: "white",
+            }}
+          />
+          <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="pill"
+              disabled={!feedbackChoice || feedbackStatus === "sending"}
+              onClick={async () => {
+                if (!feedbackChoice) return;
+                setFeedbackStatus("sending");
+                setFeedbackMessage(null);
+                try {
+                  const payload = {
+                    helpful: feedbackChoice === "yes",
+                    comment: feedbackText,
+                    topicKey,
+                    nodeId,
+                    responseId: currentResponse?.responseId || null,
+                    tab,
+                    mode,
+                    grade,
+                    subject: subjectTitle,
+                    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+                    clientTs: new Date().toISOString(),
+                  };
+                  const res = await fetch("/api/tutor-feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data?.error || "Feedback failed.");
+                  setFeedbackStatus("success");
+                  setFeedbackMessage("Thanks! Your feedback was saved.");
+                } catch (err: any) {
+                  setFeedbackStatus("error");
+                  setFeedbackMessage(err?.message || "Could not save feedback.");
+                }
+              }}
+            >
+              {feedbackStatus === "sending" ? "Submitting..." : "Submit"}
+            </button>
+            {feedbackMessage ? (
+              <div style={{ fontSize: 12, color: feedbackStatus === "error" ? "#b91c1c" : "#166534" }}>
+                {feedbackMessage}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

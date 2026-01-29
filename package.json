@@ -30,6 +30,7 @@
     "predev": "node scripts/prebuild.cjs",
     "pmem:npm-run-ext": "node tools/pmem/pmem-runner.cjs npm-run-ext",
     "build": "tsc -b && vite build",
+    "tutor:mvp": "npm run build && npm run tutor:eval",
     "check:mojibake": "node scripts/check-mojibake.cjs",
     "blackbox:stage": "node scripts/stageTracker.mjs",
     "pmem:open-session": "node tools/pmem/pmem-runner.cjs open-session",
