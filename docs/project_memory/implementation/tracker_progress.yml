@@ -33,12 +33,12 @@
         D4: "DONE"
 
     tutor_rag:
-      current: "B0"
+      current: "B6"
       states:
-        B0: "TODO" # Tooling Health Pre-Block (build + tracker + doctor)
+        B0: "DONE" # Tooling Health Pre-Block (build + tracker + doctor)
         B1: "DONE" # Triangles tutor contracts canonicalized; server validates + fallback; commit: TBD
         B2: "DONE" # Attempt loop + BSRE (attempt_loop + fallback); commit: TBD
         B3: "DONE" # Hint ladder runtime (L0?L5); commit: TBD
         B4: "DONE" # Rubric scoring + mastery bands; commit: TBD
         B5: "DONE" # Retrieval + sources (local knowledge); commit: TBD
-        B6: "TODO" # Public ship MVP (deploy + feedback loop)
+        B6: "DOING" # Public ship MVP (deploy + feedback loop)

@@ -107,8 +107,14 @@ function main() {
 
   const drift = computeDrift(statusLines, allowedPrefixes);
 
+  const tutorRagDoing = tutorRagStages.find((s) => {
+    const state = tutorRagStates?.[s.id];
+    return state && String(state).toUpperCase() === "DOING";
+  });
   const overallFirst = tracks.find((t) => t.currentStage !== "COMPLETE");
-  const overall = overallFirst ? `${overallFirst.id}:${overallFirst.currentStage}` : "COMPLETE";
+  const overall = tutorRagDoing
+    ? `tutor_rag:${tutorRagDoing.id}`
+    : (overallFirst ? `${overallFirst.id}:${overallFirst.currentStage}` : "COMPLETE");
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
