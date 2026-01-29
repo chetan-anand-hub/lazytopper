@@ -20,8 +20,10 @@ const ALLOWED_TUTOR = [
   "src/",
   "server/",
   "docs/project_memory/implementation/",
+  "scripts/tutorEval.mjs",
   "scripts/tracker",
   ".vscode/",
+  "package.json",
 ];
 
 const ALLOWED_PREFIXES = mode === "tutor" ? ALLOWED_TUTOR : ALLOWED_TOOLING;
