@@ -81,7 +81,8 @@ function main() {
     { id: "B3", title: "Hint ladder runtime (H0→H3)" },
     { id: "B4", title: "Mistake map + remediation drills" },
     { id: "B5", title: "Mastery gate + spaced review" },
-    { id: "B6", title: "Public ship MVP (deploy + feedback loop)" },
+    { id: "B6", title: "Evaluation harness + regression tests (Triangles-first)" },
+    { id: "B7", title: "Public ship MVP (deploy + feedback loop)" },
   ];
 
   const bbStates = progress?.tracks?.blackbox?.states || {};

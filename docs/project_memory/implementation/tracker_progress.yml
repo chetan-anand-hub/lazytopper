@@ -41,4 +41,5 @@
         B3: "DONE" # Hint ladder runtime (L0?L5); commit: TBD
         B4: "DONE" # Rubric scoring + mastery bands; commit: TBD
         B5: "DONE" # Retrieval + sources (local knowledge); commit: TBD
-        B6: "DOING" # Public ship MVP (deploy + feedback loop)
+        B6: "DOING" # Evaluation harness + regression tests (Triangles-first)
+        B7: "TODO" # Public ship MVP (deploy + feedback loop)

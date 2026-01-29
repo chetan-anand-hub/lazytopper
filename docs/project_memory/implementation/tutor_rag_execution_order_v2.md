@@ -16,7 +16,9 @@ Pass criteria: build + tracker + doctor succeed before any tutor RAG work.
 
 ## B5 — Mastery gate + spaced review
 
-## B6 — Public ship MVP (deploy + feedback loop)
+## B6 — Evaluation harness + regression tests (Triangles-first)
+
+## B7 — Public ship MVP (deploy + feedback loop)
 
 ## Nomenclature Rule
 - Roadmap stages: R*
