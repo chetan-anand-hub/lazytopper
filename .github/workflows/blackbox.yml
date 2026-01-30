@@ -14,8 +14,8 @@ jobs:
           node-version: "18"
           cache: "npm"
       - run: npm ci
-  - run: npm run rules:digest
-  - run: npm run blackbox
+      - run: npm run rules:digest
+      - run: npm run blackbox
       - run: npm run contextpack
       - name: Upload blackbox snapshot
         if: always()

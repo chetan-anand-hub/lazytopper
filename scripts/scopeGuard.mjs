@@ -17,6 +17,7 @@ const ALLOWED_TOOLING = [
   "scripts/lintDebtCheck.mjs",
   "scripts/lintCi.mjs",
   "scripts/scopeGuard.mjs",
+  ".github/workflows/blackbox.yml",
   "src/pages/WeeklyWrappedPage.tsx",
   ".vscode/",
   "package.json",
