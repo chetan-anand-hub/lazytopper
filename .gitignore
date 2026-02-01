@@ -1,3 +1,14 @@
+# GENERATED EVIDENCE — NEVER COMMIT
+.project_memory/
+docs/ops/out/
+RUN_*/
+**/RUN_*/
+.codex_runs/
+node_modules
+dist
+build
+Reports/
+
 # Dependencies / builds
 node_modules
 dist
