@@ -44,7 +44,9 @@
     "lint": "npm run lint:ci && npm run lint:debt:check",
     "lint:full": "eslint .",
     "bom:guard": "node scripts/bomGuard.mjs",
-    "tutor:eval": "node scripts/tutorEval.mjs"
+    "tutor:eval": "node scripts/tutorEval.mjs",
+    "start:safe": "node scripts/startSafe.mjs",
+    "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"
   },
   "dependencies": {
     "html-to-image": "^1.10.7",
