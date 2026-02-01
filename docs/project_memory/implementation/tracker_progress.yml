@@ -14,6 +14,10 @@
         R15: "TODO"
         R16: "TODO"
         R17: "TODO"
+    governance_gates:
+      current: "G1"
+      states:
+        G1: "DONE" # BLOCK-1 / Triangles / Batch-3 Closeout (QA-Grind Fixtures Evidence) - Evidence ZIP: LT_BLOCK1_TRIANGLES_BATCH3_CLOSEOUT_20260131_114047.zip
     blackbox:
       states:
         S0: "DONE"
@@ -43,3 +47,4 @@
         B5: "DONE" # Retrieval + sources (local knowledge); commit: TBD
         B6: "DONE" # Evaluation harness + regression tests (Triangles-first)
         B7: "DOING" # Public ship MVP (deploy + feedback loop)
+
