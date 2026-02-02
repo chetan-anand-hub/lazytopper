@@ -316,6 +316,51 @@ export interface MentorDiagramStepLink {
   highlightAnchorIds: string[];
 }
 
+/* ------------------------------------------------------------------ */
+/* Human-grade loop blocks (nested under structured.tutor.*)            */
+/* ------------------------------------------------------------------ */
+
+export interface MentorTutorDiagnosis {
+  mistake_tags?: string[];
+  misconception_summary?: string;
+  confidence?: "low" | "med" | "high" | string;
+}
+
+export interface MentorTutorSocratic {
+  question?: string;
+  expected_thought?: string;
+}
+
+export interface MentorTutorHintLadder {
+  level?: number;
+  hint?: string;
+  next_action?: string;
+}
+
+export interface MentorTutorBoardSteps {
+  steps?: Array<{ line?: string; marks?: number }>;
+  total_marks?: number;
+  deductions?: Array<{ reason?: string; marks_lost?: number }>;
+  examiner_note?: string;
+}
+
+export interface MentorTutorNext {
+  micro_drill?: string;
+  revision_hook?: string;
+  suggested_practice_ids?: string[];
+}
+
+export interface MentorTutorObject {
+  text?: string;
+  rawText?: string;
+  items?: string[];
+  diagnosis?: MentorTutorDiagnosis;
+  socratic?: MentorTutorSocratic;
+  hint_ladder?: MentorTutorHintLadder;
+  board_steps_ms?: MentorTutorBoardSteps;
+  next?: MentorTutorNext;
+}
+
 
 export interface SolveWithMeStructured {
   kind: SolveWithMeKind;
@@ -432,6 +477,16 @@ export interface LearnMindmapStructured {
 }
 
 /**
+ * Minimal envelope returned by the gateway for nested tutor payloads.
+ * Keeps backwards compatibility with older "tutor: string" shapes.
+ */
+export interface MentorTutorEnvelope {
+  kind: string;
+  tutor?: string | MentorTutorObject;
+  finalAnswer?: string;
+}
+
+/**
  * Union of all structured protocols we currently support.
  * (Other modes generally return plain text only.)
  */
@@ -440,7 +495,8 @@ export type MentorStructured =
   | BoardStepsStructured
   | LearnTeachStructured
   | LearnProofStructured
-  | LearnMindmapStructured;
+  | LearnMindmapStructured
+  | MentorTutorEnvelope;
 
 /**
  * Mentor gateway response data payload.

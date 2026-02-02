@@ -7,6 +7,9 @@ import React, { useEffect, useState } from "react";
 // import avoids unused variable errors and mismatched argument counts.
 // import { saveStrategyPlan } from "../services/planStorage";
 import { callMentor } from "../ai/aiClient";
+import { getHintVariant } from "../services/abFlags";
+import { logActivity } from "../services/sessionLogger";
+import { HumanGradeCoachView } from "./mentor/HumanGradeCoachView";
 import type {
   MentorMode,
   MentorMessage,
@@ -206,6 +209,23 @@ function isSolveWithMe(obj: any): obj is SolveWithMeStructured {
   );
 }
 
+function getTutorObject(structured: MentorStructured | undefined): any | null {
+  const tutor = structured ? (structured as any).tutor : null;
+  if (tutor && typeof tutor === "object" && !Array.isArray(tutor)) return tutor;
+  return null;
+}
+
+function getTutorText(structured: MentorStructured | undefined): string {
+  const tutor = structured ? (structured as any).tutor : null;
+  if (typeof tutor === "string") return tutor;
+  if (tutor && typeof tutor === "object") {
+    const text = typeof tutor.text === "string" ? tutor.text : "";
+    const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
+    return text || rawText || "";
+  }
+  return "";
+}
+
 function formatBoardSteps(obj: any): string {
   const total = typeof obj.totalMarks === "number" ? obj.totalMarks : 0;
   const steps = Array.isArray(obj.steps) ? obj.steps : [];
@@ -220,6 +240,21 @@ function formatBoardSteps(obj: any): string {
     lines.push(`Step ${idx + 1} (${marks}m): ${stepText}`);
   });
 
+  return lines.join("\n");
+}
+
+function formatBoardStepsBlock(block: any): string {
+  if (!block || typeof block !== "object") return "";
+  const total = Number(block.total_marks) || 0;
+  const steps = Array.isArray(block.steps) ? block.steps : [];
+  const lines: string[] = [];
+  lines.push(`Board Steps (${total} mark${total === 1 ? "" : "s"}):`);
+  steps.forEach((s: any, idx: number) => {
+    const line = String(s?.line ?? "").trim();
+    const marks = Number(s?.marks) || 0;
+    if (!line) return;
+    lines.push(`Step ${idx + 1} (${marks}m): ${line}`);
+  });
   return lines.join("\n");
 }
 
@@ -272,7 +307,12 @@ function sanitizeMentorOutput(raw: string): string {
   return leftover || stripped;
 }
 
-async function callMentorAPI(payload: MentorRequest): Promise<string> {
+type MentorReply = {
+  text: string;
+  structured?: MentorStructured;
+};
+
+async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
   // Build a compact MentorPayload-style object from the richer MentorRequest.
   // This keeps all the planner logic here, while delegating the actual HTTP
   // call + error handling to src/ai/aiClient.ts.
@@ -318,6 +358,11 @@ async function callMentorAPI(payload: MentorRequest): Promise<string> {
           extraNotes: payload.message,
         };
 
+  const hintLevel = (payload as any).hintLevel;
+  const requestNextHint = (payload as any).requestNextHint;
+  if (hintLevel != null) mentorPayload.hintLevel = hintLevel;
+  if (requestNextHint != null) mentorPayload.requestNextHint = requestNextHint;
+
   const result = await callMentor(
     payload.mode,
     mentorPayload,
@@ -329,17 +374,26 @@ async function callMentorAPI(payload: MentorRequest): Promise<string> {
   const rawText = data && typeof data.text === "string" ? String(data.text) : "";
   const text = rawText.trim();
   const structured: MentorStructured | undefined = data?.structured;
+  const tutorObj = getTutorObject(structured);
+  const tutorText = getTutorText(structured);
 
   // Mode-first: Prefer structured protocol returned by the gateway (more reliable than regex extraction).
   if (mode === "board_steps_ms" && structured && isBoardSteps(structured)) {
-    return formatBoardSteps(structured);
+    return { text: formatBoardSteps(structured), structured };
   }
   if (mode === "solve_with_me" && structured && isSolveWithMe(structured)) {
-    return formatSolveWithMe(structured);
+    return { text: formatSolveWithMe(structured), structured };
+  }
+  if (mode === "board_steps_ms" && tutorObj?.board_steps_ms) {
+    const formatted = formatBoardStepsBlock(tutorObj.board_steps_ms);
+    if (formatted) return { text: formatted, structured };
   }
 
+  if (tutorText.trim().length > 0) {
+    return { text: tutorText.trim(), structured };
+  }
   if (text.length > 0) {
-    return sanitizeMentorOutput(text);
+    return { text: sanitizeMentorOutput(text), structured };
   }
   if (mode === "plan") {
     const lines: string[] = [];
@@ -377,14 +431,15 @@ async function callMentorAPI(payload: MentorRequest): Promise<string> {
     }
 
     if (lines.length > 0) {
-      return lines.join("\n");
+      return { text: lines.join("\n"), structured };
     }
   }
 
   // Fallback: pretty-print whatever data we received
-  return JSON.stringify(result.data ?? {}, null, 2);
+  return { text: JSON.stringify(result.data ?? {}, null, 2), structured };
 }
 
+type MentorMessageView = MentorMessage & { structured?: MentorStructured };
 
 export const MentorPanel: React.FC<MentorPanelProps> = ({
   pageContext,
@@ -397,7 +452,7 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
 }) => {
   // Current mentor mode.  Defaults to the provided mode and can change via chips.
   const [mode, setMode] = useState<MentorMode>(defaultMode);
-  const [messages, setMessages] = useState<MentorMessage[]>([]);
+  const [messages, setMessages] = useState<MentorMessageView[]>([]);
   const [planPreview, setPlanPreview] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -409,6 +464,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     pageContext.chapter ?? "All Chapters"
   );
   const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
+  const [hintLevels, setHintLevels] = useState<Record<number, number>>({});
+  const [hintLoading, setHintLoading] = useState<Record<number, boolean>>({});
+  const [hintWarnings, setHintWarnings] = useState<Record<number, string>>({});
+  const [hintFallback, setHintFallback] = useState<Record<number, boolean>>({});
+  const [hintVariant] = useState(() => getHintVariant());
+  const isDev = Boolean(import.meta && (import.meta as any).env && (import.meta as any).env.DEV);
 
   const effectivePageContext: PageContext = {
     ...pageContext,
@@ -417,22 +478,23 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   };
   const chaptersForSubject = CHAPTERS_BY_SUBJECT[subject] ?? ["All Chapters"];
 
-  const handleAssistantReply = (replyText: string) => {
-    const assistantMsg: MentorMessage = {
+  const handleAssistantReply = (reply: MentorReply) => {
+    const assistantMsg: MentorMessageView = {
       role: "assistant",
-      content: replyText,
+      content: reply.text,
       mode,
+      structured: reply.structured,
     };
     setMessages((prev) => [...prev, assistantMsg]);
-    setPlanPreview(replyText);
-    if (onPlanUpdated) onPlanUpdated(replyText);
+    setPlanPreview(reply.text);
+    if (onPlanUpdated) onPlanUpdated(reply.text);
 
     // Persist plan drafts in plan mode so the dashboard can load a
     // strategy plan later.  We save only when mode is "plan" and the
     // reply is nonempty.  The context contains grade and subject
     // information, which we forward to the storage helper.  Saving
     // plans helps bridge the mentor and dashboard flows.
-    if (mode === "plan" && replyText && replyText.trim().length > 0) {
+    if (mode === "plan" && reply.text && reply.text.trim().length > 0) {
       try {
         // grade is stored as e.g. "Class 10", remove non‑digits for route convenience
         const _gradeNum = String(
@@ -471,12 +533,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
       persona,
     };
     try {
-      const replyText = await callMentorAPI(payload);
-      handleAssistantReply(replyText);
+      const reply = await callMentorAPI(payload);
+      handleAssistantReply(reply);
     } catch {
-      handleAssistantReply(
-        "Hmm, something glitched while talking to your mentor. Try again in a few seconds."
-      );
+      handleAssistantReply({
+        text: "Hmm, something glitched while talking to your mentor. Try again in a few seconds.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -513,12 +575,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
         persona,
       };
       try {
-        const replyText = await callMentorAPI(payload);
-        handleAssistantReply(replyText);
+        const reply = await callMentorAPI(payload);
+        handleAssistantReply(reply);
       } catch {
-        handleAssistantReply(
-          "I couldn’t auto-generate your plan. Try typing a quick tweak and I’ll rebuild it."
-        );
+        handleAssistantReply({
+          text: "I couldn't auto-generate your plan. Try typing a quick tweak and I'll rebuild it.",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -551,6 +613,143 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     coach: "Tell me about your study challenges or ask for exam tips…",
     mindset: "Share any thoughts or worries for mindset advice…",
   };
+
+
+  const logHintEvent = (event: string, level: number) => {
+    try {
+      logActivity({
+        type: "mentor",
+        topicKey: effectivePageContext.chapter ?? effectivePageContext.topic ?? mode,
+        questionIds: [event, hintVariant],
+        score: level,
+      });
+    } catch {
+      // Ignore logging failures.
+    }
+    if (isDev) {
+      console.log("hint_event", { event, level, variant: hintVariant });
+    }
+  };
+
+  const refreshHint = async (msgIdx: number, targetLevel: number) => {
+    if (hintLoading[msgIdx]) return;
+    setHintLoading((prev) => ({ ...prev, [msgIdx]: true }));
+    setHintWarnings((prev) => ({ ...prev, [msgIdx]: "" }));
+
+    const prompt = (() => {
+      for (let i = msgIdx - 1; i >= 0; i -= 1) {
+        const msg = messages[i];
+        if (msg && msg.role === "user" && msg.content) return String(msg.content);
+      }
+      return "";
+    })();
+
+    const hintPrompt = prompt
+      ? `${prompt}
+
+Give me hint level ${targetLevel} only (keep it short).`
+      : `Give me hint level ${targetLevel} only (keep it short).`;
+
+    const payload: MentorRequest = {
+      mode,
+      message: hintPrompt,
+      pageContext: effectivePageContext,
+      studentState,
+      history: messages,
+      persona,
+    };
+    (payload as any).hintLevel = targetLevel;
+    (payload as any).requestNextHint = true;
+
+    try {
+      const reply = await callMentorAPI(payload);
+      if (!reply.structured) throw new Error("No structured hint received");
+      setMessages((prev) =>
+        prev.map((m, i) => (i === msgIdx ? { ...m, structured: reply.structured } : m))
+      );
+      setHintLevels((prev) => ({ ...prev, [msgIdx]: targetLevel }));
+      setHintFallback((prev) => ({ ...prev, [msgIdx]: false }));
+      logHintEvent("hint_level_reached", targetLevel);
+    } catch {
+      setHintWarnings((prev) => ({
+        ...prev,
+        [msgIdx]: "Hint refresh failed; showing local hint.",
+      }));
+      setHintLevels((prev) => ({ ...prev, [msgIdx]: targetLevel }));
+      setHintFallback((prev) => ({ ...prev, [msgIdx]: true }));
+      logHintEvent("hint_refresh_failed", targetLevel);
+    } finally {
+      setHintLoading((prev) => ({ ...prev, [msgIdx]: false }));
+    }
+  };
+
+
+  const buildCoachViewProps = (msg: MentorMessageView, idx: number) => {
+    const tutorObj = getTutorObject(msg.structured);
+    if (!tutorObj) return null;
+
+    const hint = tutorObj.hint_ladder;
+    const hints = Array.isArray(hint?.hints) ? hint.hints : [];
+    const baseLevel = Number.isFinite(Number(hint?.level)) ? Number(hint.level) : 1;
+    const maxHintLevel = hints.length ? Math.min(3, hints.length) : 3;
+    const localLevel = hintLevels[idx] ?? baseLevel;
+    const displayLevel = Math.min(maxHintLevel, localLevel);
+    const hintTextRaw = typeof hint?.hint === "string" ? hint.hint : "";
+    const hintFromList = hints.length ? String(hints[Math.max(0, displayLevel - 1)] || "") : "";
+    const effectiveVariant =
+      hintVariant === "C_REFRESH" && hintFallback[idx] ? "B_LOCAL" : hintVariant;
+    const displayHint =
+      effectiveVariant === "B_LOCAL" && hints.length
+        ? hintFromList
+        : hintTextRaw || hintFromList;
+    const showSingleHintNote =
+      effectiveVariant === "B_LOCAL" && !hints.length && Boolean(hintTextRaw);
+    const hintBusy = Boolean(hintLoading[idx]);
+    const hintWarning = hintWarnings[idx];
+    const canAdvance =
+      effectiveVariant === "C_REFRESH"
+        ? displayLevel < 3 && !hintBusy
+        : hints.length > 1 && displayLevel < maxHintLevel;
+
+    const coachTutorObj = hint
+      ? {
+          ...tutorObj,
+          hint_ladder: {
+            ...hint,
+            hint: displayHint,
+            _warning: hintWarning,
+            _busy: hintBusy,
+            _single_hint_note: showSingleHintNote,
+            _can_advance: canAdvance,
+          },
+        }
+      : tutorObj;
+
+    const onNextHint = hint
+      ? () => {
+          const nextLevel = Math.min(maxHintLevel, displayLevel + 1);
+          logHintEvent("next_hint_clicked", nextLevel);
+          if (effectiveVariant === "C_REFRESH") {
+            void refreshHint(idx, nextLevel);
+          } else if (hints.length > 1) {
+            setHintLevels((prev) => ({
+              ...prev,
+              [idx]: nextLevel,
+            }));
+            logHintEvent("hint_level_reached", nextLevel);
+          }
+        }
+      : undefined;
+
+    return {
+      tutorObj: coachTutorObj,
+      hintLevel: displayLevel,
+      onNextHint,
+      variantLabel: isDev ? hintVariant : undefined,
+      compact: true,
+    };
+  };
+
 
   return (
     <div className="mentor-panel">
@@ -659,6 +858,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
                   <p key={i}>{line}</p>
                 ))}
               </div>
+              {msg.role === "assistant"
+                ? (() => {
+                    const coachProps = buildCoachViewProps(msg, idx);
+                    return coachProps ? <HumanGradeCoachView {...coachProps} /> : null;
+                  })()
+                : null}
             </div>
           ))}
         {/* If no conversation yet and we’re in plan mode with a plan preview, show the plan preview bubble. */}

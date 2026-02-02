@@ -2,9 +2,29 @@
 import { DiagramBlock } from "../DiagramBlock";
 import { MENTOR_ENDPOINT } from "../../ai/aiClient";
 import { extractDiagramMeta, validateTutorStructured } from "../../contracts/tutorContracts.ts";
+import { getHintVariant } from "../../services/abFlags";
+import { logActivity } from "../../services/sessionLogger";
+import { HumanGradeCoachView } from "../mentor/HumanGradeCoachView";
 
 type ModeKey = "zombie" | "beast";
 type TutorTab = "teach" | "examples";
+
+const getTutorObject = (structured: any) => {
+  const tutor = structured ? structured.tutor : null;
+  if (tutor && typeof tutor === "object" && !Array.isArray(tutor)) return tutor;
+  return null;
+};
+
+const getTutorText = (structured: any) => {
+  const tutor = structured ? structured.tutor : null;
+  if (typeof tutor === "string") return tutor;
+  if (tutor && typeof tutor === "object") {
+    const text = typeof tutor.text === "string" ? tutor.text : "";
+    const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
+    return text || rawText || "";
+  }
+  return "";
+};
 export default function TutorDrawerV2(props: {
   open: boolean;
   onClose: () => void;
@@ -53,6 +73,12 @@ export default function TutorDrawerV2(props: {
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [coachHintLevel, setCoachHintLevel] = useState(1);
+  const [coachHintLoading, setCoachHintLoading] = useState(false);
+  const [coachHintWarning, setCoachHintWarning] = useState<string | null>(null);
+  const [coachHintFallback, setCoachHintFallback] = useState(false);
+  const [hintVariant] = useState(() => getHintVariant());
+  const isDev = Boolean(import.meta && (import.meta as any).env && (import.meta as any).env.DEV);
   const abortRef = useRef<AbortController | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -93,6 +119,8 @@ export default function TutorDrawerV2(props: {
 
   const formatDoubtStructured = (obj: any) => {
     if (!obj || typeof obj !== "object") return "";
+    const tutorText = getTutorText(obj);
+    if (tutorText) return tutorText;
     if (obj.kind === "learn_mindmap") {
       const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets.slice(0, 4) : [];
       const examLines = Array.isArray(obj.examLines) ? obj.examLines.slice(0, 2) : [];
@@ -115,7 +143,31 @@ export default function TutorDrawerV2(props: {
     return "";
   };
 
-  const buildPayload = (nextTab: TutorTab, doubtContext?: any, prompt?: string, requestNextHint?: boolean, hintLadderState?: any) => {
+  const logHintEvent = (event: string, level: number) => {
+    try {
+      logActivity({
+        type: "mentor",
+        topicKey,
+        questionIds: [event, hintVariant],
+        score: level,
+      });
+    } catch {
+      // Ignore logging failures.
+    }
+    if (isDev) {
+      console.log("hint_event", { event, level, variant: hintVariant });
+    }
+  };
+
+
+  const buildPayload = (
+    nextTab: TutorTab,
+    doubtContext?: any,
+    prompt?: string,
+    requestNextHint?: boolean,
+    hintLadderState?: any,
+    hintLevel?: number
+  ) => {
     const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
     return {
       mode: modeApi,
@@ -141,6 +193,7 @@ export default function TutorDrawerV2(props: {
         doubtContext,
         requestNextHint,
         hintLadderState,
+        hintLevel,
       },
       messages: prompt ? [{ role: "user", content: prompt }] : undefined,
     };
@@ -177,7 +230,8 @@ export default function TutorDrawerV2(props: {
 
         const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
         const meta = extractDiagramMeta(structured);
-        const check = validateTutorStructured(modeApi, structured, body.payload);
+        const tutorObj = getTutorObject(structured);
+        const check = tutorObj ? { ok: true, issues: [] } : validateTutorStructured(modeApi, structured, body.payload);
         if (!check.ok) {
           const msg = check.issues[0] || "Mentor response incomplete. Please retry.";
           setErrors((prev) => ({ ...prev, [key]: msg }));
@@ -221,6 +275,53 @@ export default function TutorDrawerV2(props: {
       mode,
     ]
   );
+
+  const refreshCoachHint = async (targetLevel: number) => {
+    if (!open || !nodeId || coachHintLoading) return;
+    setCoachHintLoading(true);
+    setCoachHintWarning(null);
+
+    const prompt = `Give me hint level ${targetLevel} only (keep it short).`;
+    const body = buildPayload(tab, undefined, prompt, true, undefined, targetLevel);
+
+    try {
+      const res = await fetch(MENTOR_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+
+      const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
+      if (!structured) throw new Error("Mentor response incomplete. Please retry.");
+
+      const meta = extractDiagramMeta(structured);
+      setResponses((prev) => ({
+        ...prev,
+        [currentKey]: {
+          ...(prev[currentKey] || {}),
+          structured,
+          diagramType: meta.diagramType,
+          diagramLabels: meta.diagramLabels,
+          diagramSpec: meta.diagramSpec,
+          responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          summary: JSON.stringify(structured).slice(0, 280),
+        },
+      }));
+      setCoachHintLevel(Math.min(3, targetLevel));
+      setCoachHintFallback(false);
+      logHintEvent("hint_level_reached", targetLevel);
+    } catch (err) {
+      setCoachHintWarning("Hint refresh failed; showing local hint.");
+      setCoachHintLevel((prev) => Math.min(3, Math.max(prev, targetLevel)));
+      setCoachHintFallback(true);
+      logHintEvent("hint_refresh_failed", targetLevel);
+    } finally {
+      setCoachHintLoading(false);
+    }
+  };
+
 
   const sendDoubt = useCallback(
     async (prompt: string) => {
@@ -299,7 +400,19 @@ export default function TutorDrawerV2(props: {
     setFeedbackText("");
     setFeedbackStatus("idle");
     setFeedbackMessage(null);
+    setCoachHintWarning(null);
+    setCoachHintLoading(false);
+    setCoachHintFallback(false);
   }, [tab, nodeId]);
+
+  useEffect(() => {
+    const tutorObj = getTutorObject(currentResponse?.structured);
+    const base = Number(tutorObj?.hint_ladder?.level);
+    setCoachHintLevel(Number.isFinite(base) ? Math.min(3, base) : 1);
+    setCoachHintWarning(null);
+    setCoachHintLoading(false);
+    setCoachHintFallback(false);
+  }, [currentKey, currentResponse]);
 
   if (!open) return null;
 
@@ -394,9 +507,72 @@ export default function TutorDrawerV2(props: {
     );
   };
 
+  const buildCoachViewProps = (obj: any) => {
+    const tutorObj = getTutorObject(obj);
+    if (!tutorObj) return null;
+
+    const hint = tutorObj.hint_ladder;
+    const hints = Array.isArray(hint?.hints) ? hint.hints : [];
+    const baseLevel = Number.isFinite(Number(hint?.level)) ? Number(hint.level) : 1;
+    const maxHintLevel = hints.length ? Math.min(3, hints.length) : 3;
+    const displayLevel = Math.min(maxHintLevel, coachHintLevel || baseLevel);
+    const hintTextRaw = typeof hint?.hint === "string" ? hint.hint : "";
+    const hintFromList = hints.length ? String(hints[Math.max(0, displayLevel - 1)] || "") : "";
+    const effectiveVariant =
+      hintVariant === "C_REFRESH" && coachHintFallback ? "B_LOCAL" : hintVariant;
+    const displayHint =
+      effectiveVariant === "B_LOCAL" && hints.length
+        ? hintFromList
+        : hintTextRaw || hintFromList;
+    const showSingleHintNote =
+      effectiveVariant === "B_LOCAL" && !hints.length && Boolean(hintTextRaw);
+    const canAdvance =
+      effectiveVariant === "C_REFRESH"
+        ? displayLevel < 3 && !coachHintLoading
+        : hints.length > 1 && displayLevel < maxHintLevel;
+
+    const coachTutorObj = hint
+      ? {
+          ...tutorObj,
+          hint_ladder: {
+            ...hint,
+            hint: displayHint,
+            _warning: coachHintWarning,
+            _busy: coachHintLoading,
+            _single_hint_note: showSingleHintNote,
+            _can_advance: canAdvance,
+          },
+        }
+      : tutorObj;
+
+    const onNextHint = hint
+      ? () => {
+          const nextLevel = Math.min(maxHintLevel, displayLevel + 1);
+          logHintEvent("next_hint_clicked", nextLevel);
+          if (effectiveVariant === "C_REFRESH") {
+            void refreshCoachHint(nextLevel);
+          } else if (hints.length > 1) {
+            setCoachHintLevel(nextLevel);
+            logHintEvent("hint_level_reached", nextLevel);
+          }
+        }
+      : undefined;
+
+    return {
+      tutorObj: coachTutorObj,
+      hintLevel: displayLevel,
+      onNextHint,
+      variantLabel: isDev ? hintVariant : undefined,
+      compact: false,
+    };
+  };
+
+
   const renderTeach = () => {
     const obj = currentResponse?.structured || null;
     if (!obj) return null;
+    const tutorText = getTutorText(obj);
+    const coachProps = buildCoachViewProps(obj);
     const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
     const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
     const worked = obj.workedExample || {};
@@ -409,6 +585,12 @@ export default function TutorDrawerV2(props: {
           diagramSpec={currentResponse.diagramSpec}
           note="CBSE diagram block"
         />
+        {tutorText ? (
+          <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            {String(tutorText)}
+          </div>
+        ) : null}
+        {coachProps ? <HumanGradeCoachView {...coachProps} /> : null}
         {renderAttemptFeedback(obj)}
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
@@ -484,6 +666,8 @@ export default function TutorDrawerV2(props: {
   const renderExamples = () => {
     const obj = currentResponse?.structured || null;
     if (!obj) return null;
+    const tutorText = getTutorText(obj);
+    const coachProps = buildCoachViewProps(obj);
     const teach = obj.teach || {};
     const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
     const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
@@ -497,6 +681,12 @@ export default function TutorDrawerV2(props: {
           diagramSpec={currentResponse.diagramSpec}
           note="CBSE diagram block"
         />
+        {tutorText ? (
+          <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            {String(tutorText)}
+          </div>
+        ) : null}
+        {coachProps ? <HumanGradeCoachView {...coachProps} /> : null}
         {renderAttemptFeedback(obj)}
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
