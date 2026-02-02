@@ -5,25 +5,71 @@ import { extractDiagramMeta, validateTutorStructured } from "../../contracts/tut
 import { getHintVariant } from "../../services/abFlags";
 import { logActivity } from "../../services/sessionLogger";
 import { HumanGradeCoachView } from "../mentor/HumanGradeCoachView";
+import { isRecord } from "../../types/mentor";
+import type { MentorDiagramSpec, MentorStructured, TutorBlock } from "../../types/mentor";
 
 type ModeKey = "zombie" | "beast";
 type TutorTab = "teach" | "examples";
 
-const getTutorObject = (structured: any) => {
-  const tutor = structured ? structured.tutor : null;
+const getTutorObject = (structured?: MentorStructured | null): TutorBlock | null => {
+  const tutor = structured?.tutor;
   if (tutor && typeof tutor === "object" && !Array.isArray(tutor)) return tutor;
   return null;
 };
 
-const getTutorText = (structured: any) => {
-  const tutor = structured ? structured.tutor : null;
+const getTutorText = (structured?: MentorStructured | null) => {
+  const tutor = structured?.tutor;
   if (typeof tutor === "string") return tutor;
-  if (tutor && typeof tutor === "object") {
+  if (isRecord(tutor)) {
     const text = typeof tutor.text === "string" ? tutor.text : "";
     const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
     return text || rawText || "";
   }
   return "";
+};
+
+const asString = (v: unknown): string => (typeof v === "string" ? v : "");
+const getErrorName = (err: unknown): string =>
+  isRecord(err) && typeof err.name === "string" ? err.name : "";
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (err instanceof Error && err.message) return err.message;
+  if (isRecord(err) && typeof err.message === "string") return err.message;
+  return fallback;
+};
+const safeJsonParse = (raw: string): unknown | null => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+const getResponseError = (payload: unknown, fallback: string) => {
+  if (!isRecord(payload)) return fallback;
+  if (typeof payload.error === "string") return payload.error;
+  if (typeof payload.message === "string") return payload.message;
+  return fallback;
+};
+const getResponseStructured = (payload: unknown): MentorStructured | null => {
+  if (!isRecord(payload)) return null;
+  const dataBlock = isRecord(payload.data) ? payload.data : null;
+  const structuredCandidate = dataBlock?.structured;
+  const textFallback = dataBlock?.text;
+  const parsed = structuredCandidate ?? safeJsonParse(String(textFallback ?? ""));
+  return (parsed ?? null) as MentorStructured | null;
+};
+const getResponseText = (payload: unknown): string => {
+  if (!isRecord(payload)) return "";
+  const dataBlock = isRecord(payload.data) ? payload.data : null;
+  return dataBlock && typeof dataBlock.text === "string" ? dataBlock.text : "";
+};
+
+type TutorResponseEntry = {
+  structured?: MentorStructured;
+  diagramType?: string;
+  diagramLabels?: Record<string, string> | string[] | null;
+  diagramSpec?: MentorDiagramSpec | null;
+  responseId?: string;
+  summary?: string;
 };
 export default function TutorDrawerV2(props: {
   open: boolean;
@@ -62,7 +108,7 @@ export default function TutorDrawerV2(props: {
     mode,
   } = props;
 
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [responses, setResponses] = useState<Record<string, TutorResponseEntry>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [doubtInput, setDoubtInput] = useState("");
@@ -78,7 +124,7 @@ export default function TutorDrawerV2(props: {
   const [coachHintWarning, setCoachHintWarning] = useState<string | null>(null);
   const [coachHintFallback, setCoachHintFallback] = useState(false);
   const [hintVariant] = useState(() => getHintVariant());
-  const isDev = Boolean(import.meta && (import.meta as any).env && (import.meta as any).env.DEV);
+  const isDev = Boolean(import.meta?.env?.DEV);
   const abortRef = useRef<AbortController | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -108,36 +154,30 @@ export default function TutorDrawerV2(props: {
     setLoadingKey(null);
   }, []);
 
-  const safeJsonParse = (raw: string) => {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  };
 
 
-  const formatDoubtStructured = (obj: any) => {
-    if (!obj || typeof obj !== "object") return "";
-    const tutorText = getTutorText(obj);
+  const formatDoubtStructured = (obj: unknown) => {
+    if (!isRecord(obj)) return "";
+    const tutorText = getTutorText(obj as MentorStructured);
     if (tutorText) return tutorText;
-    if (obj.kind === "learn_mindmap") {
+    const kind = asString(obj.kind);
+    if (kind === "learn_mindmap") {
       const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets.slice(0, 4) : [];
       const examLines = Array.isArray(obj.examLines) ? obj.examLines.slice(0, 2) : [];
       const lines = [];
-      bullets.forEach((b: string) => lines.push(`- ${b}`));
-      examLines.forEach((l: string, idx: number) => lines.push(`Exam line ${idx + 1}: ${l}`));
-      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
+      bullets.forEach((b) => lines.push(`- ${String(b)}`));
+      examLines.forEach((l, idx: number) => lines.push(`Exam line ${idx + 1}: ${String(l)}`));
+      if (obj.checkQuestion) lines.push(`Quick check: ${String(obj.checkQuestion)}`);
       return lines.join("\n");
     }
-    if (obj.kind === "learn_teach") {
-      const teach = obj.teach || {};
+    if (kind === "learn_teach") {
+      const teach = isRecord(obj.teach) ? obj.teach : {};
       const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation.slice(0, 4) : [];
       const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence.slice(0, 2) : [];
       const lines = [];
-      simple.forEach((b: string) => lines.push(`- ${b}`));
-      exam.forEach((l: string) => lines.push(`Exam line: ${l}`));
-      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
+      simple.forEach((b) => lines.push(`- ${String(b)}`));
+      exam.forEach((l) => lines.push(`Exam line: ${String(l)}`));
+      if (obj.checkQuestion) lines.push(`Quick check: ${String(obj.checkQuestion)}`);
       return lines.join("\n");
     }
     return "";
@@ -160,44 +200,58 @@ export default function TutorDrawerV2(props: {
   };
 
 
-  const buildPayload = (
-    nextTab: TutorTab,
-    doubtContext?: any,
-    prompt?: string,
-    requestNextHint?: boolean,
-    hintLadderState?: any,
-    hintLevel?: number
-  ) => {
-    const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
-    return {
-      mode: modeApi,
-      payload: {
-        subject: subjectTitle,
-        grade: Number(grade),
-        topicKey,
-        chapter: topicKey,
-        cardTitle: nodeTitle,
-        cardName: nodeTitle,
-        section: "learn",
-        subSection: nextTab === "teach" ? "mindmap" : "board-examples",
-        selectedTab: nextTab,
-        selectedMode: modeApi,
-        mindmapNodeId: nodeId,
-        mindmapNodeTitle: nodeTitle,
-        mindmapNodeText: nodeText,
-        mindmapCoreId: coreId,
-        explainType: "mindmap_node",
-        contextText: coreText || nodeText,
-        stepIndex: nodeIndex,
-        vibe: mode,
-        doubtContext,
-        requestNextHint,
-        hintLadderState,
-        hintLevel,
-      },
-      messages: prompt ? [{ role: "user", content: prompt }] : undefined,
-    };
-  };
+  const buildPayload = useCallback(
+    (
+      nextTab: TutorTab,
+      doubtContext?: Record<string, unknown>,
+      prompt?: string,
+      requestNextHint?: boolean,
+      hintLadderState?: unknown,
+      hintLevel?: number
+    ) => {
+      const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
+      return {
+        mode: modeApi,
+        payload: {
+          subject: subjectTitle,
+          grade: Number(grade),
+          topicKey,
+          chapter: topicKey,
+          cardTitle: nodeTitle,
+          cardName: nodeTitle,
+          section: "learn",
+          subSection: nextTab === "teach" ? "mindmap" : "board-examples",
+          selectedTab: nextTab,
+          selectedMode: modeApi,
+          mindmapNodeId: nodeId,
+          mindmapNodeTitle: nodeTitle,
+          mindmapNodeText: nodeText,
+          mindmapCoreId: coreId,
+          explainType: "mindmap_node",
+          contextText: coreText || nodeText,
+          stepIndex: nodeIndex,
+          vibe: mode,
+          doubtContext,
+          requestNextHint,
+          hintLadderState,
+          hintLevel,
+        },
+        messages: prompt ? [{ role: "user", content: prompt }] : undefined,
+      };
+    },
+    [
+      subjectTitle,
+      grade,
+      topicKey,
+      nodeTitle,
+      nodeId,
+      nodeText,
+      coreId,
+      coreText,
+      nodeIndex,
+      mode,
+    ]
+  );
 
   const requestTutor = useCallback(
     async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string; requestNextHint?: boolean }) => {
@@ -214,7 +268,10 @@ export default function TutorDrawerV2(props: {
       abortRef.current = controller;
 
       try {
-        const hintLadderState = opts?.requestNextHint ? responses[key]?.structured?.attempt_loop?.hint_ladder : undefined;
+        const priorStructured = responses[key]?.structured;
+        const attemptLoop = isRecord(priorStructured) ? priorStructured.attempt_loop : undefined;
+        const hintLadderState =
+          opts?.requestNextHint && isRecord(attemptLoop) ? attemptLoop.hint_ladder : undefined;
         const body = buildPayload(nextTab, undefined, opts?.prompt, opts?.requestNextHint, hintLadderState);
         const res = await fetch(MENTOR_ENDPOINT, {
           method: "POST",
@@ -223,15 +280,15 @@ export default function TutorDrawerV2(props: {
           signal: controller.signal,
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+        if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
 
-        const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
-        if (!structured) throw new Error("Mentor response incomplete. Please retry.");
+        const nextStructured = getResponseStructured(data);
+        if (!nextStructured) throw new Error("Mentor response incomplete. Please retry.");
 
         const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
-        const meta = extractDiagramMeta(structured);
-        const tutorObj = getTutorObject(structured);
-        const check = tutorObj ? { ok: true, issues: [] } : validateTutorStructured(modeApi, structured, body.payload);
+        const meta = extractDiagramMeta(nextStructured);
+        const tutorObj = getTutorObject(nextStructured);
+        const check = tutorObj ? { ok: true, issues: [] } : validateTutorStructured(modeApi, nextStructured, body.payload);
         if (!check.ok) {
           const msg = check.issues[0] || "Mentor response incomplete. Please retry.";
           setErrors((prev) => ({ ...prev, [key]: msg }));
@@ -241,17 +298,20 @@ export default function TutorDrawerV2(props: {
         setResponses((prev) => ({
           ...prev,
           [key]: {
-            structured,
+            structured: nextStructured,
             diagramType: meta.diagramType,
-            diagramLabels: meta.diagramLabels,
-            diagramSpec: meta.diagramSpec,
+            diagramLabels: meta.diagramLabels as Record<string, string> | string[] | null,
+            diagramSpec: meta.diagramSpec as MentorDiagramSpec | null,
             responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            summary: JSON.stringify(structured).slice(0, 280),
+            summary: JSON.stringify(nextStructured).slice(0, 280),
           },
         }));
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-        setErrors((prev) => ({ ...prev, [key]: err?.message || "Mentor error. Please retry." }));
+      } catch (err) {
+        if (getErrorName(err) === "AbortError") return;
+        setErrors((prev) => ({
+          ...prev,
+          [key]: getErrorMessage(err, "Mentor error. Please retry."),
+        }));
       } finally {
         if (!controller.signal.aborted) {
           setLoadingKey(null);
@@ -264,15 +324,7 @@ export default function TutorDrawerV2(props: {
       responses,
       loadingKey,
       cancelInFlight,
-      subjectTitle,
-      grade,
-      topicKey,
-      nodeTitle,
-      nodeText,
-      coreId,
-      coreText,
-      nodeIndex,
-      mode,
+      buildPayload,
     ]
   );
 
@@ -291,9 +343,9 @@ export default function TutorDrawerV2(props: {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+      if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
 
-      const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
+      const structured = getResponseStructured(data);
       if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
       const meta = extractDiagramMeta(structured);
@@ -303,8 +355,8 @@ export default function TutorDrawerV2(props: {
           ...(prev[currentKey] || {}),
           structured,
           diagramType: meta.diagramType,
-          diagramLabels: meta.diagramLabels,
-          diagramSpec: meta.diagramSpec,
+          diagramLabels: meta.diagramLabels as Record<string, string> | string[] | null,
+          diagramSpec: meta.diagramSpec as MentorDiagramSpec | null,
           responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           summary: JSON.stringify(structured).slice(0, 280),
         },
@@ -312,7 +364,7 @@ export default function TutorDrawerV2(props: {
       setCoachHintLevel(Math.min(3, targetLevel));
       setCoachHintFallback(false);
       logHintEvent("hint_level_reached", targetLevel);
-    } catch (err) {
+    } catch {
       setCoachHintWarning("Hint refresh failed; showing local hint.");
       setCoachHintLevel((prev) => Math.min(3, Math.max(prev, targetLevel)));
       setCoachHintFallback(true);
@@ -353,14 +405,14 @@ export default function TutorDrawerV2(props: {
           body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+        if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
 
-        const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
-        const formatted = structured ? formatDoubtStructured(structured) : String(data?.data?.text || "");
+        const structured = getResponseStructured(data);
+        const formatted = structured ? formatDoubtStructured(structured) : String(getResponseText(data) || "");
         setDoubtAnswer(formatted || "Mentor reply received.");
         setDoubtInput("");
-      } catch (err: any) {
-        setDoubtError(err?.message || "Mentor error. Please retry.");
+      } catch (err) {
+        setDoubtError(getErrorMessage(err, "Mentor error. Please retry."));
       } finally {
         setDoubtLoading(false);
       }
@@ -407,7 +459,9 @@ export default function TutorDrawerV2(props: {
 
   useEffect(() => {
     const tutorObj = getTutorObject(currentResponse?.structured);
-    const base = Number(tutorObj?.hint_ladder?.level);
+    const hint = tutorObj?.hint_ladder;
+    const hintRecord = isRecord(hint) ? hint : null;
+    const base = Number(hintRecord?.level);
     setCoachHintLevel(Number.isFinite(base) ? Math.min(3, base) : 1);
     setCoachHintWarning(null);
     setCoachHintLoading(false);
@@ -438,19 +492,33 @@ export default function TutorDrawerV2(props: {
     if (next !== nodeIndex) goToNodeIndex(next);
   };
 
-  const renderAttemptFeedback = (obj: any) => {
-    const loop = obj?.attempt_loop;
-    const hint = loop?.hint_ladder;
-    const rubric = loop?.rubric;
-    const sources = Array.isArray(loop?.sources) ? loop.sources : [];
-    if (!loop || typeof loop !== "object") return null;
-    const diagnosis = loop.diagnosis || {};
-    const nextAction = loop.next_action || {};
-    const tags = Array.isArray(diagnosis.mistake_tags) ? diagnosis.mistake_tags.slice(0, 3) : [];
+  const renderAttemptFeedback = (obj: unknown) => {
+    const loop = isRecord(obj) ? obj.attempt_loop : undefined;
+    if (!isRecord(loop)) return null;
+    const hint = loop.hint_ladder;
+    const hintRecord = isRecord(hint) ? hint : null;
+    const rubric = isRecord(loop.rubric) ? loop.rubric : null;
+    const rubricDimensions = isRecord(rubric?.dimensions) ? rubric.dimensions : null;
+    const rubricNext = isRecord(rubric?.recommended_next) ? rubric.recommended_next : null;
+    const rubricTotal = Number(rubric?.total_score);
+    const rubricBand = asString(rubric?.band);
+    const hintLevelValue = Number(hintRecord?.level);
+    const hintMaxValue = Number(hintRecord?.max_level);
+    const conceptScore = Number(rubricDimensions?.concept_selection);
+    const setupScore = Number(rubricDimensions?.setup_correctness);
+    const logicScore = Number(rubricDimensions?.logical_progression);
+    const computationScore = Number(rubricDimensions?.computation_accuracy);
+    const presentationScore = Number(rubricDimensions?.presentation_exam_style);
+    const sources = Array.isArray(loop.sources) ? loop.sources : [];
+    const diagnosis = isRecord(loop.diagnosis) ? loop.diagnosis : {};
+    const nextAction = isRecord(loop.next_action) ? loop.next_action : {};
+    const tags = Array.isArray(diagnosis.mistake_tags)
+      ? diagnosis.mistake_tags.slice(0, 3).map((tag) => String(tag))
+      : [];
     const verdict = String(diagnosis.status || "unclear").toUpperCase();
     const actionType = String(nextAction.type || "");
     const prompt = String(nextAction.prompt || "");
-    const brief = loop.bsre?.brief ? String(loop.bsre.brief) : "";
+    const brief = isRecord(loop.bsre) && loop.bsre.brief ? String(loop.bsre.brief) : "";
     return (
       <div style={{ borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(0,0,0,0.08)", background: "rgba(56,189,248,0.10)" }}>
         <div style={{ fontWeight: 800 }}>Attempt Feedback</div>
@@ -462,13 +530,16 @@ export default function TutorDrawerV2(props: {
           <div style={{ marginTop: 6 }}><b>{actionType || "Next"}:</b> {prompt}</div>
         ) : null}
         {brief ? <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>{brief}</div> : null}
-        {hint ? (
-          <div style={{ marginTop: 8, fontSize: 12 }}>Hint level: <b>{hint.level}</b>/{hint.max_level}</div>
+        {hintRecord ? (
+          <div style={{ marginTop: 8, fontSize: 12 }}>
+            Hint level: <b>{Number.isFinite(hintLevelValue) ? hintLevelValue : ""}</b>/
+            {Number.isFinite(hintMaxValue) ? hintMaxValue : ""}
+          </div>
         ) : null}
-        {hint?.last_hint?.text ? (
-          <div style={{ marginTop: 6, fontSize: 12 }}>{hint.last_hint.text}</div>
+        {isRecord(hintRecord?.last_hint) && hintRecord.last_hint.text ? (
+          <div style={{ marginTop: 6, fontSize: 12 }}>{String(hintRecord.last_hint.text)}</div>
         ) : null}
-        {hint?.next_hint_available ? (
+        {hintRecord?.next_hint_available ? (
           <button
             type="button"
             className="pill"
@@ -483,23 +554,26 @@ export default function TutorDrawerV2(props: {
             {sources.length ? (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontWeight: 800 }}>Sources</div>
-                {sources.map((s: any, idx: number) => (
+                {sources.map((s, idx: number) => (
                   <div key={idx} style={{ marginTop: 6 }}>
-                    <div><b>{s.title}</b> <span style={{ opacity: 0.7 }}>({s.path})</span></div>
-                    <div style={{ opacity: 0.8 }}>{s.excerpt}</div>
+                    <div>
+                      <b>{isRecord(s) ? String(s.title || "") : ""}</b>{" "}
+                      <span style={{ opacity: 0.7 }}>({isRecord(s) ? String(s.path || "") : ""})</span>
+                    </div>
+                    <div style={{ opacity: 0.8 }}>{isRecord(s) ? String(s.excerpt || "") : ""}</div>
                   </div>
                 ))}
               </div>
             ) : null}
-            <div><b>Score:</b> {rubric.total_score}/100 ({rubric.band})</div>
+            <div><b>Score:</b> {Number.isFinite(rubricTotal) ? rubricTotal : 0}/100 ({rubricBand})</div>
             <div style={{ marginTop: 4 }}>
-              Concept: {rubric.dimensions?.concept_selection}/25 | Setup: {rubric.dimensions?.setup_correctness}/20 | Logic: {rubric.dimensions?.logical_progression}/25
+              Concept: {Number.isFinite(conceptScore) ? conceptScore : ""}/25 | Setup: {Number.isFinite(setupScore) ? setupScore : ""}/20 | Logic: {Number.isFinite(logicScore) ? logicScore : ""}/25
             </div>
             <div style={{ marginTop: 2 }}>
-              Computation: {rubric.dimensions?.computation_accuracy}/20 | Presentation: {rubric.dimensions?.presentation_exam_style}/10
+              Computation: {Number.isFinite(computationScore) ? computationScore : ""}/20 | Presentation: {Number.isFinite(presentationScore) ? presentationScore : ""}/10
             </div>
-            {rubric.recommended_next ? (
-              <div style={{ marginTop: 4 }}><b>Next focus:</b> {rubric.recommended_next.focus_skill}</div>
+            {rubricNext ? (
+              <div style={{ marginTop: 4 }}><b>Next focus:</b> {String(rubricNext.focus_skill || "")}</div>
             ) : null}
           </div>
         ) : null}
@@ -507,16 +581,17 @@ export default function TutorDrawerV2(props: {
     );
   };
 
-  const buildCoachViewProps = (obj: any) => {
+  const buildCoachViewProps = (obj?: MentorStructured | null) => {
     const tutorObj = getTutorObject(obj);
     if (!tutorObj) return null;
 
     const hint = tutorObj.hint_ladder;
-    const hints = Array.isArray(hint?.hints) ? hint.hints : [];
-    const baseLevel = Number.isFinite(Number(hint?.level)) ? Number(hint.level) : 1;
+    const hintRecord = isRecord(hint) ? hint : null;
+    const hints = Array.isArray(hintRecord?.hints) ? hintRecord.hints : [];
+    const baseLevel = Number.isFinite(Number(hintRecord?.level)) ? Number(hintRecord?.level) : 1;
     const maxHintLevel = hints.length ? Math.min(3, hints.length) : 3;
     const displayLevel = Math.min(maxHintLevel, coachHintLevel || baseLevel);
-    const hintTextRaw = typeof hint?.hint === "string" ? hint.hint : "";
+    const hintTextRaw = typeof hintRecord?.hint === "string" ? hintRecord.hint : "";
     const hintFromList = hints.length ? String(hints[Math.max(0, displayLevel - 1)] || "") : "";
     const effectiveVariant =
       hintVariant === "C_REFRESH" && coachHintFallback ? "B_LOCAL" : hintVariant;
@@ -531,11 +606,11 @@ export default function TutorDrawerV2(props: {
         ? displayLevel < 3 && !coachHintLoading
         : hints.length > 1 && displayLevel < maxHintLevel;
 
-    const coachTutorObj = hint
+    const coachTutorObj = hintRecord
       ? {
           ...tutorObj,
           hint_ladder: {
-            ...hint,
+            ...hintRecord,
             hint: displayHint,
             _warning: coachHintWarning,
             _busy: coachHintLoading,
@@ -545,7 +620,7 @@ export default function TutorDrawerV2(props: {
         }
       : tutorObj;
 
-    const onNextHint = hint
+    const onNextHint = hintRecord
       ? () => {
           const nextLevel = Math.min(maxHintLevel, displayLevel + 1);
           logHintEvent("next_hint_clicked", nextLevel);
@@ -569,20 +644,21 @@ export default function TutorDrawerV2(props: {
 
 
   const renderTeach = () => {
-    const obj = currentResponse?.structured || null;
-    if (!obj) return null;
+    const response = currentResponse;
+    if (!response || !response.structured) return null;
+    const obj = response.structured;
     const tutorText = getTutorText(obj);
     const coachProps = buildCoachViewProps(obj);
     const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
     const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
-    const worked = obj.workedExample || {};
+    const worked = isRecord(obj.workedExample) ? obj.workedExample : {};
     const steps = Array.isArray(worked.steps) ? worked.steps : [];
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
-          diagramType={currentResponse.diagramType}
-          diagramLabels={currentResponse.diagramLabels}
-          diagramSpec={currentResponse.diagramSpec}
+          diagramType={response.diagramType}
+          diagramLabels={response.diagramLabels}
+          diagramSpec={response.diagramSpec}
           note="CBSE diagram block"
         />
         {tutorText ? (
@@ -595,14 +671,14 @@ export default function TutorDrawerV2(props: {
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {bullets.map((b: any, idx: number) => (
+            {bullets.map((b, idx: number) => (
               <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
             ))}
           </ul>
         </div>
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam lines</div>
-          {examLines.map((l: any, idx: number) => (
+          {examLines.map((l, idx: number) => (
             <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
               {String(l)}
             </div>
@@ -615,7 +691,7 @@ export default function TutorDrawerV2(props: {
           ) : null}
           {steps.length ? (
             <ol style={{ margin: 0, paddingLeft: 18 }}>
-              {steps.map((s: any, idx: number) => (
+              {steps.map((s, idx: number) => (
                 <li key={idx} style={{ marginBottom: 6 }}>{String(s)}</li>
               ))}
             </ol>
@@ -664,11 +740,12 @@ export default function TutorDrawerV2(props: {
   };
 
   const renderExamples = () => {
-    const obj = currentResponse?.structured || null;
-    if (!obj) return null;
+    const response = currentResponse;
+    if (!response || !response.structured) return null;
+    const obj = response.structured;
     const tutorText = getTutorText(obj);
     const coachProps = buildCoachViewProps(obj);
-    const teach = obj.teach || {};
+    const teach = isRecord(obj.teach) ? obj.teach : {};
     const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
     const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
     const worked = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
@@ -676,9 +753,9 @@ export default function TutorDrawerV2(props: {
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
-          diagramType={currentResponse.diagramType}
-          diagramLabels={currentResponse.diagramLabels}
-          diagramSpec={currentResponse.diagramSpec}
+          diagramType={response.diagramType}
+          diagramLabels={response.diagramLabels}
+          diagramSpec={response.diagramSpec}
           note="CBSE diagram block"
         />
         {tutorText ? (
@@ -691,14 +768,14 @@ export default function TutorDrawerV2(props: {
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {simple.map((b: any, idx: number) => (
+            {simple.map((b, idx: number) => (
               <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
             ))}
           </ul>
         </div>
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam line</div>
-          {exam.map((l: any, idx: number) => (
+          {exam.map((l, idx: number) => (
             <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
               {String(l)}
             </div>
@@ -706,21 +783,22 @@ export default function TutorDrawerV2(props: {
         </div>
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked examples (2)</div>
-          {worked.map((ex: any, exIdx: number) => {
-            const steps = Array.isArray(ex?.steps) ? ex.steps : [];
-            const sumMarks = steps.reduce((acc: number, s: any) => acc + (Number(s?.marks) || 0), 0);
-            const total = Number(ex?.totalMarks);
+          {worked.map((ex, exIdx: number) => {
+            const exRecord = isRecord(ex) ? ex : {};
+            const steps = Array.isArray(exRecord.steps) ? exRecord.steps : [];
+            const sumMarks = steps.reduce((acc: number, s) => acc + (isRecord(s) ? Number(s.marks) || 0 : 0), 0);
+            const total = Number(exRecord.totalMarks);
             return (
               <div key={exIdx} style={{ borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(0,0,0,0.08)", marginBottom: 10 }}>
                 <div style={{ fontWeight: 800 }}>
                   {exIdx === 0 ? "Example 1: Basic" : "Example 2: Board-style"}
                 </div>
-                {ex?.question ? <div style={{ marginTop: 6 }}>{String(ex.question)}</div> : null}
+                {exRecord.question ? <div style={{ marginTop: 6 }}>{String(exRecord.question)}</div> : null}
                 {steps.length ? (
                   <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                    {steps.map((s: any, idx: number) => (
+                    {steps.map((s, idx: number) => (
                       <li key={idx} style={{ marginBottom: 6 }}>
-                        <b>[{Number(s?.marks) || 0}]</b> {String(s?.text || "")}
+                        <b>[{isRecord(s) ? Number(s.marks) || 0 : 0}]</b> {isRecord(s) ? String(s.text || "") : ""}
                       </li>
                     ))}
                   </ol>
@@ -733,8 +811,8 @@ export default function TutorDrawerV2(props: {
                     Marking check: step marks sum to {sumMarks}, expected {total}.
                   </div>
                 ) : null}
-                {ex?.finalAnswer ? (
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(ex.finalAnswer)}</div>
+                {exRecord.finalAnswer ? (
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(exRecord.finalAnswer)}</div>
                 ) : null}
               </div>
             );
@@ -744,7 +822,7 @@ export default function TutorDrawerV2(props: {
           <div>
             <div style={{ fontWeight: 800, marginBottom: 6 }}>Common mistakes</div>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {mistakes.map((m: any, idx: number) => (
+              {mistakes.map((m, idx: number) => (
                 <li key={idx} style={{ marginBottom: 6 }}>{String(m)}</li>
               ))}
             </ul>
@@ -1036,12 +1114,12 @@ export default function TutorDrawerV2(props: {
                     body: JSON.stringify(payload),
                   });
                   const data = await res.json();
-                  if (!res.ok) throw new Error(data?.error || "Feedback failed.");
+                  if (!res.ok) throw new Error(getResponseError(data, "Feedback failed."));
                   setFeedbackStatus("success");
                   setFeedbackMessage("Thanks! Your feedback was saved.");
-                } catch (err: any) {
+                } catch (err) {
                   setFeedbackStatus("error");
-                  setFeedbackMessage(err?.message || "Could not save feedback.");
+                  setFeedbackMessage(getErrorMessage(err, "Could not save feedback."));
                 }
               }}
             >

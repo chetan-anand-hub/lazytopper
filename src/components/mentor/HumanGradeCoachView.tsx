@@ -1,12 +1,21 @@
 import React from "react";
+import type { TutorBlock } from "../../types/mentor";
 
 type HumanGradeCoachViewProps = {
-  tutorObj?: any;
+  tutorObj?: TutorBlock | null;
   hintLevel: number;
   onNextHint?: () => void;
   variantLabel?: string;
   compact?: boolean;
 };
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const asString = (v: unknown): string => (typeof v === "string" ? v : "");
+
+const asStringArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.map((item) => String(item)) : [];
 
 export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
   tutorObj,
@@ -22,18 +31,26 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
   const hint = tutorObj.hint_ladder;
   const board = tutorObj.board_steps_ms;
   const next = tutorObj.next;
+  const diagnosisRecord = isRecord(diagnosis) ? diagnosis : null;
+  const socraticRecord = isRecord(socratic) ? socratic : null;
+  const hintRecord = isRecord(hint) ? hint : null;
+  const boardRecord = isRecord(board) ? board : null;
+  const nextRecord = isRecord(next) ? next : null;
   const hasAny = diagnosis || socratic || hint || board || next;
   if (!hasAny) return null;
 
-  const mistakeTags = Array.isArray(diagnosis?.mistake_tags) ? diagnosis.mistake_tags : [];
-  const hintText = typeof hint?.hint === "string" ? hint.hint : "";
-  const hintWarning = typeof hint?._warning === "string" ? hint._warning : "";
-  const hintBusy = Boolean(hint?._busy);
-  const canAdvance = typeof hint?._can_advance === "boolean" ? hint._can_advance : Boolean(onNextHint);
-  const showSingleHintNote = Boolean(hint?._single_hint_note);
-  const steps = Array.isArray(board?.steps) ? board.steps : [];
-  const deductions = Array.isArray(board?.deductions) ? board.deductions : [];
-  const totalMarks = Number(board?.total_marks);
+  const mistakeTags = Array.isArray(diagnosisRecord?.mistake_tags)
+    ? asStringArray(diagnosisRecord.mistake_tags)
+    : [];
+  const hintText = asString(hintRecord?.hint);
+  const hintWarning = asString(hintRecord?._warning);
+  const hintBusy = Boolean(hintRecord?._busy);
+  const canAdvance =
+    typeof hintRecord?._can_advance === "boolean" ? hintRecord._can_advance : Boolean(onNextHint);
+  const showSingleHintNote = Boolean(hintRecord?._single_hint_note);
+  const steps = Array.isArray(boardRecord?.steps) ? boardRecord.steps : [];
+  const deductions = Array.isArray(boardRecord?.deductions) ? boardRecord.deductions : [];
+  const totalMarks = Number(boardRecord?.total_marks);
 
   const containerStyle = compact
     ? { marginTop: 10 }
@@ -72,15 +89,15 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
                   >
                     {tag}
                   </span>
-                ))}
+                ))} 
               </div>
             ) : null}
-            {diagnosis.misconception_summary ? (
-              <div style={{ marginBottom: 4 }}>{String(diagnosis.misconception_summary)}</div>
+            {diagnosisRecord?.misconception_summary ? (
+              <div style={{ marginBottom: 4 }}>{String(diagnosisRecord.misconception_summary)}</div>
             ) : null}
-            {diagnosis.confidence ? (
+            {diagnosisRecord?.confidence ? (
               <div style={{ fontSize: 12, opacity: compact ? 0.8 : 0.75 }}>
-                Confidence: {String(diagnosis.confidence)}
+                Confidence: {String(diagnosisRecord.confidence)}
               </div>
             ) : null}
           </div>
@@ -89,11 +106,11 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
         {socratic ? (
           <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
             <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Socratic</div>
-            {socratic.question ? (
-              <div style={{ fontWeight: 700 }}>{String(socratic.question)}</div>
+            {socraticRecord?.question ? (
+              <div style={{ fontWeight: 700 }}>{String(socraticRecord.question)}</div>
             ) : null}
-            {socratic.expected_thought ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(socratic.expected_thought)}</div>
+            {socraticRecord?.expected_thought ? (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(socraticRecord.expected_thought)}</div>
             ) : null}
           </div>
         ) : null}
@@ -138,9 +155,9 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
             ) : null}
             {steps.length ? (
               <ol style={{ margin: 0, paddingLeft: 18 }}>
-                {steps.map((s: any, stepIdx: number) => {
-                  const line = String(s?.line || "");
-                  const marks = Number(s?.marks);
+                {steps.map((s, stepIdx: number) => {
+                  const line = isRecord(s) ? String(s.line || "") : "";
+                  const marks = isRecord(s) ? Number(s.marks) : Number.NaN;
                   if (!line) return null;
                   return (
                     <li key={stepIdx} style={{ marginBottom: 6 }}>
@@ -153,16 +170,16 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
             {deductions.length ? (
               <div style={{ marginTop: 6 }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>Deductions</div>
-                {deductions.map((d: any, dIdx: number) => (
+                {deductions.map((d, dIdx: number) => (
                   <div key={dIdx} style={{ fontSize: 12, marginBottom: 4 }}>
-                    {String(d?.reason || "")}{" "}
-                    {Number.isFinite(Number(d?.marks_lost)) ? `(-${Number(d.marks_lost)})` : ""}
+                    {isRecord(d) ? String(d.reason || "") : ""}{" "}
+                    {isRecord(d) && Number.isFinite(Number(d.marks_lost)) ? `(-${Number(d.marks_lost)})` : ""}
                   </div>
                 ))}
               </div>
             ) : null}
-            {board.examiner_note ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(board.examiner_note)}</div>
+            {boardRecord?.examiner_note ? (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(boardRecord.examiner_note)}</div>
             ) : null}
           </div>
         ) : null}
@@ -170,9 +187,9 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
         {next ? (
           <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
             <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Next</div>
-            {next.micro_drill ? <div style={{ marginBottom: 4 }}>{String(next.micro_drill)}</div> : null}
-            {next.revision_hook ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(next.revision_hook)}</div>
+            {nextRecord?.micro_drill ? <div style={{ marginBottom: 4 }}>{String(nextRecord.micro_drill)}</div> : null}
+            {nextRecord?.revision_hook ? (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(nextRecord.revision_hook)}</div>
             ) : null}
           </div>
         ) : null}

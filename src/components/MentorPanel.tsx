@@ -10,6 +10,7 @@ import { callMentor } from "../ai/aiClient";
 import { getHintVariant } from "../services/abFlags";
 import { logActivity } from "../services/sessionLogger";
 import { HumanGradeCoachView } from "./mentor/HumanGradeCoachView";
+import { isRecord } from "../types/mentor";
 import type {
   MentorMode,
   MentorMessage,
@@ -21,6 +22,8 @@ import type {
   BoardStepsStructured,
   SolveWithMeStructured,
 } from "../types/MentorRequest";
+import type { MentorPayload } from "../ai/aiClient";
+import type { TutorBlock } from "../types/mentor";
 
 /**
  * MentorPanel
@@ -180,7 +183,7 @@ function repairJsonForParse(raw: string): string {
   return t;
 }
 
-function safeJsonParse(text: string): any | null {
+function safeJsonParse(text: string): unknown | null {
   try {
     return JSON.parse(text);
   } catch {
@@ -192,33 +195,33 @@ function safeJsonParse(text: string): any | null {
   }
 }
 
-function isBoardSteps(obj: any): obj is BoardStepsStructured {
+function isBoardSteps(obj: unknown): obj is BoardStepsStructured {
   return (
-    !!obj &&
+    isRecord(obj) &&
     obj.kind === "board_steps_ms" &&
     typeof obj.totalMarks === "number" &&
     Array.isArray(obj.steps)
   );
 }
 
-function isSolveWithMe(obj: any): obj is SolveWithMeStructured {
+function isSolveWithMe(obj: unknown): obj is SolveWithMeStructured {
   return (
-    !!obj &&
+    isRecord(obj) &&
     (obj.kind === "question" || obj.kind === "hint" || obj.kind === "final") &&
     typeof obj.tutor === "string"
   );
 }
 
-function getTutorObject(structured: MentorStructured | undefined): any | null {
-  const tutor = structured ? (structured as any).tutor : null;
+function getTutorObject(structured: MentorStructured | undefined): TutorBlock | null {
+  const tutor = structured?.tutor;
   if (tutor && typeof tutor === "object" && !Array.isArray(tutor)) return tutor;
   return null;
 }
 
 function getTutorText(structured: MentorStructured | undefined): string {
-  const tutor = structured ? (structured as any).tutor : null;
+  const tutor = structured?.tutor;
   if (typeof tutor === "string") return tutor;
-  if (tutor && typeof tutor === "object") {
+  if (isRecord(tutor)) {
     const text = typeof tutor.text === "string" ? tutor.text : "";
     const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
     return text || rawText || "";
@@ -226,16 +229,16 @@ function getTutorText(structured: MentorStructured | undefined): string {
   return "";
 }
 
-function formatBoardSteps(obj: any): string {
-  const total = typeof obj.totalMarks === "number" ? obj.totalMarks : 0;
-  const steps = Array.isArray(obj.steps) ? obj.steps : [];
+function formatBoardSteps(obj: unknown): string {
+  const total = isRecord(obj) && typeof obj.totalMarks === "number" ? obj.totalMarks : 0;
+  const steps = isRecord(obj) && Array.isArray(obj.steps) ? obj.steps : [];
   const lines: string[] = [];
 
   lines.push(`Board Steps (${total} mark${total === 1 ? "" : "s"}):`);
 
-  steps.forEach((s: any, idx: number) => {
-    const stepText = String(s?.text ?? "").trim();
-    const marks = typeof s?.marks === "number" ? s.marks : 0;
+  steps.forEach((s, idx: number) => {
+    const stepText = isRecord(s) ? String(s.text ?? "").trim() : "";
+    const marks = isRecord(s) && typeof s.marks === "number" ? s.marks : 0;
     if (!stepText) return;
     lines.push(`Step ${idx + 1} (${marks}m): ${stepText}`);
   });
@@ -243,29 +246,29 @@ function formatBoardSteps(obj: any): string {
   return lines.join("\n");
 }
 
-function formatBoardStepsBlock(block: any): string {
-  if (!block || typeof block !== "object") return "";
+function formatBoardStepsBlock(block: unknown): string {
+  if (!isRecord(block)) return "";
   const total = Number(block.total_marks) || 0;
   const steps = Array.isArray(block.steps) ? block.steps : [];
   const lines: string[] = [];
   lines.push(`Board Steps (${total} mark${total === 1 ? "" : "s"}):`);
-  steps.forEach((s: any, idx: number) => {
-    const line = String(s?.line ?? "").trim();
-    const marks = Number(s?.marks) || 0;
+  steps.forEach((s, idx: number) => {
+    const line = isRecord(s) ? String(s.line ?? "").trim() : "";
+    const marks = isRecord(s) ? Number(s.marks) || 0 : 0;
     if (!line) return;
     lines.push(`Step ${idx + 1} (${marks}m): ${line}`);
   });
   return lines.join("\n");
 }
 
-function formatSolveWithMe(obj: any): string {
-  const tutor = String(obj?.tutor ?? "").trim();
+function formatSolveWithMe(obj: unknown): string {
+  const tutor = isRecord(obj) ? String(obj.tutor ?? "").trim() : "";
   if (!tutor) return "";
-  if (obj.kind !== "final") return tutor;
+  if (!isRecord(obj) || obj.kind !== "final") return tutor;
 
   const parts: string[] = [tutor];
-  const finalAnswer = String(obj?.finalAnswer ?? "").trim();
-  const boardWriteup = String(obj?.boardWriteup ?? "").trim();
+  const finalAnswer = String(obj.finalAnswer ?? "").trim();
+  const boardWriteup = String(obj.boardWriteup ?? "").trim();
 
   if (finalAnswer) parts.push("", "Final Answer:", finalAnswer);
   if (boardWriteup) parts.push("", "Board Write-up:", boardWriteup);
@@ -278,7 +281,7 @@ function sanitizeMentorOutput(raw: string): string {
   const candidates = extractAllJsonObjects(stripped);
 
   // 1) Try to parse a protocol object (board_steps_ms / solve_with_me)
-  let protocol: any | null = null;
+  let protocol: unknown | null = null;
   for (const c of candidates) {
     const obj = safeJsonParse(c.text);
     if (isBoardSteps(obj) || isSolveWithMe(obj)) {
@@ -312,11 +315,21 @@ type MentorReply = {
   structured?: MentorStructured;
 };
 
-async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
+type MentorRequestWithHints = MentorRequest & {
+  hintLevel?: number;
+  requestNextHint?: boolean;
+};
+
+const getStringProp = (obj: unknown, key: string): string | undefined =>
+  isRecord(obj) && typeof obj[key] === "string" ? String(obj[key]) : undefined;
+
+async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorReply> {
   // Build a compact MentorPayload-style object from the richer MentorRequest.
   // This keeps all the planner logic here, while delegating the actual HTTP
   // call + error handling to src/ai/aiClient.ts.
-  const mentorPayload: any =
+  const pageContextTopicKey = getStringProp(payload.pageContext, "topicKey");
+  const pageContextTopic = getStringProp(payload.pageContext, "topic");
+  const mentorPayload: MentorPayload & Record<string, unknown> =
     payload.mode === "plan"
       ? {
           subject: payload.pageContext.subject,
@@ -326,9 +339,9 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
           hoursPerDay:
             (payload.studentState.mathHoursPerDay ?? 0) +
             (payload.studentState.scienceHoursPerDay ?? 0),
-          topicKey: (payload.pageContext as any).topicKey ?? payload.pageContext.chapter ?? undefined,
+          topicKey: pageContextTopicKey ?? payload.pageContext.chapter ?? undefined,
           // Keep weak chapters for future prompt tuning (gateway ignores unknown keys safely).
-          weakChapters: (payload.studentState as any).weakChapters,
+          weakChapters: payload.studentState.weakChapters,
           optionalChapters: [],
           extraNotes: undefined,
         }
@@ -346,7 +359,7 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
           subject: payload.pageContext.subject,
           // Prefer a canonical topic/concept key when available.
           topicKey:
-            (payload.pageContext as any).topic ??
+            pageContextTopic ??
             payload.pageContext.chapter ??
             "",
           questionText: payload.message,
@@ -358,8 +371,8 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
           extraNotes: payload.message,
         };
 
-  const hintLevel = (payload as any).hintLevel;
-  const requestNextHint = (payload as any).requestNextHint;
+  const hintLevel = payload.hintLevel;
+  const requestNextHint = payload.requestNextHint;
   if (hintLevel != null) mentorPayload.hintLevel = hintLevel;
   if (requestNextHint != null) mentorPayload.requestNextHint = requestNextHint;
 
@@ -398,9 +411,10 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
   if (mode === "plan") {
     const lines: string[] = [];
 
-    if (Array.isArray((data as any)?.seasonPlan)) {
+    if (isRecord(data) && Array.isArray(data.seasonPlan)) {
       lines.push("Study phases:");
-      (data as any).seasonPlan.forEach((phase: any) => {
+      data.seasonPlan.forEach((phase) => {
+        if (!isRecord(phase)) return;
         lines.push(
           `• ${phase.phase} – ${phase.durationDays} days: ${phase.focus}`
         );
@@ -408,9 +422,10 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
       lines.push("");
     }
 
-    if (Array.isArray((data as any)?.chapterHours)) {
+    if (isRecord(data) && Array.isArray(data.chapterHours)) {
       lines.push("Chapter allocation:");
-      (data as any).chapterHours.forEach((ch: any) => {
+      data.chapterHours.forEach((ch) => {
+        if (!isRecord(ch)) return;
         lines.push(
           `• ${ch.chapter} [${ch.tier}] – ${ch.recommendedHours} hrs (${ch.weightagePercent}% weightage)`
         );
@@ -418,11 +433,12 @@ async function callMentorAPI(payload: MentorRequest): Promise<MentorReply> {
       lines.push("");
     }
 
-    if (Array.isArray((data as any)?.dailySchedule)) {
+    if (isRecord(data) && Array.isArray(data.dailySchedule)) {
       lines.push("First few days schedule:");
-      (data as any).dailySchedule.forEach((d: any) => {
+      data.dailySchedule.forEach((d) => {
+        if (!isRecord(d)) return;
         const parts: string[] = [];
-        if (d.hours) {
+        if (isRecord(d.hours)) {
           if (d.hours.Maths) parts.push(`Maths: ${d.hours.Maths}h`);
           if (d.hours.Science) parts.push(`Science: ${d.hours.Science}h`);
         }
@@ -469,7 +485,7 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   const [hintWarnings, setHintWarnings] = useState<Record<number, string>>({});
   const [hintFallback, setHintFallback] = useState<Record<number, boolean>>({});
   const [hintVariant] = useState(() => getHintVariant());
-  const isDev = Boolean(import.meta && (import.meta as any).env && (import.meta as any).env.DEV);
+  const isDev = Boolean(import.meta?.env?.DEV);
 
   const effectivePageContext: PageContext = {
     ...pageContext,
@@ -650,7 +666,7 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
 Give me hint level ${targetLevel} only (keep it short).`
       : `Give me hint level ${targetLevel} only (keep it short).`;
 
-    const payload: MentorRequest = {
+    const payload: MentorRequestWithHints = {
       mode,
       message: hintPrompt,
       pageContext: effectivePageContext,
@@ -658,8 +674,8 @@ Give me hint level ${targetLevel} only (keep it short).`
       history: messages,
       persona,
     };
-    (payload as any).hintLevel = targetLevel;
-    (payload as any).requestNextHint = true;
+    payload.hintLevel = targetLevel;
+    payload.requestNextHint = true;
 
     try {
       const reply = await callMentorAPI(payload);
@@ -689,12 +705,13 @@ Give me hint level ${targetLevel} only (keep it short).`
     if (!tutorObj) return null;
 
     const hint = tutorObj.hint_ladder;
-    const hints = Array.isArray(hint?.hints) ? hint.hints : [];
-    const baseLevel = Number.isFinite(Number(hint?.level)) ? Number(hint.level) : 1;
+    const hintRecord = isRecord(hint) ? hint : null;
+    const hints = Array.isArray(hintRecord?.hints) ? hintRecord.hints : [];
+    const baseLevel = Number.isFinite(Number(hintRecord?.level)) ? Number(hintRecord?.level) : 1;
     const maxHintLevel = hints.length ? Math.min(3, hints.length) : 3;
     const localLevel = hintLevels[idx] ?? baseLevel;
     const displayLevel = Math.min(maxHintLevel, localLevel);
-    const hintTextRaw = typeof hint?.hint === "string" ? hint.hint : "";
+    const hintTextRaw = typeof hintRecord?.hint === "string" ? hintRecord.hint : "";
     const hintFromList = hints.length ? String(hints[Math.max(0, displayLevel - 1)] || "") : "";
     const effectiveVariant =
       hintVariant === "C_REFRESH" && hintFallback[idx] ? "B_LOCAL" : hintVariant;
@@ -711,11 +728,11 @@ Give me hint level ${targetLevel} only (keep it short).`
         ? displayLevel < 3 && !hintBusy
         : hints.length > 1 && displayLevel < maxHintLevel;
 
-    const coachTutorObj = hint
+    const coachTutorObj = hintRecord
       ? {
           ...tutorObj,
           hint_ladder: {
-            ...hint,
+            ...hintRecord,
             hint: displayHint,
             _warning: hintWarning,
             _busy: hintBusy,
@@ -725,7 +742,7 @@ Give me hint level ${targetLevel} only (keep it short).`
         }
       : tutorObj;
 
-    const onNextHint = hint
+    const onNextHint = hintRecord
       ? () => {
           const nextLevel = Math.min(maxHintLevel, displayLevel + 1);
           logHintEvent("next_hint_clicked", nextLevel);

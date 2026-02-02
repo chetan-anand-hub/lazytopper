@@ -41,6 +41,11 @@ export type MentorMode =
   | 'learn_proof'
   | 'learn_mindmap';
 
+export type UnknownRecord = Record<string, unknown>;
+
+export const isRecord = (v: unknown): v is UnknownRecord =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
 /**
  * Configuration for a single mentor mode.  Defines how the backend should
  * behave when this mode is active, including the system prompt and
@@ -320,6 +325,23 @@ export interface MentorDiagramStepLink {
 /* Human-grade loop blocks (nested under structured.tutor.*)            */
 /* ------------------------------------------------------------------ */
 
+export type TutorBlock = {
+  text?: string;
+  diagnosis?: unknown;
+  socratic?: unknown;
+  hint_ladder?: unknown;
+  board_steps_ms?: unknown;
+  next?: unknown;
+  [k: string]: unknown;
+};
+
+export type MentorStructured = {
+  kind?: string;
+  finalAnswer?: string;
+  tutor?: TutorBlock | string;
+  [k: string]: unknown;
+};
+
 export interface MentorTutorDiagnosis {
   mistake_tags?: string[];
   misconception_summary?: string;
@@ -490,7 +512,7 @@ export interface MentorTutorEnvelope {
  * Union of all structured protocols we currently support.
  * (Other modes generally return plain text only.)
  */
-export type MentorStructured =
+export type MentorStructuredProtocol =
   | SolveWithMeStructured
   | BoardStepsStructured
   | LearnTeachStructured
