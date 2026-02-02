@@ -105,3 +105,8 @@ docs/project_notes/issues_backup_*.md
 
 # local reports evidence
 Reports/
+# --- Evidence / audit artifacts (keep OUT of repo) ---
+evidence_pack_*.zip
+LazyTopper_Audit_*.zip
+audit_*/
+Audit_*/
