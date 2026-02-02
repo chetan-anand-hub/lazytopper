@@ -110,3 +110,7 @@ evidence_pack_*.zip
 LazyTopper_Audit_*.zip
 audit_*/
 Audit_*/
+
+# evidence output (must live outside repo)
+REPORT.md
+
