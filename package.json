@@ -10,6 +10,7 @@
     "pmem:end-session": "node tools/pmem/pmem-runner.cjs end-session",
     "blackbox:ci": "npm run blackbox:full && npm run build",
     "dev": "vite",
+    "dev:gateway": "node server/index.cjs",
     "tracker:ui": "npm run tracker && node scripts/trackerUi.mjs",
     "hooks:disable": "git config --unset core.hooksPath",
     "blackbox:full": "npm run blackbox -- --full && npm run rules:digest && npm run blackbox:stage && npm run contextpack",

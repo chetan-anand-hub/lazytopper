@@ -8,12 +8,13 @@
 // Node 18+ recommended.
 //
 // Auth (recommended):
-//   Put GEMINI_API_KEY and optional GEMINI_MODEL into server/.env
+//   Put AI_PROVIDER and API_KEY into server/.env
 //   Example:
-//     GEMINI_API_KEY=your_key_here
+//     AI_PROVIDER=gemini
+//     API_KEY=your_key_here
 //     GEMINI_MODEL=gemini-2.5-flash
 //
-// The server will also read GEMINI_API_KEY / GOOGLE_API_KEY from environment variables if set.
+// If AI_PROVIDER or API_KEY is missing, the server runs in deterministic STUB mode.
 
 const http = require('http');
 const fs = require('fs');
@@ -62,6 +63,7 @@ const { scoreRubric } = require(
 const { retrieveTrianglesSources } = require(
   path.join(__dirname, '../src/tutor/retrieval/trianglesRetriever.ts')
 );
+const { orchestrateTutorResponse } = require('./tutorOrchestrator.cjs');
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -90,8 +92,33 @@ function loadDotEnvIfPresent() {
 }
 loadDotEnvIfPresent();
 
+const RAW_API_KEY = String(process.env.API_KEY || '').trim();
+const RAW_GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || '').trim();
+const RAW_AI_PROVIDER = String(process.env.AI_PROVIDER || '').trim();
+const ENV_USED = [];
+
+if (!RAW_API_KEY && RAW_GEMINI_API_KEY) {
+  process.env.API_KEY = RAW_GEMINI_API_KEY;
+  ENV_USED.push('GEMINI_API_KEY');
+} else if (RAW_API_KEY) {
+  ENV_USED.push('API_KEY');
+}
+
+const HAS_API_KEY = Boolean(String(process.env.API_KEY || '').trim());
+if (!RAW_AI_PROVIDER && HAS_API_KEY) {
+  process.env.AI_PROVIDER = 'gemini';
+} else if (RAW_AI_PROVIDER) {
+  ENV_USED.push('AI_PROVIDER');
+}
+
 const PORT = process.env.PORT || 3001;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+const AI_PROVIDER = String(process.env.AI_PROVIDER || '').trim();
+const API_KEY = String(process.env.API_KEY || '').trim();
+const CORS_ORIGIN = String(process.env.CORS_ORIGIN || 'http://localhost:5173').trim();
+const AI_PROVIDER_NORMALIZED = AI_PROVIDER.toLowerCase();
+const STUB_MODE = !AI_PROVIDER || !API_KEY || AI_PROVIDER_NORMALIZED !== 'gemini';
+const ACTIVE_PROVIDER = STUB_MODE ? 'stub' : AI_PROVIDER_NORMALIZED;
+const GEMINI_API_KEY = AI_PROVIDER_NORMALIZED === 'gemini' ? API_KEY : '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_MODEL_ZOMBIE = process.env.GEMINI_MODEL_ZOMBIE || '';
 const GEMINI_MODEL_BEAST = process.env.GEMINI_MODEL_BEAST || '';
@@ -108,7 +135,7 @@ const FEEDBACK_FILE = path.join(FEEDBACK_DIR, 'triangles_feedback.jsonl');
 function sendJson(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
   });
   res.end(JSON.stringify(body));
 }
@@ -147,6 +174,163 @@ function isValidMentorProtocol(obj, mode) {
 
   // Unknown protocol mode
   return false;
+}
+
+let mentorSeedCache = undefined;
+function loadTrianglesMentorSeed() {
+  if (mentorSeedCache !== undefined) return mentorSeedCache;
+  const jsonPath = path.join(__dirname, '../src/data/_final/maths-triangles/mentor.json');
+  const tsPath = path.join(__dirname, '../src/data/_finalGenerated/triangles.mentor.ts');
+  try {
+    if (fs.existsSync(jsonPath)) {
+      const raw = fs.readFileSync(jsonPath, 'utf8');
+      mentorSeedCache = JSON.parse(raw);
+      return mentorSeedCache;
+    }
+  } catch (err) {
+    console.warn('[stub] Failed to read mentor.json:', err?.message || err);
+  }
+  try {
+    if (fs.existsSync(tsPath)) {
+      const mod = require(tsPath);
+      mentorSeedCache = mod?.trianglesMentor || mod?.default || null;
+      return mentorSeedCache;
+    }
+  } catch (err) {
+    console.warn('[stub] Failed to load triangles.mentor.ts:', err?.message || err);
+  }
+  mentorSeedCache = null;
+  return mentorSeedCache;
+}
+
+function normalizeLines(value) {
+  const raw = Array.isArray(value) ? value : [];
+  const seen = new Set();
+  const lines = [];
+  raw.forEach((item) => {
+    const text = String(item || '').replace(/\s+/g, ' ').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    lines.push(text);
+  });
+  return lines;
+}
+
+function mergeLines(primary, fallback, min) {
+  const merged = normalizeLines([...(primary || []), ...(fallback || [])]);
+  if (merged.length >= min) return merged;
+  const fallbackLines = normalizeLines(fallback || []);
+  const combined = normalizeLines([...merged, ...fallbackLines]);
+  if (combined.length >= min) return combined;
+  const pad = [
+    'Use a clear similarity criterion (AA/SAS/SSS).',
+    'Match corresponding sides and angles carefully.',
+    'State the final similarity conclusion explicitly.',
+  ];
+  return normalizeLines([...combined, ...pad]).slice(0, Math.max(min, combined.length));
+}
+
+function buildStubTutorStructured(mode, payload) {
+  let structured = buildTutorFallback(mode, payload);
+  const seed = loadTrianglesMentorSeed();
+  if (!seed || typeof seed !== 'object') return structured;
+  const mentor = seed.mentorResponse && typeof seed.mentorResponse === 'object' ? seed.mentorResponse : seed;
+
+  const correct = normalizeLines(mentor.correctAnswerFeedback);
+  const incorrect = normalizeLines(mentor.incorrectAnswerFeedback);
+  const warnings = normalizeLines(mentor.examinerWarning);
+  const nextSteps = normalizeLines(mentor.nextStepSuggestion);
+
+  if (mode === 'learn_teach') {
+    structured.teach = structured.teach || {};
+    structured.teach.simpleExplanation = mergeLines(
+      [...correct, ...incorrect],
+      structured.teach.simpleExplanation || [],
+      4
+    );
+    structured.teach.cbseExamSentence = mergeLines(
+      warnings,
+      structured.teach.cbseExamSentence || [],
+      2
+    );
+    structured.commonMistakes = mergeLines(
+      incorrect,
+      structured.commonMistakes || [],
+      1
+    );
+    if (nextSteps[0]) structured.checkQuestion = nextSteps[0];
+  }
+
+  if (mode === 'learn_mindmap') {
+    structured.conceptBullets = mergeLines(
+      [...correct, ...incorrect],
+      structured.conceptBullets || [],
+      5
+    );
+    structured.examLines = mergeLines(
+      warnings,
+      structured.examLines || [],
+      2
+    );
+    if (incorrect[0]) structured.commonError = incorrect[0];
+    if (nextSteps[0]) structured.commonFix = nextSteps[0];
+    if (nextSteps[1]) structured.checkQuestion = nextSteps[1];
+  }
+
+  if (mode === 'learn_proof' || mode === 'solve_with_me' || mode === 'board_steps_ms') {
+    structured = ensureDiagramFields(structured, payload);
+  }
+
+  return structured;
+}
+
+function buildStubText() {
+  const seed = loadTrianglesMentorSeed();
+  if (seed && typeof seed === 'object') {
+    const mentor = seed.mentorResponse && typeof seed.mentorResponse === 'object' ? seed.mentorResponse : seed;
+    const lines = normalizeLines([
+      ...(mentor.correctAnswerFeedback || []),
+      ...(mentor.incorrectAnswerFeedback || []),
+      ...(mentor.examinerWarning || []),
+      ...(mentor.nextStepSuggestion || []),
+    ]);
+    if (lines.length) return lines.join('\n');
+  }
+  return 'Stub mentor response active. Provide AI_PROVIDER and API_KEY to enable live responses.';
+}
+
+function buildStubMoreLikeThis(payload) {
+  const seedQuestion = payload?.seedQuestion || {};
+  const baseText = String(seedQuestion.text || seedQuestion.questionText || '').trim();
+  const marks = seedQuestion.marks;
+  const difficulty = seedQuestion.difficulty;
+  const bloomSkill = seedQuestion.bloomSkill;
+  const subject = payload?.subject || 'Maths/Science';
+  const topicKey = payload?.topicKey || null;
+  const requested = Number(payload?.numVariants || 3);
+  const numVariants = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 6) : 3;
+  const seedLine =
+    baseText ||
+    'Write a CBSE Class 10 triangles question that uses AA/SAS/SSS similarity.';
+  const mentorSeed = loadTrianglesMentorSeed();
+  const mentor = mentorSeed && mentorSeed.mentorResponse ? mentorSeed.mentorResponse : mentorSeed || {};
+  const hints = normalizeLines([
+    ...(mentor.nextStepSuggestion || []),
+    ...(mentor.examinerWarning || []),
+  ]);
+  const variants = Array.from({ length: numVariants }).map((_, idx) => {
+    const hint = hints.length ? ` Focus: ${hints[idx % hints.length]}` : '';
+    const text = `${seedLine}${hint}`.trim();
+    return {
+      index: idx,
+      text,
+      questionText: text,
+      marks,
+      difficulty,
+      bloomSkill,
+    };
+  });
+  return { subject, topicKey, variants, model: 'stub' };
 }
 
 
@@ -772,6 +956,10 @@ function isTrianglesBsreEnabled() {
 function isNoProviderEnabled() {
   const flag = String(process.env.LT_NO_PROVIDER || '').trim().toLowerCase();
   return ['1', 'true', 'yes', 'on'].includes(flag);
+}
+
+function isStubMode() {
+  return STUB_MODE || isNoProviderEnabled();
 }
 
 let bsreEvaluatorInstance = null;
@@ -2541,7 +2729,7 @@ function buildMoreLikeThisUserPrompt(payload) {
  */
 async function callGemini(model, finalContents, config) {
   if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) is not set. Put it in server/.env or as an environment variable.');
+    throw new Error('API_KEY is not set or AI_PROVIDER is not "gemini". Set AI_PROVIDER=gemini and API_KEY in server/.env or environment.');
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
@@ -2631,7 +2819,7 @@ async function handleRequest(req, res) {
     (req.url === '/api/mentor' || req.url === '/api/more-like-this' || req.url === '/api/tutor-feedback')
   ) {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': CORS_ORIGIN,
       'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
@@ -2644,11 +2832,12 @@ async function handleRequest(req, res) {
     return sendJson(res, 200, {
       ok: true,
       service: 'lazytopper-ai-server',
-      provider: 'gemini',
+      provider: ACTIVE_PROVIDER,
       model: GEMINI_MODEL,
       modelZombie: GEMINI_MODEL_ZOMBIE || null,
       modelBeast: GEMINI_MODEL_BEAST || null,
-      hasKey: Boolean(GEMINI_API_KEY),
+      hasKey: Boolean(API_KEY),
+      stub: STUB_MODE,
       node: process.version,
     });
   }
@@ -2691,8 +2880,9 @@ async function handleRequest(req, res) {
       ? extractStudentAttempt(payload, reqJson?.messages)
       : '';
     const trianglesFlag = isTrianglesBsreEnabled();
-    const noProvider = isNoProviderEnabled();
-    const shouldRunBsre = isTrianglesEvaluation && trianglesFlag && trianglesAttempt;
+    const stubMode = isStubMode();
+    const noProvider = stubMode;
+    const shouldRunBsre = !stubMode && isTrianglesEvaluation && trianglesFlag && trianglesAttempt;
     if (shouldRunBsre) {
       const bsreRubricId = determineBsreRubricId(payload);
       console.info(`[BSRE_ENTRY] flag=true rubric=${bsreRubricId} no_provider=${noProvider}`);
@@ -2712,11 +2902,18 @@ async function handleRequest(req, res) {
           schema_used: 'schema_triangles_bsre',
           repair_used: false,
         };
+        const orchestrated = orchestrateTutorResponse({
+          mode: 'triangles_evaluation',
+          payload,
+          messages: reqJson?.messages,
+          structuredDraft: bsreStructured,
+          trace,
+        });
         return sendJson(res, 200, {
           ok: true,
           data: {
-            text: JSON.stringify(bsreStructured),
-            structured: bsreStructured,
+            text: JSON.stringify(orchestrated),
+            structured: orchestrated,
             trace,
           },
         });
@@ -2739,6 +2936,44 @@ async function handleRequest(req, res) {
 
     let handlerUsed = persona && typeof persona === 'object' ? 'persona_prompt' : `prompt_builder:${normalisedMode}`;
     if (isTrianglesEvaluation) handlerUsed = 'triangles_evaluation';
+
+    if (stubMode) {
+      let structured = isStructuredMode(normalisedMode)
+        ? buildStubTutorStructured(normalisedMode, payload)
+        : null;
+      if (structured) {
+        if (
+          normalisedMode === 'learn_teach' ||
+          normalisedMode === 'learn_mindmap' ||
+          normalisedMode === 'learn_proof'
+        ) {
+          const tutorCheck = validateTutorStructured(normalisedMode, structured, payload);
+          if (!tutorCheck.ok) structured = buildTutorFallback(normalisedMode, payload);
+        }
+        structured = orchestrateTutorResponse({
+          mode: normalisedMode,
+          payload,
+          messages: reqJson?.messages,
+          structuredDraft: structured,
+        });
+      }
+      const text = structured ? JSON.stringify(structured) : buildStubText();
+      const trace = {
+        normalized_mode: normalisedMode,
+        handler_used: handlerUsed,
+        schema_used: structured ? `schema_${normalisedMode}` : 'text',
+        repair_used: false,
+        stub_used: true,
+      };
+      return sendJson(res, 200, {
+        ok: true,
+        data: {
+          text,
+          structured,
+          trace,
+        },
+      });
+    }
 
     // Build system prompt from persona (if provided as object)
     let systemPrompt = '';
@@ -3028,6 +3263,26 @@ ${userPrompt}` }] },
           structured = ensureDiagramFields(structured, payload);
         }
 
+        if (structured) {
+          if (
+            normalisedMode === 'learn_teach' ||
+            normalisedMode === 'learn_mindmap' ||
+            normalisedMode === 'learn_proof'
+          ) {
+            const tutorCheck = validateTutorStructured(normalisedMode, structured, payload);
+            if (!tutorCheck.ok) {
+              structured = buildTutorFallback(normalisedMode, payload);
+              fallbackUsed = true;
+            }
+          }
+          structured = orchestrateTutorResponse({
+            mode: normalisedMode,
+            payload,
+            messages: reqJson?.messages,
+            structuredDraft: structured,
+          });
+        }
+
         finalText = JSON.stringify(structured);
       }
 
@@ -3134,13 +3389,17 @@ ${userPrompt}` }] },
         finalText = ensureDiagramLineInText(finalText, payload);
       }
 
-      if (structured && normalisedMode === 'solve_with_me') {
+      if (structured && normalisedMode === 'solve_with_me' && (!structured.tutor || typeof structured.tutor !== 'object')) {
         structured = ensureDiagramFields(structured, payload);
         finalText = JSON.stringify(structured);
       }
 
       const validStructured =
-        structured && isValidMentorProtocol(structured, normalisedMode) ? structured : null;
+        structured && structured.tutor && typeof structured.tutor === 'object'
+          ? structured
+          : structured && isValidMentorProtocol(structured, normalisedMode)
+            ? structured
+            : null;
       const trace = {
         normalized_mode: normalisedMode,
         handler_used: handlerUsed,
@@ -3172,6 +3431,14 @@ ${userPrompt}` }] },
       payload = await readJson(req);
     } catch (e) {
       return sendJson(res, 400, { error: 'Invalid JSON' });
+    }
+
+    if (isStubMode()) {
+      const stub = buildStubMoreLikeThis(payload);
+      return sendJson(res, 200, {
+        ...stub,
+        provider: ACTIVE_PROVIDER,
+      });
     }
 
     try {
@@ -3234,7 +3501,7 @@ ${userPrompt}` }] },
       return sendJson(res, 200, {
         subject,
         topicKey: payload.topicKey || null,
-        provider: 'gemini',
+        provider: ACTIVE_PROVIDER,
         model: GEMINI_MODEL,
         variants,
       });
@@ -3261,7 +3528,10 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`LazyTopper AI server running on port ${PORT}`);
-  console.log(`Provider: Gemini | Model: ${GEMINI_MODEL} | KeyPresent: ${Boolean(GEMINI_API_KEY)}`);
+  const envUsedLabel = ENV_USED.length ? ENV_USED.join(',') : '';
+  console.log(
+    `Provider: ${ACTIVE_PROVIDER} | Model: ${GEMINI_MODEL} | KeyPresent: ${Boolean(API_KEY)} | Stub: ${STUB_MODE} | EnvUsed: ${envUsedLabel}`
+  );
 });
 function messagesToGeminiContents(messages, systemPrompt) {
   const contents = [];
