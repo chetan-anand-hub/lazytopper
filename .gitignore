@@ -114,3 +114,6 @@ Audit_*/
 # evidence output (must live outside repo)
 REPORT.md
 
+
+codex_tutor_snapshot.ps1
+
