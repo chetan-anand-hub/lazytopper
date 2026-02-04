@@ -1,13 +1,16 @@
 import { useState } from "react";
 import type { MentorDiagramSpec } from "../types/mentor";
+import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import { DiagramRenderer } from "./diagrams/DiagramRenderer";
+import { DiagramSvg } from "../tutor/diagram/DiagramSvg";
+import { isDiagramSpec } from "../tutor/diagram/diagramTypes";
 
 type DiagramLabels = Record<string, string>;
 
 type Props = {
   diagramType?: string | null;
   diagramLabels?: DiagramLabels | string[] | null;
-  diagramSpec?: MentorDiagramSpec | null;
+  diagramSpec?: MentorDiagramSpec | DiagramSpec | null;
   title?: string;
   note?: string;
 };
@@ -253,7 +256,11 @@ export function DiagramBlock({
       </div>
       <div style={{ maxWidth: zoomed ? 520 : 360, margin: "0 auto" }}>
       {diagramSpec ? (
-        <DiagramRenderer diagramSpec={diagramSpec} />
+        isDiagramSpec(diagramSpec) ? (
+          <DiagramSvg spec={diagramSpec} />
+        ) : (
+          <DiagramRenderer diagramSpec={diagramSpec as MentorDiagramSpec} />
+        )
       ) : type === "BPT" ? (
         <BptDiagram labels={labels} />
       ) : type === "PYTHAGORAS" ? (

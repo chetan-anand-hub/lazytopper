@@ -18,6 +18,9 @@ import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
 import { MENTOR_ENDPOINT } from "../ai/aiClient";
+import { getDiagramTemplate } from "../tutor/diagram/diagramTemplates";
+import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
+import type { MentorDiagramSpec } from "../types/mentor";
 
 type SubjectKey = "maths" | "science";
 type ModeKey = "zombie" | "beast";
@@ -1661,7 +1664,16 @@ function TutorDrawerV2(props: {
     mode,
   } = props;
 
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  type TutorResponseEntry = {
+    structured?: any;
+    diagramType?: string;
+    diagramLabels?: Record<string, string> | string[] | null;
+    diagramSpec?: MentorDiagramSpec | DiagramSpec | null;
+    responseId?: string;
+    summary?: string;
+  };
+
+  const [responses, setResponses] = useState<Record<string, TutorResponseEntry>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [doubtInput, setDoubtInput] = useState("");
@@ -1669,7 +1681,11 @@ function TutorDrawerV2(props: {
   const [doubtError, setDoubtError] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const autoRequestedRef = useRef<Set<string>>(new Set());
+  const autoRequestReasonRef = useRef<string | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
+  const isDev = Boolean(import.meta?.env?.DEV);
 
   const nodeTitle = String(node?.title || "Concept");
   const nodeText = String(node?.text || core?.means || "");
@@ -1710,12 +1726,12 @@ function TutorDrawerV2(props: {
       String(obj?.diagramType || obj?.diagram?.diagramType || obj?.diagram?.type || "").trim() ||
       "";
     const diagramLabels = obj?.diagramLabels || obj?.diagram?.diagramLabels || obj?.diagram?.labels || null;
-    const diagramSpec = obj?.diagram || obj?.diagramSpec || null;
-    return { diagramType, diagramLabels, diagramSpec };
+    const diagramSpec = obj?.diagram || obj?.diagramSpec || obj?.tutor?.diagramSpec || null;
+    const diagramRequired = Boolean(obj?.diagramRequired ?? obj?.tutor?.diagramRequired);
+    return { diagramType, diagramLabels, diagramSpec, diagramRequired };
   };
 
-  const validateTeach = (obj: any, diagramType: string, diagramSpec: any) => {
-    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
+  const validateTeach = (obj: any) => {
     const bullets = Array.isArray(obj?.conceptBullets) ? obj.conceptBullets : [];
     const examLines = Array.isArray(obj?.examLines) ? obj.examLines : [];
     const worked = obj?.workedExample || {};
@@ -1731,8 +1747,7 @@ function TutorDrawerV2(props: {
     return null;
   };
 
-  const validateExamples = (obj: any, diagramType: string, diagramSpec: any) => {
-    if (!diagramType && !diagramSpec) return "Diagram missing. Please retry.";
+  const validateExamples = (obj: any) => {
     const teach = obj?.teach || {};
     const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
     const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
@@ -1797,15 +1812,21 @@ function TutorDrawerV2(props: {
   };
 
   const requestTutor = useCallback(
-    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string }) => {
+    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string; reason?: string }) => {
       if (!open || !nodeId) return;
       const key = `${nextTab}:${nodeId}`;
       if (!opts?.force && responses[key]) return;
       if (loadingKey === key) return;
+      if (inFlightRef.current.has(key)) return;
 
       cancelInFlight();
       setErrors((prev) => ({ ...prev, [key]: "" }));
       setLoadingKey(key);
+      inFlightRef.current.add(key);
+
+      if (isDev) {
+        console.debug("[tutor] request", { tab: nextTab, nodeId, reason: opts?.reason || "auto" });
+      }
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -1825,10 +1846,24 @@ function TutorDrawerV2(props: {
         if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
         const meta = extractDiagramMeta(structured);
+        const needsDiagram =
+          meta.diagramRequired ||
+          String(topicKey || "")
+            .toLowerCase()
+            .includes("triangle") ||
+          String(nodeTitle || "")
+            .toLowerCase()
+            .includes("triangle");
+        const hasDiagram = Boolean(meta.diagramType || meta.diagramSpec);
+        const fallbackDiagram = needsDiagram && !hasDiagram
+          ? getDiagramTemplate(topicKey, nodeId, nodeTitle)
+          : null;
+        const resolvedDiagramSpec = (meta.diagramSpec || fallbackDiagram) as MentorDiagramSpec | DiagramSpec | null;
+        const resolvedDiagramType = meta.diagramType || (fallbackDiagram ? "SIMILARITY_AA" : "");
         const validation =
           nextTab === "teach"
-            ? validateTeach(structured, meta.diagramType, meta.diagramSpec)
-            : validateExamples(structured, meta.diagramType, meta.diagramSpec);
+            ? validateTeach(structured)
+            : validateExamples(structured);
         if (validation) {
           setErrors((prev) => ({ ...prev, [key]: validation }));
           return;
@@ -1838,9 +1873,9 @@ function TutorDrawerV2(props: {
           ...prev,
           [key]: {
             structured,
-            diagramType: meta.diagramType,
+            diagramType: resolvedDiagramType,
             diagramLabels: meta.diagramLabels,
-            diagramSpec: meta.diagramSpec,
+            diagramSpec: resolvedDiagramSpec,
             responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             summary: JSON.stringify(structured).slice(0, 280),
           },
@@ -1852,6 +1887,7 @@ function TutorDrawerV2(props: {
         if (!controller.signal.aborted) {
           setLoadingKey(null);
         }
+        inFlightRef.current.delete(key);
       }
     },
     [
@@ -1935,10 +1971,15 @@ function TutorDrawerV2(props: {
       return;
     }
     if (!nodeId) return;
-    if (currentError) return;
-    if (!currentResponse && !isLoading) {
-      requestTutor(tab);
-    }
+    if (currentError || currentResponse) return;
+    if (isLoading) return;
+    const key = `${tab}:${nodeId}`;
+    if (inFlightRef.current.has(key)) return;
+    if (autoRequestedRef.current.has(key)) return;
+    autoRequestedRef.current.add(key);
+    const reason = autoRequestReasonRef.current || "open_drawer";
+    autoRequestReasonRef.current = null;
+    requestTutor(tab, { reason });
   }, [open, nodeId, tab, currentResponse, currentError, isLoading, requestTutor, cancelInFlight]);
 
   useEffect(() => {
@@ -1957,18 +1998,24 @@ function TutorDrawerV2(props: {
   const handleTabChange = (nextTab: TutorTab) => {
     if (nextTab === tab) return;
     cancelInFlight();
+    autoRequestReasonRef.current = nextTab === "teach" ? "tab_teach" : "tab_examples";
     setTab(nextTab);
+    autoRequestedRef.current.delete(`${nextTab}:${nodeId || ""}`);
   };
 
-  const goToNodeIndex = (idx: number) => {
+  const goToNodeIndex = (idx: number, reason?: string) => {
     if (idx < 0 || idx >= order.length) return;
     cancelInFlight();
+    if (reason) autoRequestReasonRef.current = reason;
     setNodeIndex(idx);
+    if (nodeId) {
+      autoRequestedRef.current.delete(`${tab}:${nodeId}`);
+    }
   };
 
   const handleNextConcept = () => {
     const next = Math.min(nodeIndex + 1, Math.max(0, order.length - 1));
-    if (next !== nodeIndex) goToNodeIndex(next);
+    if (next !== nodeIndex) goToNodeIndex(next, "next_concept");
   };
 
   const renderTeach = () => {
@@ -1981,9 +2028,9 @@ function TutorDrawerV2(props: {
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
-          diagramType={currentResponse.diagramType}
-          diagramLabels={currentResponse.diagramLabels}
-          diagramSpec={currentResponse.diagramSpec}
+          diagramType={currentResponse?.diagramType}
+          diagramLabels={currentResponse?.diagramLabels}
+          diagramSpec={currentResponse?.diagramSpec}
           note="CBSE diagram block"
         />
         <div>
@@ -2068,9 +2115,9 @@ function TutorDrawerV2(props: {
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
-          diagramType={currentResponse.diagramType}
-          diagramLabels={currentResponse.diagramLabels}
-          diagramSpec={currentResponse.diagramSpec}
+          diagramType={currentResponse?.diagramType}
+          diagramLabels={currentResponse?.diagramLabels}
+          diagramSpec={currentResponse?.diagramSpec}
           note="CBSE diagram block"
         />
         <div>
@@ -2161,7 +2208,7 @@ function TutorDrawerV2(props: {
             type="button"
             className="pill"
             style={{ marginTop: 10 }}
-            onClick={() => requestTutor(tab, { force: true })}
+            onClick={() => requestTutor(tab, { force: true, reason: "retry" })}
           >
             Retry
           </button>
@@ -2245,7 +2292,7 @@ function TutorDrawerV2(props: {
           <button
             type="button"
             className="pill"
-            onClick={() => goToNodeIndex(0)}
+            onClick={() => goToNodeIndex(0, "start_from_basics")}
             disabled={nodeIndex === 0}
           >
             Start from basics
@@ -2260,7 +2307,7 @@ function TutorDrawerV2(props: {
           </button>
           <select
             value={nodeId || ""}
-            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value))}
+            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value), "node_select")}
             style={{
               borderRadius: 999,
               padding: "6px 10px",
@@ -3183,25 +3230,36 @@ const renderAssistantContent = (raw: string) => {
     } finally {
       setLoading(false);
     }
-  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection]);
+  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection]);  // ---- FIX: prevent infinite update loop by removing unstable callback dependency
+  // Keep latest kickoff function in a ref (avoids useEffect depending on resetAndKickoff identity).
+  const kickoffRef = useRef<null | (() => void)>(null);
+  useEffect(() => {
+    kickoffRef.current = resetAndKickoff;
+  }, [resetAndKickoff]);
+
+  // Only clear state once per close transition (prevents repeated setState loops).
+  const closedOnceRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
-      if (messages.length === 0) {
-        if (seedExample?.requestedMode === "board_steps" && solveStyle !== "board") return;
-        if (seedExample?.requestedMode === "solve_with_me" && solveStyle !== "socratic") return;
-        resetAndKickoff();
-      }
-    } else {
+    if (!open) {
+      if (closedOnceRef.current) return;
+      closedOnceRef.current = true;
+
       setMessages([]);
       setInput("");
       setErrorText(null);
       setLoading(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, seedExample, solveStyle, resetAndKickoff, messages.length]);
 
-  const sendStudentMessage = useCallback(async () => {
+    closedOnceRef.current = false;
+
+    if (messages.length === 0) {
+      if (seedExample?.requestedMode === "board_steps" && solveStyle !== "board") return;
+      if (seedExample?.requestedMode === "solve_with_me" && solveStyle !== "socratic") return;
+      kickoffRef.current?.();
+    }
+  }, [open, messages.length, seedExample?.requestedMode, solveStyle]);const sendStudentMessage = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
 
@@ -4501,3 +4559,4 @@ function GrindDrawerV1(props: {
     </div>
   );
 }
+

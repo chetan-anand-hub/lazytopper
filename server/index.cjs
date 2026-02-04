@@ -1,4 +1,4 @@
-// server/index.cjs
+﻿// server/index.cjs
 //
 // LazyTopper AI Gateway server (Gemini-powered)
 // - POST /api/mentor         : Mentor personas (plan / explain / solve / coach / mindset)
@@ -62,6 +62,9 @@ const { scoreRubric } = require(
 );
 const { retrieveTrianglesSources } = require(
   path.join(__dirname, '../src/tutor/retrieval/trianglesRetriever.ts')
+);
+const { getDiagramTemplate } = require(
+  path.join(__dirname, '../src/tutor/diagram/diagramTemplates.ts')
 );
 const { orchestrateTutorResponse } = require('./tutorOrchestrator.cjs');
 
@@ -1107,6 +1110,57 @@ function diagramLabelsForType(diagramType) {
   return { A: 'A', B: 'B', C: 'C' };
 }
 
+function diagramSpecForPayload(payload) {
+  if (!shouldRequireDiagram(payload)) return null;
+  const topicKey = payload?.topicKey || payload?.chapter || '';
+  const nodeId = payload?.mindmapNodeId || payload?.cardId || payload?.nodeId || '';
+  const title =
+    payload?.mindmapNodeTitle ||
+    payload?.cardTitle ||
+    payload?.cardName ||
+    payload?.questionText ||
+    payload?.contextText ||
+    '';
+  try {
+    return getDiagramTemplate(topicKey, nodeId, title);
+  } catch {
+    return null;
+  }
+}
+
+function attachTutorDiagramIntent(structured, payload) {
+  if (!structured || typeof structured !== 'object') return structured;
+  const diagramRequired = shouldRequireDiagram(payload);
+  const diagramType = diagramRequired ? inferDiagramType(payload) : '';
+  const diagramLabels = diagramRequired ? diagramLabelsForType(diagramType) : null;
+  const diagramSpec = diagramRequired ? diagramSpecForPayload(payload) : null;
+
+  if (typeof structured.tutor === 'string') {
+    structured.tutor = { text: structured.tutor };
+  }
+  if (structured.tutor && typeof structured.tutor === 'object') {
+    structured.tutor.diagramRequired = diagramRequired;
+    structured.tutor.diagramType = diagramType;
+    if (diagramSpec) structured.tutor.diagramSpec = diagramSpec;
+  } else if (diagramRequired) {
+    structured.tutor = {
+      diagramRequired,
+      diagramType,
+      diagramSpec,
+    };
+  }
+
+  if (diagramRequired) {
+    if (!structured.diagramType) structured.diagramType = diagramType;
+    if (!structured.diagramLabels) structured.diagramLabels = diagramLabels;
+    if (!structured.diagramSpec && !structured.diagram && diagramSpec) {
+      structured.diagram = diagramSpec;
+    }
+  }
+
+  return structured;
+}
+
 function diagramLineForExplain(payload) {
   const type = inferDiagramType(payload);
   const labels = diagramLabelsForType(type);
@@ -1161,8 +1215,10 @@ function ensureDiagramFields(obj, payload) {
   if (!shouldRequireDiagram(payload)) return obj;
   const diagramType = inferDiagramType(payload);
   const diagramLabels = diagramLabelsForType(diagramType);
+  const diagramSpec = diagramSpecForPayload(payload);
   if (!obj.diagramType) obj.diagramType = diagramType;
   if (!obj.diagramLabels) obj.diagramLabels = diagramLabels;
+  if (!obj.diagramSpec && !obj.diagram && diagramSpec) obj.diagram = diagramSpec;
   return obj;
 }
 
@@ -2753,7 +2809,12 @@ async function callGemini(model, finalContents, config) {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    const err = new Error(
+      `Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`
+    );
+    err.status = response.status;
+    err.body = errorBody;
+    throw err;
   }
 
   const data = await response.json();
@@ -2902,13 +2963,14 @@ async function handleRequest(req, res) {
           schema_used: 'schema_triangles_bsre',
           repair_used: false,
         };
-        const orchestrated = orchestrateTutorResponse({
+        let orchestrated = orchestrateTutorResponse({
           mode: 'triangles_evaluation',
           payload,
           messages: reqJson?.messages,
           structuredDraft: bsreStructured,
           trace,
         });
+        orchestrated = attachTutorDiagramIntent(orchestrated, payload);
         return sendJson(res, 200, {
           ok: true,
           data: {
@@ -2956,6 +3018,7 @@ async function handleRequest(req, res) {
           messages: reqJson?.messages,
           structuredDraft: structured,
         });
+        structured = attachTutorDiagramIntent(structured, payload);
       }
       const text = structured ? JSON.stringify(structured) : buildStubText();
       const trace = {
@@ -3281,6 +3344,7 @@ ${userPrompt}` }] },
             messages: reqJson?.messages,
             structuredDraft: structured,
           });
+          structured = attachTutorDiagramIntent(structured, payload);
         }
 
         finalText = JSON.stringify(structured);
@@ -3416,6 +3480,19 @@ ${userPrompt}` }] },
         },
       });
     } catch (err) {
+      if (err && err.status === 429) {
+        const fallback = attachTutorDiagramIntent(
+          { tutor: { text: 'Mentor is rate-limited. Please wait 20 seconds and retry.' } },
+          payload
+        );
+        return sendJson(res, 429, {
+          error: 'Mentor is rate-limited. Please wait and retry.',
+          data: {
+            structured: fallback,
+            trace: { rate_limited: true },
+          },
+        });
+      }
       console.error(err);
       return sendJson(res, 500, {
         error: 'Failed to query the AI service',
@@ -3558,3 +3635,4 @@ function messagesToGeminiContents(messages, systemPrompt) {
 
   return contents;
 }
+
