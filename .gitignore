@@ -129,7 +129,26 @@ RUN_*/**
 **/RUN_*/**
 .codex_runs/**
 Reports/**
+reports/**
 tools/.local_ops/**
 dist/**
 build/**
 node_modules/**
+_codex_output/**
+_debug_bundle/**
+_handover_evidence/**
+_handoff/**
+_rollback/**
+
+# --- Local-only tracked artifact cleanup ---
+/fix_patch.diff
+/gate_git_status.txt
+/mojibake_pre_stdout.txt
+/mojibake_pre_stderr.txt
+/mojibake_post_stdout.txt
+/mojibake_post_stderr.txt
+/repo_folders.txt
+/repo_paths.txt
+/tsc_noemit_stdout.txt
+/tsc_noemit_stderr.txt
+/set
