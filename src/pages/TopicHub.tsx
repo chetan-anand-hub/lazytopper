@@ -4,8 +4,9 @@
 // - If topicKey is missing -> redirects to a sane default (never blank)
 // - Renders baked TopicHubV2 content (base + enrichment)
 // - Implements the locked UI direction: sticky action bar + progressive disclosure (accordions)
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { getTopicV2Content, normalizeTopicKey } from "../utils/topicHubV2Store";
@@ -18,9 +19,325 @@ import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
 import { MENTOR_ENDPOINT } from "../ai/aiClient";
-import { getDiagramTemplate } from "../tutor/diagram/diagramTemplates";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
+
+type TeachDiagram = {
+  required: boolean;
+  type: string;
+  labels: string[];
+  spec: any;
+  svg?: string | null;
+  altText: string;
+};
+
+type TeachViewModel = {
+  goalLine: string;
+  keyIdeaBullets: string[];
+  diagram: TeachDiagram;
+  checkpoint: { question: string; answer: string };
+  commonMistakeWarning: string;
+};
+
+function toStringList(value: any): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+function ensureMinList(list: string[], min: number, makeItem: (i: number) => string) {
+  const out = Array.isArray(list) ? list.slice() : [];
+  while (out.length < min) out.push(makeItem(out.length));
+  return out;
+}
+
+function inferDiagramTypeFromText(text: string) {
+  const t = String(text || "").toLowerCase();
+  if (t.includes("trigon") || t.includes("sin") || t.includes("cos") || t.includes("tan") || t.includes("height") || t.includes("distance")) {
+    return "trigonometric_triangle";
+  }
+  if (t.includes("circle") || t.includes("tangent") || t.includes("chord")) return "circle";
+  if (t.includes("coordinate") || t.includes("cartesian") || t.includes("graph")) return "coordinate_plane";
+  if (t.includes("mensuration") || t.includes("surface area") || t.includes("volume") || t.includes("cylinder") || t.includes("cone") || t.includes("sphere") || t.includes("cuboid")) {
+    return "mensuration_solid";
+  }
+  if (t.includes("ray") || t.includes("reflection") || t.includes("refraction") || t.includes("lens") || t.includes("mirror") || t.includes("optics")) {
+    return "ray_diagram";
+  }
+  if (t.includes("circuit") || t.includes("electric") || t.includes("current") || t.includes("resistance")) return "circuit";
+  if (t.includes("triangle") || t.includes("similar") || t.includes("congruen") || t.includes("pyth") || t.includes("bpt")) return "triangle";
+  return "generic";
+}
+
+function defaultLabelsForType(diagramType: string): string[] {
+  const t = String(diagramType || "").toLowerCase();
+  if (t === "trigonometric_triangle") return ["A", "B", "C", "theta"];
+  if (t === "circle") return ["O", "A", "B"];
+  if (t === "coordinate_plane") return ["O", "x", "y", "P"];
+  if (t === "mensuration_solid") return ["h", "r"];
+  if (t === "ray_diagram") return ["O", "F", "2F"];
+  if (t === "circuit") return ["A", "B", "V"];
+  if (t.includes("triangle") || t.includes("similarity")) return ["A", "B", "C", "P", "Q", "R"];
+  return ["A", "B", "C"];
+}
+
+function buildDiagramView(raw: any): TeachDiagram {
+  const teach = raw?.teach || {};
+  const diagram = teach?.diagram || raw?.diagram || {};
+  const required = Boolean(
+    diagram.required ??
+      raw?.diagramRequired ??
+      diagram.diagramRequired ??
+      raw?.diagram?.diagramRequired ??
+      false
+  );
+  const hint = JSON.stringify(raw || {});
+  const inferred = inferDiagramTypeFromText(hint);
+  const type = String(
+    diagram.type ||
+      diagram.diagramType ||
+      raw?.diagramType ||
+      raw?.diagram?.diagramType ||
+      inferred ||
+      "generic"
+  ).trim() || "generic";
+  let labels = Array.isArray(diagram.labels)
+    ? diagram.labels.map((v: any) => String(v || "").trim()).filter(Boolean)
+    : Array.isArray(raw?.diagramLabels)
+      ? raw.diagramLabels.map((v: any) => String(v || "").trim()).filter(Boolean)
+      : diagram.labels && typeof diagram.labels === "object"
+        ? Object.values(diagram.labels).map((v: any) => String(v || "").trim()).filter(Boolean)
+        : raw?.diagramLabels && typeof raw.diagramLabels === "object"
+          ? Object.values(raw.diagramLabels).map((v: any) => String(v || "").trim()).filter(Boolean)
+          : defaultLabelsForType(type);
+  if (!labels.length) labels = defaultLabelsForType(type);
+  const spec = diagram.spec ?? diagram.diagramSpec ?? raw?.diagramSpec ?? raw?.diagram ?? null;
+  const svg = typeof diagram.svg === "string" ? diagram.svg : typeof raw?.diagramSvg === "string" ? raw.diagramSvg : null;
+  const altText =
+    String(diagram.altText || raw?.diagramAltText || "").trim() ||
+    "Diagram placeholder for this concept.";
+  return {
+    required,
+    type,
+    labels,
+    spec,
+    svg,
+    altText,
+  };
+}
+
+function buildFallbackTeachModel(seed?: string): TeachViewModel {
+  const safeGoal = seed ? `Goal: ${seed}` : "Goal: Understand the core idea.";
+  const keyIdeas = ensureMinList([], 2, (i) => `Key idea ${i + 1}: Review the core steps.`);
+  return {
+    goalLine: safeGoal,
+    keyIdeaBullets: keyIdeas,
+    diagram: {
+      required: true,
+      type: "generic",
+      labels: ["A", "B", "C"],
+      spec: null,
+      svg: null,
+      altText: "Diagram placeholder for this concept.",
+    },
+    checkpoint: {
+      question: "Quick check: What is the key condition to apply here?",
+      answer: "Expected: State the criterion and correspondence clearly.",
+    },
+    commonMistakeWarning: "Common mistake: skipping the criterion or correspondence.",
+  };
+}
+
+function extractTeachContract(rawPayload: any): TeachViewModel {
+  if (!rawPayload || typeof rawPayload !== "object") {
+    const seed = typeof rawPayload === "string" ? rawPayload : "";
+    return buildFallbackTeachModel(seed);
+  }
+
+  const teach = rawPayload.teach || {};
+  const goalLine =
+    String(
+      teach.goal ||
+        rawPayload.goalLine ||
+        rawPayload.goal ||
+        teach.goalLine ||
+        teach.headline ||
+        teach.oneLiner ||
+        rawPayload.title ||
+        ""
+    ).trim() || "Goal: Understand the core idea.";
+  let keyIdeas = toStringList(
+    teach.keyIdeas ||
+      rawPayload.keyIdeaBullets ||
+      rawPayload.keyIdeas ||
+      teach.keyIdeaBullets ||
+      teach.conceptBullets ||
+      teach.simpleExplanation
+  );
+  keyIdeas = ensureMinList(keyIdeas, 2, (i) => `Key idea ${i + 1}: Review the core step.`);
+
+  const diagram = buildDiagramView(rawPayload);
+
+  const checkpointRaw = rawPayload.checkpoint || teach.checkpoint || {};
+  const checkpointQuestion =
+    String(checkpointRaw.question || rawPayload.checkpointQ || rawPayload.checkQuestion || "").trim() ||
+    "Quick check: What is the key condition to apply?";
+  const checkpointAnswer =
+    String(checkpointRaw.answer || rawPayload.checkpointA || "").trim() ||
+    "Expected: State the criterion and correspondence clearly.";
+
+  const commonMistakeWarning =
+    String(
+      rawPayload.commonMistakeWarning ||
+        rawPayload.commonMistake ||
+        teach.commonMistake ||
+        rawPayload.commonError ||
+        (Array.isArray(rawPayload.commonMistakes) ? rawPayload.commonMistakes[0] : "")
+    ).trim() || "Common mistake: skipping the criterion or correspondence.";
+
+  return {
+    goalLine,
+    keyIdeaBullets: keyIdeas,
+    diagram,
+    checkpoint: { question: checkpointQuestion, answer: checkpointAnswer },
+    commonMistakeWarning,
+  };
+}
+
+function isTeachPayloadComplete(structured: TeachViewModel | null): boolean {
+  if (!structured) return false;
+  if (!String(structured.goalLine || "").trim()) return false;
+  if (!Array.isArray(structured.keyIdeaBullets) || structured.keyIdeaBullets.length < 2) return false;
+  if (!structured.diagram || !String(structured.diagram.altText || "").trim()) return false;
+  if (!structured.checkpoint || !String(structured.checkpoint.question || "").trim()) return false;
+  if (!String(structured.checkpoint.answer || "").trim()) return false;
+  if (!String(structured.commonMistakeWarning || "").trim()) return false;
+  return true;
+}
+
+function toTeachViewModel(structured: any) {
+  return extractTeachContract(structured);
+}
+
+function sanitizeSvg(svg: string) {
+  return String(svg || "").replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "").trim();
+}
+
+function renderDiagram(diagram: TeachDiagram) {
+  const type = String(diagram?.type || "generic").toLowerCase();
+  const altText = String(diagram?.altText || "Diagram placeholder.");
+  const svgRaw = typeof diagram?.svg === "string" ? diagram.svg.trim() : "";
+  const containerStyle = {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 10,
+    background: "white",
+  } as const;
+
+  if (svgRaw.startsWith("<svg")) {
+    const safeSvg = sanitizeSvg(svgRaw);
+    return (
+      <div style={containerStyle}>
+        <div dangerouslySetInnerHTML={{ __html: safeSvg }} />
+      </div>
+    );
+  }
+
+  const baseSvgProps = { width: 240, height: 160, viewBox: "0 0 240 160" };
+  const labelStyle = { fontSize: 12, fontWeight: 700 } as const;
+
+  const diagramSvg = (() => {
+    switch (type) {
+      case "triangle":
+      case "similarity":
+        return (
+          <svg {...baseSvgProps}>
+            <polygon points="30,130 120,20 210,130" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <text x="24" y="140" style={labelStyle}>A</text>
+            <text x="118" y="16" style={labelStyle}>B</text>
+            <text x="214" y="140" style={labelStyle}>C</text>
+            <path d="M50 120 L65 120 L65 105" stroke="#1b1b1b" strokeWidth="2" fill="none" />
+          </svg>
+        );
+      case "trigonometric_triangle":
+        return (
+          <svg {...baseSvgProps}>
+            <polygon points="40,130 40,30 200,130" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <path d="M40 115 L55 115 L55 130" stroke="#1b1b1b" strokeWidth="2" fill="none" />
+            <text x="46" y="28" style={labelStyle}>A</text>
+            <text x="202" y="140" style={labelStyle}>B</text>
+            <text x="24" y="140" style={labelStyle}>C</text>
+            <text x="85" y="120" style={labelStyle}>theta</text>
+          </svg>
+        );
+      case "circle":
+        return (
+          <svg {...baseSvgProps}>
+            <circle cx="120" cy="80" r="50" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="120" y1="80" x2="170" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <text x="112" y="84" style={labelStyle}>O</text>
+            <text x="172" y="84" style={labelStyle}>A</text>
+          </svg>
+        );
+      case "coordinate_plane":
+        return (
+          <svg {...baseSvgProps}>
+            <line x1="20" y1="80" x2="220" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="120" y1="20" x2="120" y2="140" stroke="#1b1b1b" strokeWidth="2" />
+            <circle cx="170" cy="50" r="4" fill="#1b1b1b" />
+            <text x="176" y="48" style={labelStyle}>P</text>
+            <text x="224" y="84" style={labelStyle}>x</text>
+            <text x="124" y="18" style={labelStyle}>y</text>
+          </svg>
+        );
+      case "mensuration_solid":
+        return (
+          <svg {...baseSvgProps}>
+            <ellipse cx="120" cy="40" rx="60" ry="18" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <ellipse cx="120" cy="120" rx="60" ry="18" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="60" y1="40" x2="60" y2="120" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="180" y1="40" x2="180" y2="120" stroke="#1b1b1b" strokeWidth="2" />
+            <text x="188" y="85" style={labelStyle}>h</text>
+          </svg>
+        );
+      case "ray_diagram":
+        return (
+          <svg {...baseSvgProps}>
+            <line x1="20" y1="80" x2="220" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="120" y1="30" x2="120" y2="130" stroke="#1b1b1b" strokeWidth="3" />
+            <line x1="40" y1="60" x2="120" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="40" y1="100" x2="120" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <text x="112" y="26" style={labelStyle}>Lens</text>
+          </svg>
+        );
+      case "circuit":
+        return (
+          <svg {...baseSvgProps}>
+            <line x1="40" y1="80" x2="90" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="90" y1="70" x2="90" y2="90" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="100" y1="65" x2="100" y2="95" stroke="#1b1b1b" strokeWidth="2" />
+            <rect x="130" y="70" width="40" height="20" fill="none" stroke="#1b1b1b" strokeWidth="2" />
+            <line x1="170" y1="80" x2="210" y2="80" stroke="#1b1b1b" strokeWidth="2" />
+            <text x="136" y="66" style={labelStyle}>R</text>
+          </svg>
+        );
+      default:
+        return null;
+    }
+  })();
+
+  if (diagramSvg) {
+    return <div style={containerStyle}>{diagramSvg}</div>;
+  }
+
+  return (
+    <div style={{ ...containerStyle, textAlign: "center", color: "#444" }}>
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>Diagram</div>
+      <div style={{ fontSize: 12 }}>{altText}</div>
+    </div>
+  );
+}
+
 
 type SubjectKey = "maths" | "science";
 type ModeKey = "zombie" | "beast";
@@ -257,54 +574,14 @@ export default function TopicHub() {
     [title]
   );
 
+  const v2Data = v2 || {};
+  const tier = toTierLabel(String((v2Data as any).tier || ""));
+  const overview = safeArray<string>((v2Data as any).overview);
+  const examPatterns = safeArray<string>((v2Data as any).examPatterns);
 
-if (!v2) {
-    return (
-      <div className="page" style={{
-      background:
-        mode === "beast"
-          ? "linear-gradient(180deg, #f5f8ff 0%, #eef2ff 50%, #f7f7ff 100%)"
-          : "linear-gradient(180deg, #f7fff7 0%, #eefcf2 55%, #f8fffd 100%)",
-    }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 16px" }}>
-          <div style={{ opacity: 0.7, marginBottom: 10 }}>
-            Class {grade} • {subject.toUpperCase()}
-          </div>
-
-          <h1 style={{ fontSize: 44, margin: "8px 0 8px" }}>{topicKey}</h1>
-
-          <div
-            style={{
-              border: "1px solid rgba(255,0,0,0.25)",
-              background: "rgba(255,0,0,0.04)",
-              padding: 14,
-              borderRadius: 12,
-              marginTop: 16,
-            }}
-          >
-            <b>TopicHub content not found.</b>
-            <div style={{ marginTop: 6, opacity: 0.85 }}>
-              No baked TopicHubV2 entry exists for <code>{topicKey}</code>.
-            </div>
-            <div style={{ marginTop: 10 }}>
-              Try:{" "}
-              <Link to={`/topic-hub/${grade}/${subject}/${defaultTopicKeyFor(subject)}`}>
-                /topic-hub/{grade}/{subject}/{defaultTopicKeyFor(subject)}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const tier = toTierLabel(String((v2 as any).tier || ""));
-  const overview = safeArray<string>((v2 as any).overview);
-  const examPatterns = safeArray<string>((v2 as any).examPatterns);
-
-  const definitions = safeArray<V2Definition>((v2 as any).definitions);
-  const markingTips = safeArray<string>((v2 as any).markingTips);
-  const scoreTips = safeArray<string>((v2 as any).scoreTips);
+  const definitions = safeArray<V2Definition>((v2Data as any).definitions);
+  const markingTips = safeArray<string>((v2Data as any).markingTips);
+  const scoreTips = safeArray<string>((v2Data as any).scoreTips);
 // Board-pattern anchors (A-E) pulled from the canonical question bank for this topic.
 const [exampleSection, setExampleSection] = useState<"A" | "B" | "C" | "D" | "E">("A");
 
@@ -549,32 +826,34 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
 
     return mapped.slice(0, 5);
   }, [subject, topicKey]);
-  const rawQuickQuiz = safeArray<V2Example>((v2 as any).quickQuiz);
+  const rawQuickQuiz = safeArray<V2Example>((v2Data as any).quickQuiz);
   const quickQuiz = quickQuizFromPractice.length
     ? quickQuizFromPractice
     : rawQuickQuiz.length
       ? rawQuickQuiz
       : buildFallbackQuickQuiz();
 
-  const misconceptions = safeArray<Misconception>((v2 as any).misconceptions);
-  const competencies = safeArray<Competency>((v2 as any).competencies);
+  const misconceptions = safeArray<Misconception>((v2Data as any).misconceptions);
+  const competencies = safeArray<Competency>((v2Data as any).competencies);
   // NCERT competencies: one context-aware Ask Mentor button
   const [selectedCompetencyIdx, setSelectedCompetencyIdx] = useState(0);
   useEffect(() => {
+    // Keep competency card reset when topic changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedCompetencyIdx(0);
   }, [topicKey]);
 
-  const labActivities = safeArray<LabActivity>((v2 as any).labActivities);
-  const caseStudies = safeArray<CaseStudy>((v2 as any).caseStudies);
+  const labActivities = safeArray<LabActivity>((v2Data as any).labActivities);
+  const caseStudies = safeArray<CaseStudy>((v2Data as any).caseStudies);
 
     // --- Resources (optional fields) ---
-  const mindMap = (v2 as any).mindMap || (v2 as any).mindmap || null;
-  const formulae = safeArray<any>((v2 as any).formulae || (v2 as any).formulas || (v2 as any).formulaSheet);
-  const videos = safeArray<any>((v2 as any).videos || (v2 as any).videoLinks || (v2 as any).youtube);
+  const mindMap = (v2Data as any).mindMap || (v2Data as any).mindmap || null;
+  const formulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
+  const videos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
   const guidedMindmap = topicKey === "triangles" ? trianglesGuidedMindmap : null;
   const grindMindmap = topicKey === "triangles" ? trianglesGrindMindmap : null;
-  const guidedOrder = guidedMindmap?.recommendedOrder || [];
-  const guidedNodes = guidedMindmap?.nodes || [];
+  const guidedOrder = useMemo(() => guidedMindmap?.recommendedOrder || [], [guidedMindmap]);
+  const guidedNodes = useMemo(() => guidedMindmap?.nodes || [], [guidedMindmap]);
   const guidedNodeById = useMemo(() => {
     const map = new Map<string, (typeof guidedNodes)[number]>();
     guidedNodes.forEach((n) => map.set(String(n.id), n));
@@ -606,6 +885,8 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
 
   useEffect(() => {
     if (!grindMindmap) {
+      // Keep drawer state aligned when grind data is unavailable.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGrindDrawerOpen(false);
       setGrindNodeId("");
       return;
@@ -684,6 +965,46 @@ const showInZombie = (sectionId: string) => {
     cursor: 'pointer' as const,
     boxShadow: active ? '0 10px 22px rgba(0,0,0,0.16)' : 'none',
   });
+
+  if (!v2) {
+    return (
+      <div className="page" style={{
+      background:
+        mode === "beast"
+          ? "linear-gradient(180deg, #f5f8ff 0%, #eef2ff 50%, #f7f7ff 100%)"
+          : "linear-gradient(180deg, #f7fff7 0%, #eefcf2 55%, #f8fffd 100%)",
+    }}>
+        <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 16px" }}>
+          <div style={{ opacity: 0.7, marginBottom: 10 }}>
+            Class {grade} • {subject.toUpperCase()}
+          </div>
+
+          <h1 style={{ fontSize: 44, margin: "8px 0 8px" }}>{topicKey}</h1>
+
+          <div
+            style={{
+              border: "1px solid rgba(255,0,0,0.25)",
+              background: "rgba(255,0,0,0.04)",
+              padding: 14,
+              borderRadius: 12,
+              marginTop: 16,
+            }}
+          >
+            <b>TopicHub content not found.</b>
+            <div style={{ marginTop: 6, opacity: 0.85 }}>
+              No baked TopicHubV2 entry exists for <code>{topicKey}</code>.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              Try:{" "}
+              <Link to={`/topic-hub/${grade}/${subject}/${defaultTopicKeyFor(subject)}`}>
+                /topic-hub/{grade}/{subject}/{defaultTopicKeyFor(subject)}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -1664,8 +1985,77 @@ function TutorDrawerV2(props: {
     mode,
   } = props;
 
+  type TutorFsmStatus =
+    | "S0_CLOSED"
+    | "S1_OPEN_IDLE"
+    | "S2_REQUESTING_TEACH"
+    | "S3_SHOW_TEACH"
+    | "S4_REQUESTING_BOARD"
+    | "S5_SHOW_BOARD"
+    | "S6_AWAIT_CHECKPOINT"
+    | "S7_HINTING"
+    | "S8_PRACTICE"
+    | "S9_ADVANCE_GUARD"
+    | "S10_ERROR_RECOVERABLE"
+    | "S11_ERROR_BLOCKING";
+
+  type TutorFsmState = {
+    status: TutorFsmStatus;
+    lastIntent: "teach" | "board" | null;
+    errorMessage: string | null;
+  };
+
+  type TutorFsmEvent =
+    | { type: "EV_OPEN_DRAWER" }
+    | { type: "EV_CLOSE_DRAWER" }
+    | { type: "EV_CLICK_TEACH" }
+    | { type: "EV_CLICK_BOARD" }
+    | { type: "EV_SUBMIT_CHECKPOINT" }
+    | { type: "EV_RETRY" }
+    | { type: "EV_API_OK"; intent: "teach" | "board" }
+    | { type: "EV_API_FAIL"; recoverable: boolean; message: string };
+
+  const tutorFsmReducer = (state: TutorFsmState, event: TutorFsmEvent): TutorFsmState => {
+    switch (event.type) {
+      case "EV_OPEN_DRAWER":
+        return { ...state, status: "S1_OPEN_IDLE", errorMessage: null };
+      case "EV_CLOSE_DRAWER":
+        return { ...state, status: "S0_CLOSED", errorMessage: null };
+      case "EV_CLICK_TEACH":
+        return { ...state, status: "S2_REQUESTING_TEACH", lastIntent: "teach", errorMessage: null };
+      case "EV_CLICK_BOARD":
+        return { ...state, status: "S4_REQUESTING_BOARD", lastIntent: "board", errorMessage: null };
+      case "EV_SUBMIT_CHECKPOINT":
+        return { ...state, status: "S6_AWAIT_CHECKPOINT" };
+      case "EV_RETRY":
+        if (state.lastIntent === "teach") {
+          return { ...state, status: "S2_REQUESTING_TEACH", errorMessage: null };
+        }
+        if (state.lastIntent === "board") {
+          return { ...state, status: "S4_REQUESTING_BOARD", errorMessage: null };
+        }
+        return state;
+      case "EV_API_OK":
+        return {
+          ...state,
+          status: event.intent === "teach" ? "S3_SHOW_TEACH" : "S5_SHOW_BOARD",
+          lastIntent: event.intent,
+          errorMessage: null,
+        };
+      case "EV_API_FAIL":
+        return {
+          ...state,
+          status: event.recoverable ? "S10_ERROR_RECOVERABLE" : "S11_ERROR_BLOCKING",
+          errorMessage: event.message,
+        };
+      default:
+        return state;
+    }
+  };
+
   type TutorResponseEntry = {
     structured?: any;
+    rawStructured?: any;
     diagramType?: string;
     diagramLabels?: Record<string, string> | string[] | null;
     diagramSpec?: MentorDiagramSpec | DiagramSpec | null;
@@ -1673,17 +2063,23 @@ function TutorDrawerV2(props: {
     summary?: string;
   };
 
+  const [fsm, dispatch] = useReducer(tutorFsmReducer, {
+    status: open ? "S1_OPEN_IDLE" : "S0_CLOSED",
+    lastIntent: null,
+    errorMessage: null,
+  });
   const [responses, setResponses] = useState<Record<string, TutorResponseEntry>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
+  const [cooldownTick, setCooldownTick] = useState(0);
+  const [clickHint, setClickHint] = useState<string | null>(null);
   const [doubtInput, setDoubtInput] = useState("");
   const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
   const [doubtError, setDoubtError] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inFlightRef = useRef<Set<string>>(new Set());
-  const autoRequestedRef = useRef<Set<string>>(new Set());
-  const autoRequestReasonRef = useRef<string | null>(null);
+  const lastRequestAtRef = useRef<number>(0);
+  const clickHintTimeoutRef = useRef<number | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
   const isDev = Boolean(import.meta?.env?.DEV);
 
@@ -1702,16 +2098,58 @@ function TutorDrawerV2(props: {
 
   const currentKey = nodeId ? `${tab}:${nodeId}` : "";
   const currentResponse = currentKey ? responses[currentKey] : null;
-  const currentError = currentKey ? errors[currentKey] : null;
-  const isLoading = loadingKey === currentKey;
+  const currentError =
+    fsm.status === "S10_ERROR_RECOVERABLE" || fsm.status === "S11_ERROR_BLOCKING"
+      ? fsm.errorMessage
+      : null;
+  const isLoading = fsm.status === "S2_REQUESTING_TEACH" || fsm.status === "S4_REQUESTING_BOARD";
+  const cooldownRemainingSec = cooldownUntilMs
+    ? Math.max(0, Math.ceil((cooldownUntilMs - Date.now()) / 1000))
+    : 0;
+  const isCooldownActive = cooldownRemainingSec > 0;
+  const actionsDisabled = isLoading || isCooldownActive;
 
   const cancelInFlight = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
     }
-    setLoadingKey(null);
+    inFlightRef.current.clear();
+    if (open) {
+      dispatch({ type: "EV_OPEN_DRAWER" });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!cooldownUntilMs) return;
+    const id = window.setInterval(() => setCooldownTick((prev) => prev + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [cooldownUntilMs]);
+
+  useEffect(() => {
+    if (cooldownUntilMs && Date.now() >= cooldownUntilMs) {
+      setCooldownUntilMs(null);
+    }
+  }, [cooldownTick, cooldownUntilMs]);
+
+  useEffect(() => {
+    if (open) {
+      dispatch({ type: "EV_OPEN_DRAWER" });
+    } else {
+      dispatch({ type: "EV_CLOSE_DRAWER" });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    dispatch({ type: "EV_OPEN_DRAWER" });
+  }, [open, nodeId]);
+
+  useEffect(() => () => {
+    if (clickHintTimeoutRef.current) window.clearTimeout(clickHintTimeoutRef.current);
   }, []);
+
+  useEffect(() => () => cancelInFlight(), [cancelInFlight]);
 
   const safeJsonParse = (raw: string) => {
     try {
@@ -1721,29 +2159,38 @@ function TutorDrawerV2(props: {
     }
   };
 
-  const extractDiagramMeta = (obj: any) => {
-    const diagramType =
-      String(obj?.diagramType || obj?.diagram?.diagramType || obj?.diagram?.type || "").trim() ||
-      "";
-    const diagramLabels = obj?.diagramLabels || obj?.diagram?.diagramLabels || obj?.diagram?.labels || null;
-    const diagramSpec = obj?.diagram || obj?.diagramSpec || obj?.tutor?.diagramSpec || null;
-    const diagramRequired = Boolean(obj?.diagramRequired ?? obj?.tutor?.diagramRequired);
-    return { diagramType, diagramLabels, diagramSpec, diagramRequired };
-  };
+  const getRetryAfterMs = useCallback((res: Response, data: any) => {
+    const header = res.headers.get("Retry-After");
+    if (header) {
+      const sec = Number(header);
+      if (Number.isFinite(sec) && sec > 0) return sec * 1000;
+    }
+    const jsonMs = Number(data?.retryAfterMs ?? data?.data?.retryAfterMs);
+    if (Number.isFinite(jsonMs) && jsonMs > 0) return jsonMs;
+    const jsonSec = Number(data?.retryAfterSec ?? data?.data?.retryAfterSec ?? data?.retry_after_sec);
+    if (Number.isFinite(jsonSec) && jsonSec > 0) return jsonSec * 1000;
+    return null;
+  }, []);
+  const getRandomBackoffMs = useCallback(() => 10_000 + Math.floor(Math.random() * 20_001), []);
 
-  const validateTeach = (obj: any) => {
-    const bullets = Array.isArray(obj?.conceptBullets) ? obj.conceptBullets : [];
-    const examLines = Array.isArray(obj?.examLines) ? obj.examLines : [];
-    const worked = obj?.workedExample || {};
-    const steps = Array.isArray(worked.steps) ? worked.steps : [];
-    if (bullets.length < 5) return "Teach response incomplete. Please retry.";
-    if (examLines.length < 2) return "Teach response incomplete. Please retry.";
-    if (!String(worked.question || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!steps.length) return "Teach response incomplete. Please retry.";
-    if (!String(worked.finalAnswer || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.commonError || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.commonFix || "").trim()) return "Teach response incomplete. Please retry.";
-    if (!String(obj?.checkQuestion || "").trim()) return "Teach response incomplete. Please retry.";
+  const showClickHint = useCallback((message: string) => {
+    setClickHint(message);
+    if (clickHintTimeoutRef.current) window.clearTimeout(clickHintTimeoutRef.current);
+    clickHintTimeoutRef.current = window.setTimeout(() => setClickHint(null), 1200);
+  }, []);
+
+  const validateTeach = (obj: TeachViewModel | null) => {
+    if (!obj) return "Teach response incomplete. Please retry.";
+    if (!String(obj.goalLine || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!Array.isArray(obj.keyIdeaBullets) || obj.keyIdeaBullets.length < 2) {
+      return "Teach response incomplete. Please retry.";
+    }
+    if (!obj.diagram || !String(obj.diagram.altText || "").trim()) {
+      return "Teach response incomplete. Please retry.";
+    }
+    if (!String(obj.checkpoint?.question || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!String(obj.checkpoint?.answer || "").trim()) return "Teach response incomplete. Please retry.";
+    if (!String(obj.commonMistakeWarning || "").trim()) return "Teach response incomplete. Please retry.";
     return null;
   };
 
@@ -1759,31 +2206,20 @@ function TutorDrawerV2(props: {
   };
 
   const formatDoubtStructured = (obj: any) => {
-    if (!obj || typeof obj !== "object") return "";
-    if (obj.kind === "learn_mindmap") {
-      const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets.slice(0, 4) : [];
-      const examLines = Array.isArray(obj.examLines) ? obj.examLines.slice(0, 2) : [];
-      const lines = [];
-      bullets.forEach((b: string) => lines.push(`- ${b}`));
-      examLines.forEach((l: string, idx: number) => lines.push(`Exam line ${idx + 1}: ${l}`));
-      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
-      return lines.join("\n");
-    }
-    if (obj.kind === "learn_teach") {
-      const teach = obj.teach || {};
-      const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation.slice(0, 4) : [];
-      const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence.slice(0, 2) : [];
-      const lines = [];
-      simple.forEach((b: string) => lines.push(`- ${b}`));
-      exam.forEach((l: string) => lines.push(`Exam line: ${l}`));
-      if (obj.checkQuestion) lines.push(`Quick check: ${obj.checkQuestion}`);
-      return lines.join("\n");
-    }
-    return "";
+    const teachVm = toTeachViewModel(obj);
+    const bullets = Array.isArray(teachVm.keyIdeaBullets) ? teachVm.keyIdeaBullets.slice(0, 3) : [];
+    const lines = [];
+    lines.push(teachVm.goalLine);
+    bullets.forEach((b: string) => lines.push(`- ${b}`));
+    if (teachVm.checkpoint?.question) lines.push(`Quick check: ${teachVm.checkpoint.question}`);
+    return lines.join("\n");
   };
 
-  const buildPayload = (nextTab: TutorTab, doubtContext?: any, prompt?: string) => {
-    const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
+  const buildPayload = useCallback((nextTab: TutorTab, doubtContext?: any, prompt?: string) => {
+    const isTeachTab = nextTab === "teach";
+    const modeApi = "learn_teach";
+    const subSection = isTeachTab ? "teach" : "board-examples";
+    const explainType = isTeachTab ? "teach" : "board_examples";
     return {
       mode: modeApi,
       payload: {
@@ -1794,14 +2230,14 @@ function TutorDrawerV2(props: {
         cardTitle: nodeTitle,
         cardName: nodeTitle,
         section: "learn",
-        subSection: nextTab === "teach" ? "mindmap" : "board-examples",
+        subSection,
         selectedTab: nextTab,
         selectedMode: modeApi,
         mindmapNodeId: nodeId,
         mindmapNodeTitle: nodeTitle,
         mindmapNodeText: nodeText,
         mindmapCoreId: coreId,
-        explainType: "mindmap_node",
+        explainType,
         contextText: coreText || nodeText,
         stepIndex: nodeIndex,
         vibe: mode,
@@ -1809,27 +2245,62 @@ function TutorDrawerV2(props: {
       },
       messages: prompt ? [{ role: "user", content: prompt }] : undefined,
     };
-  };
+  }, [subjectTitle, grade, topicKey, nodeTitle, nodeId, nodeText, coreId, coreText, nodeIndex, mode]);
 
-  const requestTutor = useCallback(
-    async (nextTab: TutorTab, opts?: { force?: boolean; prompt?: string; reason?: string }) => {
+  const requestMentor = useCallback(
+    async (intent: "teach" | "board", opts?: { force?: boolean; prompt?: string; reason?: string }) => {
       if (!open || !nodeId) return;
+      const nextTab: TutorTab = intent === "teach" ? "teach" : "examples";
       const key = `${nextTab}:${nodeId}`;
-      if (!opts?.force && responses[key]) return;
-      if (loadingKey === key) return;
-      if (inFlightRef.current.has(key)) return;
+      const now = Date.now();
 
-      cancelInFlight();
-      setErrors((prev) => ({ ...prev, [key]: "" }));
-      setLoadingKey(key);
-      inFlightRef.current.add(key);
+      const hasSameKey = inFlightRef.current.has(key);
+      const isSameIntent = fsm.lastIntent === intent;
 
+      if (now - lastRequestAtRef.current < 800) {
+        showClickHint("Please wait.");
+        return;
+      }
+      if (cooldownUntilMs && now < cooldownUntilMs) {
+        showClickHint(`Please wait ${cooldownRemainingSec}s.`);
+        return;
+      }
+      if (hasSameKey || (isLoading && isSameIntent)) {
+        showClickHint("Please wait.");
+        return;
+      }
+      if (isLoading && !hasSameKey) {
+        cancelInFlight();
+      }
+
+      lastRequestAtRef.current = now;
+
+      if (!opts?.force && responses[key]) {
+        setTab(nextTab);
+        dispatch({ type: "EV_API_OK", intent });
+        return;
+      }
+
+      if (intent === "teach") {
+        dispatch({ type: "EV_CLICK_TEACH" });
+      } else {
+        dispatch({ type: "EV_CLICK_BOARD" });
+      }
+      setTab(nextTab);
+
+      const requestId = `${now}-${Math.random().toString(16).slice(2)}`;
       if (isDev) {
-        console.debug("[tutor] request", { tab: nextTab, nodeId, reason: opts?.reason || "auto" });
+        console.info("[mentor] request", {
+          intent,
+          requestId,
+          startedAt: now,
+          reason: opts?.reason || "click",
+        });
       }
 
       const controller = new AbortController();
       abortRef.current = controller;
+      inFlightRef.current.add(key);
 
       try {
         const body = buildPayload(nextTab, undefined, opts?.prompt);
@@ -1839,72 +2310,99 @@ function TutorDrawerV2(props: {
           body: JSON.stringify(body),
           signal: controller.signal,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+        let data: any = null;
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
+
+        if (res.status === 429 || res.status === 503) {
+          const retryAfterMs = getRetryAfterMs(res, data);
+          const effectiveRetryAfterMs = retryAfterMs ?? getRandomBackoffMs();
+          const retryAfterSec = Math.ceil(effectiveRetryAfterMs / 1000);
+          setCooldownUntilMs(Date.now() + effectiveRetryAfterMs);
+          if (isDev) {
+            console.warn("[mentor] rate-limited", { retryAfterSec, requestId });
+          }
+          dispatch({
+            type: "EV_API_FAIL",
+            recoverable: true,
+            message: "Mentor is rate-limited. Please wait and retry.",
+          });
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Mentor request failed.");
+        }
 
         const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
         if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
-        const meta = extractDiagramMeta(structured);
-        const needsDiagram =
-          meta.diagramRequired ||
-          String(topicKey || "")
-            .toLowerCase()
-            .includes("triangle") ||
-          String(nodeTitle || "")
-            .toLowerCase()
-            .includes("triangle");
-        const hasDiagram = Boolean(meta.diagramType || meta.diagramSpec);
-        const fallbackDiagram = needsDiagram && !hasDiagram
-          ? getDiagramTemplate(topicKey, nodeId, nodeTitle)
-          : null;
-        const resolvedDiagramSpec = (meta.diagramSpec || fallbackDiagram) as MentorDiagramSpec | DiagramSpec | null;
-        const resolvedDiagramType = meta.diagramType || (fallbackDiagram ? "SIMILARITY_AA" : "");
+        const rawStructured = structured;
+        const teachVm = extractTeachContract(rawStructured);
+        const normalizedStructured = nextTab === "teach" ? teachVm : rawStructured;
+
+        if (nextTab === "teach" && !isTeachPayloadComplete(teachVm)) {
+          throw new Error("Teach response incomplete. Please retry.");
+        }
+
         const validation =
           nextTab === "teach"
-            ? validateTeach(structured)
-            : validateExamples(structured);
+            ? validateTeach(teachVm)
+            : validateExamples(rawStructured);
         if (validation) {
-          setErrors((prev) => ({ ...prev, [key]: validation }));
+          dispatch({ type: "EV_API_FAIL", recoverable: true, message: validation });
           return;
         }
 
+        const diagramVm = extractTeachContract(rawStructured).diagram;
         setResponses((prev) => ({
           ...prev,
           [key]: {
-            structured,
-            diagramType: resolvedDiagramType,
-            diagramLabels: meta.diagramLabels,
-            diagramSpec: resolvedDiagramSpec,
+            structured: normalizedStructured,
+            rawStructured: nextTab === "teach" ? rawStructured : undefined,
+            diagramType: diagramVm.type,
+            diagramLabels: diagramVm.labels,
+            diagramSpec: diagramVm.spec,
             responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            summary: JSON.stringify(structured).slice(0, 280),
+            summary: JSON.stringify(normalizedStructured).slice(0, 280),
           },
         }));
+        dispatch({ type: "EV_API_OK", intent });
       } catch (err: any) {
-        if (err?.name === "AbortError") return;
-        setErrors((prev) => ({ ...prev, [key]: err?.message || "Mentor error. Please retry." }));
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingKey(null);
+        if (err?.name === "AbortError") {
+          dispatch({ type: "EV_OPEN_DRAWER" });
+          return;
         }
+        dispatch({
+          type: "EV_API_FAIL",
+          recoverable: false,
+          message: err?.message || "Mentor error. Please retry.",
+        });
+      } finally {
         inFlightRef.current.delete(key);
+        if (!controller.signal.aborted && abortRef.current === controller) {
+          abortRef.current = null;
+        }
       }
     },
     [
       open,
       nodeId,
       responses,
-      loadingKey,
+      isLoading,
       cancelInFlight,
-      subjectTitle,
-      grade,
-      topicKey,
-      nodeTitle,
-      nodeText,
-      coreId,
-      coreText,
-      nodeIndex,
-      mode,
+      buildPayload,
+      cooldownUntilMs,
+      cooldownRemainingSec,
+      getRetryAfterMs,
+      getRandomBackoffMs,
+      showClickHint,
+      isDev,
+      fsm.lastIntent,
+      setTab,
     ]
   );
 
@@ -1968,19 +2466,8 @@ function TutorDrawerV2(props: {
       setDoubtInput("");
       setDoubtAnswer(null);
       setDoubtError(null);
-      return;
     }
-    if (!nodeId) return;
-    if (currentError || currentResponse) return;
-    if (isLoading) return;
-    const key = `${tab}:${nodeId}`;
-    if (inFlightRef.current.has(key)) return;
-    if (autoRequestedRef.current.has(key)) return;
-    autoRequestedRef.current.add(key);
-    const reason = autoRequestReasonRef.current || "open_drawer";
-    autoRequestReasonRef.current = null;
-    requestTutor(tab, { reason });
-  }, [open, nodeId, tab, currentResponse, currentError, isLoading, requestTutor, cancelInFlight]);
+  }, [open, cancelInFlight]);
 
   useEffect(() => {
     setDoubtAnswer(null);
@@ -1995,25 +2482,26 @@ function TutorDrawerV2(props: {
       ? "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,247,255,0.98) 100%)"
       : "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,255,248,0.98) 100%)";
 
-  const handleTabChange = (nextTab: TutorTab) => {
-    if (nextTab === tab) return;
+  const handleClose = () => {
     cancelInFlight();
-    autoRequestReasonRef.current = nextTab === "teach" ? "tab_teach" : "tab_examples";
-    setTab(nextTab);
-    autoRequestedRef.current.delete(`${nextTab}:${nodeId || ""}`);
+    onClose();
   };
 
-  const goToNodeIndex = (idx: number, reason?: string) => {
+  const handleTabChange = (nextTab: TutorTab) => {
+    if (actionsDisabled) return;
+    const intent = nextTab === "teach" ? "teach" : "board";
+    requestMentor(intent, { reason: nextTab === "teach" ? "tab_teach" : "tab_examples" });
+  };
+
+  const goToNodeIndex = (idx: number) => {
     if (idx < 0 || idx >= order.length) return;
     cancelInFlight();
-    if (reason) autoRequestReasonRef.current = reason;
     setNodeIndex(idx);
-    if (nodeId) {
-      autoRequestedRef.current.delete(`${tab}:${nodeId}`);
-    }
+    dispatch({ type: "EV_OPEN_DRAWER" });
   };
 
   const handleNextConcept = () => {
+    if (actionsDisabled) return;
     const next = Math.min(nodeIndex + 1, Math.max(0, order.length - 1));
     if (next !== nodeIndex) goToNodeIndex(next, "next_concept");
   };
@@ -2021,67 +2509,41 @@ function TutorDrawerV2(props: {
   const renderTeach = () => {
     const obj = currentResponse?.structured || null;
     if (!obj) return null;
-    const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
-    const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
-    const worked = obj.workedExample || {};
-    const steps = Array.isArray(worked.steps) ? worked.steps : [];
+    const teachVm = extractTeachContract(obj);
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <DiagramBlock
-          diagramType={currentResponse?.diagramType}
-          diagramLabels={currentResponse?.diagramLabels}
-          diagramSpec={currentResponse?.diagramSpec}
-          note="CBSE diagram block"
-        />
         <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Goal</div>
+          <div style={{ padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
+            {teachVm.goalLine}
+          </div>
+        </div>
+        {renderDiagram(teachVm.diagram)}
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Key ideas</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {bullets.map((b: any, idx: number) => (
+            {teachVm.keyIdeaBullets.map((b: string, idx: number) => (
               <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
             ))}
           </ul>
         </div>
         <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam lines</div>
-          {examLines.map((l: any, idx: number) => (
-            <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
-              {String(l)}
-            </div>
-          ))}
-        </div>
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Mini worked example</div>
-          {worked.question ? (
-            <div style={{ marginBottom: 8, opacity: 0.9 }}>{String(worked.question)}</div>
-          ) : null}
-          {steps.length ? (
-            <ol style={{ margin: 0, paddingLeft: 18 }}>
-              {steps.map((s: any, idx: number) => (
-                <li key={idx} style={{ marginBottom: 6 }}>{String(s)}</li>
-              ))}
-            </ol>
-          ) : null}
-          {worked.finalAnswer ? (
-            <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(worked.finalAnswer)}</div>
-          ) : null}
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Checkpoint</div>
+          <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            <div>{teachVm.checkpoint.question}</div>
+            <div style={{ marginTop: 6, fontWeight: 700 }}>Answer: {teachVm.checkpoint.answer}</div>
+          </div>
         </div>
         <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(255,180,0,0.08)" }}>
-          <div style={{ fontWeight: 800 }}>Common error + fix</div>
-          <div style={{ marginTop: 6 }}>{String(obj.commonError || "")}</div>
-          <div style={{ marginTop: 6, fontWeight: 700 }}>Fix: {String(obj.commonFix || "")}</div>
-        </div>
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Quick check</div>
-          <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
-            {String(obj.checkQuestion || "")}
-          </div>
+          <div style={{ fontWeight: 800 }}>Common mistake</div>
+          <div style={{ marginTop: 6 }}>{teachVm.commonMistakeWarning}</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
             className="pill"
             onClick={handleNextConcept}
-            disabled={nodeIndex >= order.length - 1}
+            disabled={nodeIndex >= order.length - 1 || actionsDisabled}
           >
             Continue
           </button>
@@ -2089,6 +2551,7 @@ function TutorDrawerV2(props: {
             type="button"
             className="pill"
             onClick={() => doubtInputRef.current?.focus()}
+            disabled={actionsDisabled}
           >
             Ask a doubt
           </button>
@@ -2096,8 +2559,9 @@ function TutorDrawerV2(props: {
             type="button"
             className="pill"
             onClick={() => handleTabChange("examples")}
+            disabled={actionsDisabled}
           >
-            Show an example for this
+            Board (Solved examples)
           </button>
         </div>
       </div>
@@ -2107,6 +2571,7 @@ function TutorDrawerV2(props: {
   const renderExamples = () => {
     const obj = currentResponse?.structured || null;
     if (!obj) return null;
+    const diagramVm = extractTeachContract(currentResponse?.rawStructured || obj).diagram;
     const teach = obj.teach || {};
     const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
     const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
@@ -2114,12 +2579,7 @@ function TutorDrawerV2(props: {
     const mistakes = Array.isArray(obj.commonMistakes) ? obj.commonMistakes : [];
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <DiagramBlock
-          diagramType={currentResponse?.diagramType}
-          diagramLabels={currentResponse?.diagramLabels}
-          diagramSpec={currentResponse?.diagramSpec}
-          note="CBSE diagram block"
-        />
+        {renderDiagram(diagramVm)}
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -2191,7 +2651,12 @@ function TutorDrawerV2(props: {
           </div>
         ) : null}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" className="pill" onClick={() => handleTabChange("teach")}>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => handleTabChange("teach")}
+            disabled={actionsDisabled}
+          >
             Back to teaching (Resume Step {nodeIndex + 1})
           </button>
         </div>
@@ -2199,32 +2664,87 @@ function TutorDrawerV2(props: {
     );
   };
 
+  const renderSkeleton = () => {
+    const skeleton = buildFallbackTeachModel(nodeTitle);
+    return (
+      <div style={{ display: "grid", gap: 12, opacity: 0.7 }}>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Goal</div>
+          <div style={{ padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
+            {skeleton.goalLine}
+          </div>
+        </div>
+        {renderDiagram(skeleton.diagram)}
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Key ideas</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {skeleton.keyIdeaBullets.map((b, idx) => (
+              <li key={idx} style={{ marginBottom: 6 }}>{b}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Checkpoint</div>
+          <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+            <div>{skeleton.checkpoint.question}</div>
+            <div style={{ marginTop: 6, fontWeight: 700 }}>Answer: {skeleton.checkpoint.answer}</div>
+          </div>
+        </div>
+        <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(255,180,0,0.08)" }}>
+          <div style={{ fontWeight: 800 }}>Common mistake</div>
+          <div style={{ marginTop: 6 }}>{skeleton.commonMistakeWarning}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const isRecoverableError = fsm.status === "S10_ERROR_RECOVERABLE";
+  const isBlockingError = fsm.status === "S11_ERROR_BLOCKING";
+  const errorMessage = currentError || (isCooldownActive ? `Mentor is rate-limited. Try again in ${cooldownRemainingSec}s.` : "");
+  const retryLabel = isCooldownActive ? `Retry in ${cooldownRemainingSec}s` : "Retry";
+
+  const handleRetry = () => {
+    dispatch({ type: "EV_RETRY" });
+    if (fsm.lastIntent === "teach") {
+      requestMentor("teach", { force: true, reason: "retry" });
+    } else if (fsm.lastIntent === "board") {
+      requestMentor("board", { force: true, reason: "retry" });
+    }
+  };
+
   const drawerContent = () => {
-    if (currentError) {
+    if (isRecoverableError || isBlockingError) {
       return (
         <div style={{ padding: 12, borderRadius: 12, border: "1px solid rgba(255,0,0,0.2)", background: "rgba(255,0,0,0.06)" }}>
-          <div>{currentError}</div>
-          <button
-            type="button"
-            className="pill"
-            style={{ marginTop: 10 }}
-            onClick={() => requestTutor(tab, { force: true, reason: "retry" })}
-          >
-            Retry
-          </button>
+          <div>{errorMessage || "Mentor error. Please retry."}</div>
+          {isRecoverableError ? (
+            <button
+              type="button"
+              className="pill"
+              style={{ marginTop: 10 }}
+              onClick={handleRetry}
+              disabled={actionsDisabled}
+            >
+              {retryLabel}
+            </button>
+          ) : null}
         </div>
       );
     }
 
-    if (!currentResponse && isLoading) {
+    if (fsm.status === "S1_OPEN_IDLE") {
+      return renderSkeleton();
+    }
+    if (isLoading) {
       return <div style={{ padding: 12, opacity: 0.75 }}>Tutor is preparing your lesson...</div>;
     }
-
-    if (!currentResponse) {
-      return <div style={{ padding: 12, opacity: 0.75 }}>No tutor response yet.</div>;
+    if (fsm.status === "S3_SHOW_TEACH" || fsm.status === "S6_AWAIT_CHECKPOINT" || fsm.status === "S7_HINTING" || fsm.status === "S8_PRACTICE" || fsm.status === "S9_ADVANCE_GUARD") {
+      return currentResponse ? renderTeach() : renderSkeleton();
     }
-
-    return tab === "teach" ? renderTeach() : renderExamples();
+    if (fsm.status === "S5_SHOW_BOARD") {
+      return currentResponse ? renderExamples() : renderSkeleton();
+    }
+    return renderSkeleton();
   };
 
   return (
@@ -2236,7 +2756,7 @@ function TutorDrawerV2(props: {
         background: "rgba(0,0,0,0.35)",
       }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleClose();
       }}
     >
       <div
@@ -2254,28 +2774,32 @@ function TutorDrawerV2(props: {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>
+            Step {nodeIndex + 1}/{Math.max(1, order.length)} • {nodeTitle}
+          </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
               type="button"
               className="pill"
               onClick={() => handleTabChange("teach")}
               style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white" }}
+              disabled={actionsDisabled}
             >
-              Teach
+              Teach (Step-by-step)
             </button>
             <button
               type="button"
               className="pill"
               onClick={() => handleTabChange("examples")}
               style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white" }}
+              disabled={actionsDisabled}
             >
-              Board Examples
+              Board (Solved examples)
             </button>
             <button
               type="button"
               className="pill"
-              onClick={onClose}
+              onClick={handleClose}
               title="Close"
               style={{ background: "white" }}
             >
@@ -2283,17 +2807,16 @@ function TutorDrawerV2(props: {
             </button>
           </div>
         </div>
-
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          You're learning: <b>{nodeTitle}</b> • Step {nodeIndex + 1} of {Math.max(1, order.length)}
-        </div>
+        {clickHint ? (
+          <div style={{ marginTop: 6, fontSize: 12, color: "#9b5a00" }}>{clickHint}</div>
+        ) : null}
 
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
             className="pill"
             onClick={() => goToNodeIndex(0, "start_from_basics")}
-            disabled={nodeIndex === 0}
+            disabled={nodeIndex === 0 || actionsDisabled}
           >
             Start from basics
           </button>
@@ -2301,7 +2824,7 @@ function TutorDrawerV2(props: {
             type="button"
             className="pill"
             onClick={handleNextConcept}
-            disabled={nodeIndex >= order.length - 1}
+            disabled={nodeIndex >= order.length - 1 || actionsDisabled}
           >
             Next concept
           </button>
@@ -2315,6 +2838,7 @@ function TutorDrawerV2(props: {
               background: "white",
               fontWeight: 700,
             }}
+            disabled={actionsDisabled}
           >
             {order.map((id, idx) => (
               <option key={id} value={id}>
@@ -3093,15 +3617,15 @@ const renderAssistantContent = (raw: string) => {
       ? "board_steps_ms"
       : "solve_with_me";
 
-  const getLastAssistantMessage = (history: MentorChatMsg[]) => {
+  const getLastAssistantMessage = useCallback((history: MentorChatMsg[]) => {
     for (let i = history.length - 1; i >= 0; i -= 1) {
       const msg = history[i];
       if (msg.role === "assistant") return String(msg.content || "");
     }
     return "";
-  };
+  }, []);
 
-  const buildDoubtContext = (history: MentorChatMsg[]) => ({
+  const buildDoubtContext = useCallback((history: MentorChatMsg[]) => ({
     chapter: topicKey,
     cardTitle: seedExample?.title,
     cardSection: seedExample?.section,
@@ -3110,8 +3634,8 @@ const renderAssistantContent = (raw: string) => {
     itemTitle: seedExample?.itemTitle,
     selectedMode: resolvedMode,
     lastMentorResponse: getLastAssistantMessage(history),
-  });
-  const buildLessonPlanMessage = () => {
+  }), [topicKey, seedExample, resolvedMode, getLastAssistantMessage]);
+  const buildLessonPlanMessage = useCallback(() => {
     if (!seedExample || !isLearnSection) {
       return `Problem (${seedExample?.title}): ${seedExample?.question || ""}`;
     }
@@ -3146,7 +3670,7 @@ const renderAssistantContent = (raw: string) => {
       "- I ask 1 question -> you answer",
       "- I correct + continue",
     ].join("\n");
-  };
+  }, [seedExample, isLearnSection, requestedMode, isExplainOnly, solveStyle]);
   const inputPlaceholder = isExplainOnly
     ? "Ask a doubt about this explanation."
     : solveStyle === "board"
@@ -3230,7 +3754,8 @@ const renderAssistantContent = (raw: string) => {
     } finally {
       setLoading(false);
     }
-  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection]);  // ---- FIX: prevent infinite update loop by removing unstable callback dependency
+  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection, buildLessonPlanMessage]);
+  // ---- FIX: prevent infinite update loop by removing unstable callback dependency
   // Keep latest kickoff function in a ref (avoids useEffect depending on resetAndKickoff identity).
   const kickoffRef = useRef<null | (() => void)>(null);
   useEffect(() => {
@@ -3511,7 +4036,6 @@ const renderAssistantContent = (raw: string) => {
         </div>
 
         
-{true ? (
   <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
     <input
       value={input}
@@ -3547,7 +4071,6 @@ const renderAssistantContent = (raw: string) => {
       Send
     </button>
   </div>
-) : null}
 
         
 
@@ -3667,7 +4190,7 @@ function MindMapCanvas(props: {
       const ang = (2 * Math.PI * i) / Math.max(cleanNodes.length, 1);
       return { ...n, x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
     });
-  }, [mindMap, nodes.length]);
+  }, [nodes]);
 
   const byId = useMemo(() => {
     const m = new Map<string, { id: string; label: string; description: string; x: number; y: number }>();
@@ -3797,7 +4320,7 @@ function GuidedMindmapPanel(props: {
   }) => void;
 }) {
   const { data, onAskMentor } = props;
-  const nodes = data.nodes || [];
+  const nodes = useMemo(() => data.nodes || [], [data.nodes]);
   const [viewMode, setViewMode] = useState<"beginner" | "exam">("beginner");
   const [searchText, setSearchText] = useState("");
   const byId = useMemo(() => {
@@ -3849,6 +4372,8 @@ function GuidedMindmapPanel(props: {
     if (!visibleNodes.length) return;
     const hasSelected = visibleNodes.some((n) => String(n.id) === String(selectedId));
     if (!hasSelected) {
+      // Keep selection aligned to the currently visible set.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(String(visibleNodes[0].id));
     }
   }, [visibleNodes, selectedId]);
