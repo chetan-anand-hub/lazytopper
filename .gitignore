@@ -117,3 +117,7 @@ REPORT.md
 
 codex_tutor_snapshot.ps1
 
+_codex_output/
+_debug_bundle/
+_handover_evidence/
+src/pages/TopicHub.tsx.bak2
