@@ -123,11 +123,26 @@ const STUB_MODE = !AI_PROVIDER || !API_KEY || AI_PROVIDER_NORMALIZED !== 'gemini
 const ACTIVE_PROVIDER = STUB_MODE ? 'stub' : AI_PROVIDER_NORMALIZED;
 const GEMINI_API_KEY = AI_PROVIDER_NORMALIZED === 'gemini' ? API_KEY : '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const IS_DEV = String(process.env.NODE_ENV || '').toLowerCase() !== 'production';
 const GEMINI_MODEL_ZOMBIE = process.env.GEMINI_MODEL_ZOMBIE || '';
 const GEMINI_MODEL_BEAST = process.env.GEMINI_MODEL_BEAST || '';
 const REPO_ROOT = process.cwd();
 const FEEDBACK_DIR = path.join(REPO_ROOT, '.project_memory', 'ops', 'feedback');
 const FEEDBACK_FILE = path.join(FEEDBACK_DIR, 'triangles_feedback.jsonl');
+const TEACH_CACHE_TTL_MS = IS_DEV ? 90_000 : 60_000;
+const teachCache = new Map();
+const inflightTeach = new Map();
+
+function buildTeachContractCacheKey(payload) {
+  if (!payload || typeof payload !== 'object') return 'teach_contract|unknown';
+  const subject = String(payload.subject || '').trim();
+  const grade = payload.grade != null ? String(payload.grade) : '';
+  const topicKey = String(payload.topicKey || payload.chapter || payload.topic || '').trim();
+  const nodeId = String(payload.mindmapNodeId || payload.nodeId || '').trim();
+  const stepIndex = payload.stepIndex != null ? String(payload.stepIndex) : '';
+  const vibe = String(payload.vibe || '').trim();
+  return ['teach_contract', subject, grade, topicKey, nodeId, stepIndex, vibe].join('|');
+}
 
 /**
  * Helper to send JSON with CORS headers.
@@ -143,6 +158,15 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function sendJsonWithHeaders(res, status, body, extraHeaders) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+    ...(extraHeaders || {}),
+  });
+  res.end(JSON.stringify(body));
+}
+
 function tryParseJsonStrict(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
@@ -153,6 +177,41 @@ function tryParseJsonStrict(text) {
   } catch {
     return null;
   }
+}
+
+function extractJsonObjectFromText(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const parseObject = (value) => {
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = parseObject(trimmed);
+  if (direct) return direct;
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const sliced = trimmed.slice(firstBrace, lastBrace + 1);
+    const slicedParsed = parseObject(sliced);
+    if (slicedParsed) return slicedParsed;
+  }
+
+  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i);
+  if (fencedMatch && fencedMatch[1]) {
+    const fencedParsed = parseObject(fencedMatch[1].trim());
+    if (fencedParsed) return fencedParsed;
+  }
+
+  return null;
 }
 
 function isValidMentorProtocol(obj, mode) {
@@ -849,10 +908,25 @@ function isLearnMindmapPayload(payload) {
   const section = String(payload.section || '').toLowerCase();
   const subSection = String(payload.subSection || '').toLowerCase();
   const explainType = String(payload.explainType || '').toLowerCase();
+  const selectedTab = String(payload.selectedTab || payload.tab || '').toLowerCase();
   if (section !== 'learn') return false;
+  if (isTeachTabPayload(payload)) return false;
   if (subSection.includes('mindmap')) return true;
-  if (explainType === 'mindmap_node') return true;
-  if (payload.mindmapNodeId || payload.mindmapCoreId) return true;
+  if (explainType === 'mindmap_node' || explainType === 'mindmap') return true;
+  if (selectedTab === 'mindmap') return true;
+  return false;
+}
+
+function isTeachTabPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  const section = String(payload.section || '').toLowerCase();
+  const subSection = String(payload.subSection || '').toLowerCase();
+  const explainType = String(payload.explainType || '').toLowerCase();
+  const selectedTab = String(payload.selectedTab || payload.tab || '').toLowerCase();
+  if (section && section !== 'learn') return false;
+  if (subSection === 'teach' || subSection.includes('teach')) return true;
+  if (explainType === 'teach') return true;
+  if (selectedTab === 'teach') return true;
   return false;
 }
 
@@ -1068,12 +1142,98 @@ function runBsreEvaluation(payload, attempt, rubricIdOverride) {
   return buildBsreStructured(evaluation, payload);
 }
 
-function shouldRequireDiagram(payload) {
-  if (!isTrianglesTopic(payload)) return false;
+function getDiagramTopicText(payload) {
+  return [
+    payload?.subject,
+    payload?.topicKey,
+    payload?.topic,
+    payload?.topicTitle,
+    payload?.topicName,
+    payload?.chapter,
+    payload?.nodeTitle,
+    payload?.mindmapNodeTitle,
+    payload?.cardTitle,
+    payload?.cardName,
+    payload?.questionText,
+    payload?.contextText,
+  ]
+    .flat()
+    .map((v) => String(v || '').toLowerCase())
+    .join(' ');
+}
+
+function isTeachOrBoardPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
   const section = String(payload?.section || '').toLowerCase();
   const subSection = String(payload?.subSection || '').toLowerCase();
-  if (section === 'learn') return true;
-  if (subSection.includes('mindmap') || subSection.includes('proof')) return true;
+  const explainType = String(payload?.explainType || '').toLowerCase();
+  const selectedTab = String(payload?.selectedTab || payload?.tab || '').toLowerCase();
+  if (section !== 'learn') return false;
+  if (subSection.includes('teach') || subSection.includes('board')) return true;
+  if (explainType.includes('teach') || explainType.includes('board')) return true;
+  if (selectedTab === 'teach' || selectedTab === 'examples' || selectedTab === 'board') return true;
+  return false;
+}
+
+function isNonNegotiableDiagramTopic(payload) {
+  const subject = String(payload?.subject || '').toLowerCase();
+  const text = getDiagramTopicText(payload);
+  const maths = [
+    'triangle',
+    'triangles',
+    'similarity',
+    'congruence',
+    'circle',
+    'circles',
+    'coordinate',
+    'coordinate geometry',
+    'trigon',
+    'heights',
+    'height',
+    'distances',
+    'distance',
+    'mensuration',
+    'construction',
+    'constructions',
+    'area',
+    'surface area',
+    'volume',
+  ];
+  const science = [
+    'light',
+    'reflection',
+    'refraction',
+    'lens',
+    'lenses',
+    'mirror',
+    'mirrors',
+    'optics',
+    'ray',
+    'rays',
+    'electricity',
+    'electric',
+    'circuit',
+    'circuits',
+    'current',
+    'resistance',
+    'magnetic',
+    'magnet',
+    'field',
+  ];
+  const hasMath = maths.some((k) => text.includes(k));
+  const hasScience = science.some((k) => text.includes(k));
+  if (subject.includes('math')) return hasMath;
+  if (subject.includes('science')) return hasScience;
+  return hasMath || hasScience;
+}
+
+function shouldRequireDiagram(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  const section = String(payload?.section || '').toLowerCase();
+  const subSection = String(payload?.subSection || '').toLowerCase();
+  if (isTeachOrBoardPayload(payload) && isNonNegotiableDiagramTopic(payload)) return true;
+  if (isTrianglesTopic(payload)) return true;
+  if (section === 'learn' && (subSection.includes('mindmap') || subSection.includes('proof'))) return true;
   if (payload?.mindmapNodeId || payload?.mindmapCoreId) return true;
   return false;
 }
@@ -1086,27 +1246,45 @@ function inferDiagramType(payload) {
     payload?.mindmapNodeText,
     payload?.questionText,
     payload?.contextText,
+    payload?.topicKey,
+    payload?.topic,
+    payload?.chapter,
   ]
     .flat()
     .map((v) => String(v || '').toLowerCase())
     .join(' ');
-  if (hint.includes('bpt') || hint.includes('proportionality')) return 'BPT';
-  if (hint.includes('pyth')) return 'PYTHAGORAS';
-  if (hint.includes('sas')) return 'SIMILARITY_SAS';
-  if (hint.includes('sss')) return 'SIMILARITY_SSS';
-  if (hint.includes('aa')) return 'SIMILARITY_AA';
-  if (hint.includes('parallel') && hint.includes('angle')) return 'PARALLEL_LINE_ANGLE_RELATIONS';
-  if (hint.includes('definition') && hint.includes('similar')) return 'SIMILARITY_AA';
-  if (hint.includes('similar')) return 'SIMILARITY_AA';
-  return 'TRIANGLE_GENERIC';
+  if (hint.includes('trigon') || hint.includes('sin') || hint.includes('cos') || hint.includes('tan') || hint.includes('height') || hint.includes('distance')) {
+    return 'trigonometric_triangle';
+  }
+  if (hint.includes('circle') || hint.includes('chord') || hint.includes('tangent')) return 'circle';
+  if (hint.includes('coordinate') || hint.includes('cartesian') || hint.includes('graph')) return 'coordinate_plane';
+  if (hint.includes('mensuration') || hint.includes('surface area') || hint.includes('volume') || hint.includes('cylinder') || hint.includes('cone') || hint.includes('sphere') || hint.includes('cuboid')) {
+    return 'mensuration_solid';
+  }
+  if (hint.includes('ray') || hint.includes('reflection') || hint.includes('refraction') || hint.includes('lens') || hint.includes('mirror') || hint.includes('optics')) {
+    return 'ray_diagram';
+  }
+  if (hint.includes('circuit') || hint.includes('electric') || hint.includes('current') || hint.includes('resistance') || hint.includes('ammeter') || hint.includes('voltmeter')) {
+    return 'circuit';
+  }
+  if (hint.includes('triangle') || hint.includes('similar') || hint.includes('congruen') || hint.includes('pyth') || hint.includes('bpt') || hint.includes('parallel')) {
+    return 'triangle';
+  }
+  return 'generic';
 }
 
 function diagramLabelsForType(diagramType) {
-  const t = String(diagramType || '').toUpperCase();
-  if (t === 'BPT') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
-  if (t === 'PYTHAGORAS') return { A: 'A', B: 'B', C: 'C' };
-  if (t.includes('SIMILARITY')) return { A: 'A', B: 'B', C: 'C', P: 'P', Q: 'Q', R: 'R' };
-  if (t === 'PARALLEL_LINE_ANGLE_RELATIONS') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
+  const raw = String(diagramType || '');
+  const t = raw.toLowerCase();
+  if (t === 'bpt' || t === 'pythagoras') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
+  if (t.includes('similarity') || t.includes('triangle')) return { A: 'A', B: 'B', C: 'C', P: 'P', Q: 'Q', R: 'R' };
+  if (t === 'parallel_line_angle_relations') return { A: 'A', B: 'B', C: 'C', D: 'D', E: 'E' };
+  if (t === 'trigonometric_triangle') return { A: 'A', B: 'B', C: 'C', theta: 'theta' };
+  if (t === 'circle') return { O: 'O', A: 'A', B: 'B' };
+  if (t === 'coordinate_plane') return { O: 'O', X: 'x', Y: 'y', P: 'P' };
+  if (t === 'mensuration_solid') return { H: 'h', R: 'r' };
+  if (t === 'ray_diagram') return { O: 'O', F: 'F', F2: '2F' };
+  if (t === 'circuit') return { A: 'A', B: 'B', V: 'V' };
   return { A: 'A', B: 'B', C: 'C' };
 }
 
@@ -1721,6 +1899,534 @@ function validateLearnMindmap(obj) {
   return { ok: issues.length === 0, issues };
 }
 
+function isTeachContractRequest(payload, mode) {
+  return mode === 'learn_teach' && isTeachTabPayload(payload);
+}
+
+function toStringArray(value) {
+  return Array.isArray(value) ? value.map((v) => String(v || '').trim()).filter(Boolean) : [];
+}
+
+function ensureMinArray(list, min, makeItem) {
+  const out = Array.isArray(list) ? list.slice() : [];
+  while (out.length < min) {
+    out.push(makeItem(out.length));
+  }
+  return out;
+}
+
+function buildDiagramFields(payload, raw = {}) {
+  const diagramRequired = typeof raw.diagramRequired === 'boolean' ? raw.diagramRequired : shouldRequireDiagram(payload);
+  const diagramType = diagramRequired
+    ? String(raw.diagramType || raw.diagram?.diagramType || raw.diagram?.type || inferDiagramType(payload) || '').trim()
+    : '';
+  const diagramLabels = diagramRequired
+    ? raw.diagramLabels || raw.diagram?.diagramLabels || raw.diagram?.labels || diagramLabelsForType(diagramType)
+    : null;
+  const diagramSpec =
+    diagramRequired
+      ? raw.diagramSpec || raw.diagram || raw?.tutor?.diagramSpec || diagramSpecForPayload(payload) || {
+          type: diagramType,
+          labels: diagramLabels,
+        }
+      : null;
+  return { diagramRequired, diagramType, diagramSpec, diagramLabels };
+}
+
+function toLabelArray(value) {
+  if (Array.isArray(value)) return value.map((v) => String(v || '').trim()).filter(Boolean);
+  if (value && typeof value === 'object') {
+    return Object.values(value).map((v) => String(v || '').trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function buildTeachDiagramObject(payload, rawDiagram = {}, structured = {}) {
+  const required =
+    typeof rawDiagram.required === 'boolean'
+      ? rawDiagram.required
+      : typeof rawDiagram.diagramRequired === 'boolean'
+        ? rawDiagram.diagramRequired
+        : typeof structured.diagramRequired === 'boolean'
+          ? structured.diagramRequired
+          : shouldRequireDiagram(payload);
+  const inferredType = inferDiagramType(payload) || 'generic';
+  const type = String(
+    rawDiagram.type ||
+      rawDiagram.diagramType ||
+      structured.diagramType ||
+      structured.diagram?.diagramType ||
+      inferredType
+  ).trim() || 'generic';
+  let labels = toLabelArray(
+    rawDiagram.labels ||
+      rawDiagram.diagramLabels ||
+      structured.diagramLabels ||
+      structured.diagram?.diagramLabels ||
+      diagramLabelsForType(type)
+  );
+  if (!labels.length) labels = toLabelArray(diagramLabelsForType(type));
+  if (!labels.length) labels = ['A', 'B', 'C'];
+  const spec =
+    rawDiagram.spec ||
+    rawDiagram.diagramSpec ||
+    structured.diagramSpec ||
+    structured.diagram ||
+    diagramSpecForPayload(payload) ||
+    null;
+  const svg = typeof rawDiagram.svg === 'string' ? rawDiagram.svg : null;
+  let altText = String(rawDiagram.altText || rawDiagram.diagramAltText || '').trim();
+  if (!altText) {
+    const nodeTitle =
+      payload?.mindmapNodeTitle ||
+      payload?.cardTitle ||
+      payload?.cardName ||
+      payload?.itemTitle ||
+      payload?.topicKey ||
+      payload?.topic ||
+      'this concept';
+    altText = `Diagram for ${nodeTitle}.`;
+  }
+  return {
+    required: Boolean(required),
+    type,
+    labels,
+    spec,
+    svg,
+    altText,
+  };
+}
+
+function ensureTeachContractShape(raw, payload) {
+  if (!raw || typeof raw !== 'object' || raw.kind !== 'learn_teach') return raw;
+  const topic = payload?.topicKey || payload?.chapter || payload?.topic || 'this topic';
+  const nodeTitle =
+    payload?.mindmapNodeTitle ||
+    payload?.cardTitle ||
+    payload?.cardName ||
+    payload?.itemTitle ||
+    topic;
+  const teach = raw.teach && typeof raw.teach === 'object' ? { ...raw.teach } : {};
+  const goal =
+    String(teach.goal || raw.goalLine || teach.headline || teach.oneLiner || '').trim() ||
+    `Goal: Understand ${nodeTitle}.`;
+  let keyIdeas = toStringArray(teach.keyIdeas);
+  if (!keyIdeas.length) keyIdeas = toStringArray(raw.keyIdeaBullets);
+  if (!keyIdeas.length) keyIdeas = toStringArray(teach.conceptBullets);
+  if (!keyIdeas.length) keyIdeas = toStringArray(teach.simpleExplanation);
+  keyIdeas = ensureMinArray(keyIdeas, 2, (i) => `Key idea ${i + 1}: ${nodeTitle}.`);
+  const diagram = buildTeachDiagramObject(payload, teach.diagram || raw.diagram || {}, raw);
+  const checkpointRaw = raw.checkpoint || teach.checkpoint || {};
+  const checkpointQuestion =
+    String(checkpointRaw.question || raw.checkpointQ || raw.checkQuestion || '').trim() ||
+    `Quick check: What must you state before applying ${nodeTitle}?`;
+  const checkpointAnswer =
+    String(checkpointRaw.answer || raw.checkpointA || '').trim() ||
+    `Expected answer: State the criterion and correspondence clearly for ${nodeTitle}.`;
+  const commonMistake =
+    String(
+      raw.commonMistake ||
+        teach.commonMistake ||
+        raw.commonMistakeWarning ||
+        raw.commonError ||
+        (Array.isArray(raw.commonMistakes) ? raw.commonMistakes[0] : '')
+    ).trim() || 'Common mistake: skipping the criterion or correspondence.';
+
+  const nextTeach = {
+    ...teach,
+    goal,
+    keyIdeas,
+    diagram,
+    checkpoint: { question: checkpointQuestion, answer: checkpointAnswer },
+    commonMistake,
+  };
+  const next = {
+    ...raw,
+    teach: nextTeach,
+    goalLine: raw.goalLine ?? goal,
+    keyIdeaBullets: raw.keyIdeaBullets ?? keyIdeas,
+    checkpoint: { question: checkpointQuestion, answer: checkpointAnswer },
+    commonMistake,
+    commonMistakeWarning: raw.commonMistakeWarning ?? commonMistake,
+    checkpointQ: raw.checkpointQ ?? checkpointQuestion,
+    checkpointA: raw.checkpointA ?? checkpointAnswer,
+  };
+  if (diagram.required && !next.diagramRequired) next.diagramRequired = diagram.required;
+  if (!next.diagramType) next.diagramType = diagram.type;
+  if (!next.diagramLabels) next.diagramLabels = diagram.labels;
+  if (!next.diagramSpec && diagram.spec) next.diagramSpec = diagram.spec;
+  return next;
+}
+
+function validateLearnTeachContract(obj, payload) {
+  const issues = [];
+  if (!obj || typeof obj !== 'object') return { ok: false, issues: ['Missing JSON object.'] };
+  if (obj.kind !== 'learn_teach') issues.push('kind must be learn_teach.');
+
+  const teach = obj.teach || {};
+  const goal = String(teach.goal || '').trim();
+  const keyIdeas = toStringArray(teach.keyIdeas);
+  if (!goal) issues.push('teach.goal missing.');
+  if (keyIdeas.length < 2) issues.push('teach.keyIdeas needs >= 2 items.');
+
+  const diagram = teach.diagram || {};
+  if (!diagram || typeof diagram !== 'object') {
+    issues.push('teach.diagram missing.');
+  } else {
+    if (typeof diagram.required !== 'boolean') issues.push('teach.diagram.required must be boolean.');
+    if (!String(diagram.type || '').trim()) issues.push('teach.diagram.type missing.');
+    if (!Array.isArray(diagram.labels) || diagram.labels.length < 2) {
+      issues.push('teach.diagram.labels needs >= 2 items.');
+    }
+    if (!('spec' in diagram)) issues.push('teach.diagram.spec missing.');
+    if (!String(diagram.altText || '').trim()) issues.push('teach.diagram.altText missing.');
+  }
+
+  const checkpoint = obj.checkpoint || teach.checkpoint || {};
+  if (!String(checkpoint.question || '').trim()) issues.push('checkpoint.question missing.');
+  if (!String(checkpoint.answer || '').trim()) issues.push('checkpoint.answer missing.');
+
+  const commonMistake = String(obj.commonMistake || teach.commonMistake || '').trim();
+  if (!commonMistake) issues.push('commonMistake missing.');
+
+  const blob = JSON.stringify(obj || {});
+  if (containsPlaceholderLanguage(blob)) issues.push('Placeholder language detected.');
+  return { ok: issues.length === 0, issues };
+}
+
+function buildDeterministicExamLines(topicLabel) {
+  const topic = String(topicLabel || 'this concept');
+  return [
+    `CBSE line: State the criterion for ${topic} clearly with correct correspondence.`,
+    `CBSE line: Write one correct ratio/angle relation for ${topic} and conclude.`,
+  ];
+}
+
+function buildDeterministicCheckQuestion(topicLabel) {
+  const topic = String(topicLabel || 'this concept');
+  return `Which condition must be verified before applying ${topic}?`;
+}
+
+function buildLearnTeachFallback(payload) {
+  const topic = payload?.topicKey || payload?.chapter || payload?.topic || 'this topic';
+  const nodeTitle =
+    payload?.mindmapNodeTitle ||
+    payload?.cardTitle ||
+    payload?.cardName ||
+    payload?.itemTitle ||
+    topic;
+  const diagram = buildDiagramFields(payload);
+  const conceptBullets = ensureMinArray(
+    toStringArray([`Definition: ${nodeTitle}.`, 'State the criterion before CPST.']),
+    3,
+    (i) => `Key point ${i + 1} for ${nodeTitle}.`
+  );
+  const examLines = ensureMinArray(buildDeterministicExamLines(nodeTitle), 2, (i) => `CBSE line ${i + 1}: ${nodeTitle}.`);
+  const steps = ensureMinArray([], 2, (i) => ({ text: `Step ${i + 1}: Apply the criterion with correct order.`, marks: 1 }));
+  const base = {
+    kind: 'learn_teach',
+    teach: {
+      headline: `Teach: ${nodeTitle}`,
+      oneLiner: `Key idea: ${nodeTitle} in ${topic}.`,
+      conceptBullets,
+      examLines,
+    },
+    workedExample: {
+      question: `Micro-drill: Write two correct steps with reasons for ${nodeTitle}.`,
+      steps,
+      finalAnswer: `Therefore, ${nodeTitle} is established.`,
+    },
+    commonError: 'Mixing correspondence order or applying a theorem without conditions.',
+    commonFix: 'State the criterion, then write the matching ratio/angle relation before concluding.',
+    checkQuestion: buildDeterministicCheckQuestion(nodeTitle),
+    diagramRequired: diagram.diagramRequired,
+    diagramType: diagram.diagramType,
+    diagramSpec: diagram.diagramSpec,
+    diagramLabels: diagram.diagramLabels,
+    fallback_used: true,
+  };
+  return ensureTeachContractShape(base, payload);
+}
+
+function adaptLegacyLearnTeachToContract(raw, payload) {
+  const topic = payload?.topicKey || payload?.chapter || payload?.topic || 'this topic';
+  const nodeTitle =
+    payload?.mindmapNodeTitle ||
+    payload?.cardTitle ||
+    payload?.cardName ||
+    payload?.itemTitle ||
+    topic;
+  let usedFallback = false;
+  const teach = raw?.teach || {};
+  let conceptBullets = toStringArray(teach.simpleExplanation);
+  let examLines = toStringArray(teach.cbseExamSentence);
+  if (conceptBullets.length < 3) {
+    usedFallback = true;
+    conceptBullets = ensureMinArray(conceptBullets, 3, (i) => `Key point ${i + 1} for ${nodeTitle}.`);
+  }
+  if (examLines.length < 2) {
+    usedFallback = true;
+    examLines = ensureMinArray(examLines, 2, (i) => buildDeterministicExamLines(nodeTitle)[i] || `CBSE line ${i + 1}.`);
+  }
+  const firstWorked = Array.isArray(raw?.workedExamples) ? raw.workedExamples[0] : null;
+  const stepsRaw = Array.isArray(firstWorked?.steps) ? firstWorked.steps : [];
+  let steps = stepsRaw
+    .map((s, idx) => ({
+      text: String(s?.text || s?.line || s || `Step ${idx + 1}: Apply the criterion.`).trim(),
+      marks: Number.isFinite(Number(s?.marks)) ? Number(s.marks) : 1,
+    }))
+    .filter((s) => s.text);
+  if (steps.length < 2) {
+    usedFallback = true;
+    steps = ensureMinArray(steps, 2, (i) => ({ text: `Step ${i + 1}: Apply the criterion with order.`, marks: 1 }));
+  }
+  let question = String(firstWorked?.question || '').trim();
+  if (!question) {
+    usedFallback = true;
+    question = `Micro-drill: Write two correct steps with reasons for ${nodeTitle}.`;
+  }
+  let finalAnswer = String(firstWorked?.finalAnswer || '').trim();
+  if (!finalAnswer) {
+    usedFallback = true;
+    finalAnswer = `Therefore, ${nodeTitle} is established.`;
+  }
+  let commonError = '';
+  let commonFix = '';
+  if (Array.isArray(raw?.commonMistakes) && raw.commonMistakes.length) {
+    commonError = String(raw.commonMistakes[0] || '').trim();
+    commonFix = String(raw.commonMistakes[1] || '').trim();
+  }
+  if (!commonError) {
+    usedFallback = true;
+    commonError = 'Mixing correspondence order or missing criterion conditions.';
+  }
+  if (!commonFix) {
+    usedFallback = true;
+    commonFix = 'Write the criterion and correspondence order before CPST.';
+  }
+  let checkQuestion = String(raw?.checkQuestion || '').trim();
+  if (!checkQuestion) {
+    usedFallback = true;
+    checkQuestion = buildDeterministicCheckQuestion(nodeTitle);
+  }
+  const diagram = buildDiagramFields(payload, raw);
+  return {
+    kind: 'learn_teach',
+    teach: {
+      headline: `Teach: ${nodeTitle}`,
+      oneLiner: `Key idea: ${nodeTitle} in ${topic}.`,
+      conceptBullets,
+      examLines,
+    },
+    workedExample: { question, steps, finalAnswer },
+    commonError,
+    commonFix,
+    checkQuestion,
+    diagramRequired: diagram.diagramRequired,
+    diagramType: diagram.diagramType,
+    diagramSpec: diagram.diagramSpec,
+    diagramLabels: diagram.diagramLabels,
+    fallback_used: usedFallback || raw?.fallback_used === true,
+  };
+}
+
+function adaptMindmapToLearnTeachContract(raw, payload) {
+  const topic = payload?.topicKey || payload?.chapter || payload?.topic || 'this topic';
+  const nodeTitle =
+    payload?.mindmapNodeTitle ||
+    payload?.cardTitle ||
+    payload?.cardName ||
+    payload?.itemTitle ||
+    topic;
+  const tutor = raw?.tutor || {};
+  let usedFallback = false;
+
+  let conceptBullets = [];
+  conceptBullets.push(...toStringArray(tutor?.bullets));
+  if (tutor?.hint_ladder?.hint) conceptBullets.push(String(tutor.hint_ladder.hint));
+  if (tutor?.next?.revision_hook) conceptBullets.push(`Revision hook: ${tutor.next.revision_hook}`);
+  const boardSteps = Array.isArray(tutor?.board_steps_ms?.steps) ? tutor.board_steps_ms.steps : [];
+  conceptBullets.push(...boardSteps.map((s) => s?.line).filter(Boolean).map((s) => String(s)));
+  conceptBullets = conceptBullets.filter(Boolean);
+  if (conceptBullets.length < 3) {
+    usedFallback = true;
+    conceptBullets = ensureMinArray(conceptBullets, 3, (i) => `Key point ${i + 1} for ${nodeTitle}.`);
+  }
+
+  let examLines = [];
+  if (Array.isArray(tutor?.board_checks)) {
+    examLines.push(...tutor.board_checks.map((c) => c?.line).filter(Boolean).map((s) => String(s)));
+  }
+  if (!examLines.length && Array.isArray(tutor?.exam_lines)) {
+    examLines.push(...tutor.exam_lines.filter(Boolean).map((s) => String(s)));
+  }
+  if (examLines.length < 2) {
+    usedFallback = true;
+    examLines = ensureMinArray(examLines, 2, (i) => buildDeterministicExamLines(nodeTitle)[i] || `CBSE line ${i + 1}.`);
+  }
+
+  let question = String(tutor?.next?.micro_drill || '').trim();
+  if (!question) {
+    usedFallback = true;
+    question = `Micro-drill: Write two correct steps with reasons for ${nodeTitle}.`;
+  }
+  let steps = boardSteps.map((s, idx) => ({
+    text: String(s?.line || s?.text || `Step ${idx + 1}: Apply the criterion.`).trim(),
+    marks: Number.isFinite(Number(s?.marks)) ? Number(s.marks) : 1,
+  })).filter((s) => s.text);
+  if (steps.length < 2) {
+    usedFallback = true;
+    steps = ensureMinArray(steps, 2, (i) => ({ text: `Step ${i + 1}: Apply the criterion with order.`, marks: 1 }));
+  }
+  let finalAnswer = String(tutor?.board_steps_ms?.finalAnswer || tutor?.mini_example?.answer || '').trim();
+  if (!finalAnswer) {
+    usedFallback = true;
+    finalAnswer = `Therefore, ${nodeTitle} is established.`;
+  }
+  let commonError = String(tutor?.diagnosis?.misconception_summary || '').trim();
+  if (!commonError && Array.isArray(tutor?.diagnosis?.mistake_tags) && tutor.diagnosis.mistake_tags.length) {
+    commonError = `Mistake tags: ${tutor.diagnosis.mistake_tags.join(', ')}`;
+  }
+  if (!commonError) {
+    usedFallback = true;
+    commonError = 'Mixing correspondence order or applying a theorem without conditions.';
+  }
+  let commonFix = String(tutor?.next?.micro_drill || tutor?.next?.revision_hook || '').trim();
+  if (!commonFix) {
+    usedFallback = true;
+    commonFix = 'State the criterion, then write the matching ratio/angle relation before concluding.';
+  }
+  let checkQuestion = String(tutor?.socratic?.question || '').trim();
+  if (!checkQuestion) {
+    usedFallback = true;
+    checkQuestion = buildDeterministicCheckQuestion(nodeTitle);
+  }
+
+  const diagram = buildDiagramFields(payload, raw);
+  return {
+    kind: 'learn_teach',
+    teach: {
+      headline: `Teach: ${nodeTitle}`,
+      oneLiner: `Key idea: ${nodeTitle} in ${topic}.`,
+      conceptBullets,
+      examLines,
+    },
+    workedExample: { question, steps, finalAnswer },
+    commonError,
+    commonFix,
+    checkQuestion,
+    diagramRequired: diagram.diagramRequired,
+    diagramType: diagram.diagramType,
+    diagramSpec: diagram.diagramSpec,
+    diagramLabels: diagram.diagramLabels,
+    fallback_used: usedFallback || raw?.fallback_used === true,
+  };
+}
+
+function coerceLearnTeachContractStructured(raw, payload) {
+  if (!raw || typeof raw !== 'object') return { structured: raw, usedAdapter: false, usedFallback: false };
+  let adapted = raw;
+  let usedAdapter = false;
+  let usedFallback = Boolean(raw.fallback_used);
+  if (raw.kind === 'learn_mindmap' || raw.tutor) {
+    adapted = adaptMindmapToLearnTeachContract(raw, payload);
+    usedAdapter = true;
+    usedFallback = Boolean(adapted.fallback_used);
+  } else {
+    const teach = raw.teach || {};
+    if (raw.kind === 'learn_teach' && (Array.isArray(teach.simpleExplanation) || Array.isArray(raw.workedExamples))) {
+      adapted = adaptLegacyLearnTeachToContract(raw, payload);
+      usedAdapter = true;
+      usedFallback = Boolean(adapted.fallback_used);
+    }
+  }
+  const ensured = ensureTeachContractShape(adapted, payload);
+  return {
+    structured: ensured,
+    usedAdapter,
+    usedFallback: Boolean(ensured?.fallback_used) || usedFallback,
+  };
+}
+
+function getLearnTeachContractSchemaText(payload) {
+  const diagram = buildTeachDiagramObject(payload);
+  return [
+    '{',
+    '  "kind": "learn_teach",',
+    '  "teach": {',
+    '    "goal": "string",',
+    '    "keyIdeas": ["..."],',
+    '    "diagram": {',
+    `      "required": ${diagram.required ? 'true' : 'false'},`,
+    `      "type": "${diagram.type}",`,
+    `      "labels": ${JSON.stringify(diagram.labels)},`,
+    `      "spec": ${JSON.stringify(diagram.spec)},`,
+    '      "svg": null,',
+    '      "altText": "string"',
+    '    }',
+    '  },',
+    '  "checkpoint": {',
+    '    "question": "string",',
+    '    "answer": "string"',
+    '  },',
+    '  "commonMistake": "string"',
+    '}',
+  ].join('\n');
+}
+
+function buildLearnTeachContractPrompt(payload) {
+  const subject = payload.subject || 'Maths/Science';
+  const grade = payload.grade != null ? payload.grade : 10;
+  const topicKey = payload.topicKey || payload.topic || payload.chapter || '';
+  const nodeTitle = payload.mindmapNodeTitle || payload.cardTitle || payload.cardName || payload.itemTitle || '';
+  const contextText = payload.contextText || payload.mindmapNodeText || payload.itemText || '';
+  const diagram = buildTeachDiagramObject(payload);
+  const example = {
+    kind: 'learn_teach',
+    teach: {
+      goal: 'Goal: Conclude similarity and state one correct proportionality.',
+      keyIdeas: [
+        'State the angle equalities and the order of correspondence.',
+        'Use AA to conclude similarity.',
+        'Apply CPST to write the ratio of corresponding sides.',
+      ],
+      diagram: {
+        required: diagram.required,
+        type: diagram.type,
+        labels: diagram.labels,
+        spec: diagram.spec,
+        altText: diagram.altText,
+      },
+    },
+    checkpoint: {
+      question: 'Which criterion proves similarity when two angles are equal?',
+      answer: 'AA similarity (state the correspondence order first).',
+    },
+    commonMistake: 'Mixing the correspondence order of vertices before CPST.',
+  };
+  return [
+    `You are a strict CBSE Class ${grade} ${subject} teacher for the Teach tab.`,
+    topicKey ? `Topic: ${topicKey}.` : '',
+    nodeTitle ? `Node: ${nodeTitle}.` : '',
+    contextText ? `Context: ${contextText}` : '',
+    '',
+    'OUTPUT FORMAT (STRICT): Return ONLY valid JSON. No markdown. No extra keys.',
+    'Schema (LearnTeachContract):',
+    getLearnTeachContractSchemaText(payload),
+    '',
+    'RULES:',
+    '- teach.keyIdeas must have >= 2 items.',
+    '- teach.diagram must be present with required/type/labels/spec/altText.',
+    '- checkpoint.question and checkpoint.answer must be non-empty.',
+    '- commonMistake must be non-empty.',
+    '',
+    'EXAMPLE (compact, valid):',
+    JSON.stringify(example),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function validateLearnProof(obj) {
   const issues = [];
   if (!obj || typeof obj !== 'object') return { ok: false, issues: ['Missing JSON object.'] };
@@ -1774,6 +2480,9 @@ function validateStructuredForMode(obj, mode, payload, opts) {
       const loopCheck = validateAttemptLoop(obj.attempt_loop);
       if (!loopCheck.ok) issues.push(...loopCheck.issues);
     }
+  } else if (mode === 'learn_teach' && isTeachContractRequest(payload, mode)) {
+    const check = validateLearnTeachContract(obj, payload);
+    if (!check.ok) issues.push(...check.issues);
   } else if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'learn_proof') {
     const check = validateTutorStructured(mode, obj, payload);
     if (!check.ok) issues.push(...check.issues);
@@ -1833,6 +2542,10 @@ function buildProofFallbackSolveWithMe(payload) {
 function getJsonSchemaTextForMode(mode, payload) {
   const diagramType = inferDiagramType(payload);
   const diagramLabels = diagramLabelsForType(diagramType);
+
+  if (mode === 'learn_teach' && isTeachContractRequest(payload, mode)) {
+    return getLearnTeachContractSchemaText(payload);
+  }
 
   if (mode === 'solve_with_me') {
     return [
@@ -2406,7 +3119,7 @@ function buildLearnTeachFallback(payload) {
     Boolean(payload?.mindmapNodeId || payload?.mindmapNodeTitle || payload?.mindmapNodeText) ||
     String(payload?.subSection || '').toLowerCase().includes('mindmap');
   if (!seed) {
-    return {
+    return ensureTeachContractShape({
       kind: 'learn_teach',
       teach: { simpleExplanation: ['Triangles are similar if corresponding angles are equal.'], cbseExamSentence: ['State the criterion used.'] },
       workedExamples: [],
@@ -2415,7 +3128,7 @@ function buildLearnTeachFallback(payload) {
       diagramType,
       diagramLabels,
       fallback_used: true,
-    };
+    }, payload);
   }
   if (hasMindmapContext) {
     const nodeId = payload?.mindmapNodeId || payload?.itemId || 'gQ1';
@@ -2424,7 +3137,7 @@ function buildLearnTeachFallback(payload) {
     const markedSteps = steps.map((s) => ({ text: s, marks: 1 }));
     const totalMarks = markedSteps.reduce((acc, s) => acc + (Number(s.marks) || 0), 0);
     const baseQuestion = node?.example?.question || 'State the criterion and write one ratio using CPST.';
-    return {
+    return ensureTeachContractShape({
       kind: 'learn_teach',
       teach: {
         simpleExplanation: node?.bullets || seed.keyDefinitions.simpleExplanation,
@@ -2451,9 +3164,9 @@ function buildLearnTeachFallback(payload) {
       diagramType,
       diagramLabels,
       fallback_used: true,
-    };
+    }, payload);
   }
-  return {
+  return ensureTeachContractShape({
     kind: 'learn_teach',
     teach: {
       simpleExplanation: seed.keyDefinitions.simpleExplanation,
@@ -2465,7 +3178,7 @@ function buildLearnTeachFallback(payload) {
     diagramType: seed.keyDefinitions.diagramType || diagramType,
     diagramLabels: seed.keyDefinitions.diagramLabels || diagramLabels,
     fallback_used: true,
-  };
+  }, payload);
 }
 
 function buildLearnProofFallback(payload) {
@@ -2790,34 +3503,61 @@ async function callGemini(model, finalContents, config) {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
-  const body = {
-    contents: finalContents,
-    generationConfig: {
-      temperature: config && typeof config.temperature === 'number' ? config.temperature : 0.6,
-      maxOutputTokens: config && typeof config.maxOutputTokens === 'number' ? config.maxOutputTokens : 900,
-    },
+  const buildBody = (includeMimeType) => {
+    const body = {
+      contents: finalContents,
+      generationConfig: {
+        temperature: config && typeof config.temperature === 'number' ? config.temperature : 0.6,
+        maxOutputTokens: config && typeof config.maxOutputTokens === 'number' ? config.maxOutputTokens : 900,
+      },
+    };
+    if (
+      includeMimeType &&
+      config &&
+      typeof config.responseMimeType === 'string' &&
+      config.responseMimeType.trim()
+    ) {
+      body.generationConfig.responseMimeType = config.responseMimeType.trim();
+    }
+    return body;
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY,
-    },
-    body: JSON.stringify(body),
-  });
+  const doRequest = async (includeMimeType) => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': GEMINI_API_KEY,
+      },
+      body: JSON.stringify(buildBody(includeMimeType)),
+    });
+    const rawText = await response.text();
+    return { response, rawText };
+  };
+
+  let { response, rawText } = await doRequest(true);
+  if (
+    !response.ok &&
+    config &&
+    typeof config.responseMimeType === 'string' &&
+    config.responseMimeType.trim()
+  ) {
+    const retryMimeRegex = /responseMimeType|response_mime_type|Unknown name.*responseMimeType/i;
+    if (retryMimeRegex.test(rawText)) {
+      ({ response, rawText } = await doRequest(false));
+    }
+  }
 
   if (!response.ok) {
-    const errorBody = await response.text();
     const err = new Error(
-      `Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`
+      `Gemini request failed: ${response.status} ${response.statusText} - ${rawText}`
     );
     err.status = response.status;
-    err.body = errorBody;
+    err.body = rawText;
     throw err;
   }
 
-  const data = await response.json();
+  const data = JSON.parse(rawText || '{}');
 
   // Typical response shape: candidates[0].content.parts[].text
   const parts =
@@ -2932,6 +3672,7 @@ async function handleRequest(req, res) {
     const { mode, persona, payload } = normalizeMentorRequest(reqJson);
     const isMisconceptionExplain = isLearnMisconceptionPayload(payload);
     const isCompetencyExplain = isLearnCompetencyPayload(payload);
+    const isTeachTab = isTeachTabPayload(payload);
     const isMindmapTeach = isLearnMindmapPayload(payload);
     const isProofWriting = isProofWritingPayload(payload);
     const isLearnKeyDefinitions = isLearnKeyDefinitionsPayload(payload);
@@ -2988,7 +3729,8 @@ async function handleRequest(req, res) {
     if (!mode) return sendJson(res, 400, { error: 'Missing "mode" in request body' });
 
     let normalisedMode = normalizeIncomingMode(mode) || mode;
-    if (isMindmapTeach) normalisedMode = 'learn_mindmap';
+    if (isTeachTab) normalisedMode = 'learn_teach';
+    else if (isMindmapTeach) normalisedMode = 'learn_mindmap';
     if (isMisconceptionExplain || isCompetencyExplain) normalisedMode = 'explain';
     if (isTrianglesEvaluation) {
       normalisedMode = 'solve_with_me';
@@ -3000,11 +3742,18 @@ async function handleRequest(req, res) {
     if (isTrianglesEvaluation) handlerUsed = 'triangles_evaluation';
 
     if (stubMode) {
+      const isTeachContract = isTeachContractRequest(payload, normalisedMode);
       let structured = isStructuredMode(normalisedMode)
         ? buildStubTutorStructured(normalisedMode, payload)
         : null;
+      if (isTeachContract) {
+        structured = buildLearnTeachFallback(payload);
+      }
       if (structured) {
-        if (
+        if (isTeachContract) {
+          const teachCheck = validateLearnTeachContract(structured, payload);
+          if (!teachCheck.ok) structured = buildLearnTeachFallback(payload);
+        } else if (
           normalisedMode === 'learn_teach' ||
           normalisedMode === 'learn_mindmap' ||
           normalisedMode === 'learn_proof'
@@ -3024,7 +3773,9 @@ async function handleRequest(req, res) {
       const trace = {
         normalized_mode: normalisedMode,
         handler_used: handlerUsed,
-        schema_used: structured ? `schema_${normalisedMode}` : 'text',
+        schema_used: structured
+          ? (isTeachContract ? 'schema_learn_teach_contract' : `schema_${normalisedMode}`)
+          : 'text',
         repair_used: false,
         stub_used: true,
       };
@@ -3097,6 +3848,9 @@ async function handleRequest(req, res) {
     } else if (isCompetencyExplain) {
       systemPrompt =
         'You are a strict CBSE Class 10 teacher. Output must follow the exact five-section format for competencies.';
+    } else if (isTeachTabPayload(payload)) {
+      systemPrompt =
+        'You are a strict CBSE Class 10 teacher. Return only the LearnTeachContract JSON schema.';
     } else if (isMindmapTeach) {
       systemPrompt =
         'You are a strict CBSE Class 10 teacher. Output must follow the exact five-section format for mindmap node teaching.';
@@ -3125,7 +3879,9 @@ async function handleRequest(req, res) {
           userPrompt = buildBoardStepsMSPrompt(payload);
           break;
         case 'learn_teach':
-          userPrompt = buildLearnKeyDefinitionsPrompt(payload);
+          userPrompt = isTeachTabPayload(payload)
+            ? buildLearnTeachContractPrompt(payload)
+            : buildLearnKeyDefinitionsPrompt(payload);
           break;
         case 'learn_mindmap':
           userPrompt = buildLearnMindmapPrompt(payload);
@@ -3189,7 +3945,9 @@ async function handleRequest(req, res) {
       });
     }
 
-    try {
+    const isTeachContract = isTeachContractRequest(payload, normalisedMode);
+
+    const buildMentorResponse = async () => {
       const marksRaw = payload && (payload.marks ?? payload.totalMarks ?? payload.total_marks);
       const marksNum = Number(marksRaw);
       const safeMarks = Number.isFinite(marksNum) && marksNum > 0 ? marksNum : 5;
@@ -3202,6 +3960,7 @@ async function handleRequest(req, res) {
             : normalisedMode === 'solve_with_me'
               ? 1400
               : 900;
+      const responseMimeType = isTeachContract ? 'application/json' : undefined;
 
       const contents = [
         { role: 'user', parts: [{ text: `${systemPrompt}
@@ -3217,20 +3976,66 @@ ${userPrompt}` }] },
             : normalisedMode === 'learn_teach'
               ? 0.25
               : 0.35,
+        responseMimeType,
       });
 
       let finalText = reply.text;
       let structured = null;
       let repairUsed = false;
       let fallbackUsed = false;
-      const schemaUsedTrace = isStructuredMode(normalisedMode) ? `schema_${normalisedMode}` : 'text';
+      let jsonExtracted = false;
+      const schemaUsedTrace = isStructuredMode(normalisedMode)
+        ? (isTeachContract ? 'schema_learn_teach_contract' : `schema_${normalisedMode}`)
+        : 'text';
 
       if (isStructuredMode(normalisedMode)) {
-        structured = tryParseJsonStrict(finalText);
+        const parseStructured = (text) =>
+          isTeachContract ? extractJsonObjectFromText(text) : tryParseJsonStrict(text);
+        structured = parseStructured(finalText);
+        if (isTeachContract) {
+          jsonExtracted = Boolean(structured) || jsonExtracted;
+          if (!structured) {
+            if (IS_DEV) {
+              console.warn('[teach-contract] no JSON returned; triggering repair');
+            }
+            repairUsed = true;
+            const strictRepairPrompt = [
+              'Return ONLY VALID JSON object. No markdown. No prose. Output must start with { and end with }.',
+              '',
+              'You MUST follow this JSON schema exactly:',
+              getLearnTeachContractSchemaText(),
+            ].join('\n');
+            const repairContents = [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\n${strictRepairPrompt}` }] },
+            ];
+            const repaired = await callGemini(GEMINI_MODEL, repairContents, {
+              maxOutputTokens,
+              temperature: 0.1,
+              responseMimeType,
+            });
+            finalText = repaired.text;
+            structured = parseStructured(finalText);
+            jsonExtracted = Boolean(structured) || jsonExtracted;
+            if (!structured) {
+              if (IS_DEV) {
+                console.warn(
+                  '[teach-contract] fallback used because model did not return JSON'
+                );
+              }
+              structured = buildLearnTeachFallback(payload);
+              fallbackUsed = true;
+            }
+          }
+        }
         const attemptText = extractStudentAttempt(payload, reqJson?.messages);
         const shouldAttachAttemptLoop = Boolean(attemptText) && isTrianglesTopic(payload);
         if (structured && shouldAttachAttemptLoop) {
           structured.attempt_loop = buildAttemptLoopHeuristic(payload, attemptText);
+        }
+        if (isTeachContract) {
+          const coerced = coerceLearnTeachContractStructured(structured, payload);
+          structured = coerced.structured;
+          if (coerced.usedFallback) fallbackUsed = true;
         }
         const isFirstTurn =
           normalisedMode === 'solve_with_me' && Array.isArray(reqJson?.messages)
@@ -3244,6 +4049,9 @@ ${userPrompt}` }] },
           (normalisedMode === 'solve_with_me' && isTrianglesLearnPayload(payload));
 
         if (!check.ok) {
+          if (isTeachContract && IS_DEV) {
+            console.warn('[teach-contract] validation failed (pre-repair)', { issues: check.issues });
+          }
           repairUsed = true;
           const clipped = String(finalText || '').slice(0, 8000);
           const repairPrompt = buildRepairPromptForMode(normalisedMode, payload, clipped, check.issues);
@@ -3253,13 +4061,22 @@ ${userPrompt}` }] },
           const repaired = await callGemini(GEMINI_MODEL, repairContents, {
             maxOutputTokens,
             temperature: 0.2,
+            responseMimeType,
           });
           finalText = repaired.text;
-          structured = tryParseJsonStrict(finalText);
+          structured = parseStructured(finalText);
+          if (isTeachContract) {
+            jsonExtracted = Boolean(structured) || jsonExtracted;
+          }
+          if (isTeachContract) {
+            const coerced = coerceLearnTeachContractStructured(structured, payload);
+            structured = coerced.structured;
+            if (coerced.usedFallback) fallbackUsed = true;
+          }
           check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
         }
 
-        if (!check.ok && isLearnStructured) {
+        if (!check.ok && isLearnStructured && !isTeachContract) {
           repairUsed = true;
           const strictPrompt = buildRepairPromptForMode(
             normalisedMode,
@@ -3273,22 +4090,36 @@ ${userPrompt}` }] },
           const strictReply = await callGemini(GEMINI_MODEL, strictContents, {
             maxOutputTokens,
             temperature: 0.1,
+            responseMimeType,
           });
           finalText = strictReply.text;
-          structured = tryParseJsonStrict(finalText);
+          structured = parseStructured(finalText);
+          if (isTeachContract) {
+            jsonExtracted = Boolean(structured) || jsonExtracted;
+          }
           check = validateStructuredForMode(structured, normalisedMode, payload, { isFirstTurn });
         }
 
         if (!check.ok) {
-          if (isLearnStructured) {
+          if (isTeachContract) {
+            if (IS_DEV) {
+              console.warn('[teach-contract] validation failed', {
+                issues: check.issues,
+                repair_used: repairUsed,
+                fallback_used: true,
+              });
+            }
+            structured = buildLearnTeachFallback(payload);
+          } else if (isLearnStructured) {
             structured = buildStructuredFallback(normalisedMode, payload, { learn: true });
           } else {
             console.warn('[mentor] schema mismatch, falling back:', normalisedMode, check.issues);
             structured = buildStructuredFallback(normalisedMode, payload);
             if (!structured) {
-              return sendJson(res, 422, {
-                error: 'Mentor response did not match schema. Retry.',
-              });
+              return {
+                status: 422,
+                body: { error: 'Mentor response did not match schema. Retry.' },
+              };
             }
           }
           fallbackUsed = true;
@@ -3306,9 +4137,10 @@ ${userPrompt}` }] },
             const repaired = await callGemini(GEMINI_MODEL, repairContents, {
               maxOutputTokens,
               temperature: 0.2,
+              responseMimeType,
             });
             finalText = repaired.text;
-            structured = tryParseJsonStrict(finalText);
+            structured = parseStructured(finalText);
             evalCheck = validateTrianglesEvaluation(structured);
           }
           if (!evalCheck.ok) {
@@ -3332,10 +4164,12 @@ ${userPrompt}` }] },
             normalisedMode === 'learn_mindmap' ||
             normalisedMode === 'learn_proof'
           ) {
-            const tutorCheck = validateTutorStructured(normalisedMode, structured, payload);
-            if (!tutorCheck.ok) {
-              structured = buildTutorFallback(normalisedMode, payload);
-              fallbackUsed = true;
+            if (!isTeachContract) {
+              const tutorCheck = validateTutorStructured(normalisedMode, structured, payload);
+              if (!tutorCheck.ok) {
+                structured = buildTutorFallback(normalisedMode, payload);
+                fallbackUsed = true;
+              }
             }
           }
           structured = orchestrateTutorResponse({
@@ -3441,9 +4275,10 @@ ${userPrompt}` }] },
           finalText = sanitizeExplainOutput(repaired.text);
           if (!hasMindmapTeachSections(finalText)) {
             console.warn('[mentor] mindmap schema mismatch');
-            return sendJson(res, 422, {
-              error: 'Mentor response did not match schema. Retry.',
-            });
+            return {
+              status: 422,
+              body: { error: 'Mentor response did not match schema. Retry.' },
+            };
           }
         }
         structured = null;
@@ -3463,7 +4298,9 @@ ${userPrompt}` }] },
           ? structured
           : structured && isValidMentorProtocol(structured, normalisedMode)
             ? structured
-            : null;
+            : structured && ['learn_teach', 'learn_mindmap', 'learn_proof', 'board_steps_ms'].includes(String(structured.kind || ''))
+              ? structured
+              : null;
       const trace = {
         normalized_mode: normalisedMode,
         handler_used: handlerUsed,
@@ -3471,27 +4308,112 @@ ${userPrompt}` }] },
         repair_used: repairUsed,
       };
       if (fallbackUsed) trace.fallback_used = true;
-      return sendJson(res, 200, {
-        ok: true,
-        data: {
-          text: finalText,
-          structured: validStructured,
-          trace,
+      if (isTeachContract) {
+        trace.teach_contract = true;
+        trace.repair_used = repairUsed;
+        trace.fallback_used = Boolean(fallbackUsed);
+        trace.json_extracted = Boolean(jsonExtracted);
+        trace.cache_hit = false;
+        trace.coalesced = false;
+      }
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          data: {
+            text: finalText,
+            structured: validStructured,
+            trace,
+          },
         },
-      });
+        structured: validStructured,
+        trace,
+        text: finalText,
+      };
+    };
+
+    try {
+      if (isTeachContract) {
+        const cacheKey = buildTeachContractCacheKey(payload);
+        const cached = teachCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          const trace = {
+            normalized_mode: normalisedMode,
+            handler_used: handlerUsed,
+            schema_used: 'schema_learn_teach_contract',
+            repair_used: false,
+            teach_contract: true,
+            cache_hit: true,
+            coalesced: false,
+            json_extracted: true,
+          };
+          return sendJson(res, 200, {
+            ok: true,
+            data: {
+              text: cached.text,
+              structured: cached.structured,
+              trace,
+            },
+          });
+        }
+        if (cached) teachCache.delete(cacheKey);
+
+        const inflight = inflightTeach.get(cacheKey);
+        if (inflight) {
+          const result = await inflight;
+          if (result?.body?.data?.trace && result.status === 200) {
+            result.body.data.trace.cache_hit = false;
+            result.body.data.trace.coalesced = true;
+            result.body.data.trace.teach_contract = true;
+          }
+          return sendJson(res, result.status, result.body);
+        }
+
+        const promise = buildMentorResponse();
+        inflightTeach.set(cacheKey, promise);
+        let result;
+        try {
+          result = await promise;
+        } finally {
+          inflightTeach.delete(cacheKey);
+        }
+        if (result?.status === 200 && result.structured) {
+          teachCache.set(cacheKey, {
+            structured: result.structured,
+            text: result.text,
+            expiresAt: Date.now() + TEACH_CACHE_TTL_MS,
+          });
+        }
+        if (result?.body?.data?.trace && result.status === 200) {
+          result.body.data.trace.cache_hit = false;
+          result.body.data.trace.coalesced = false;
+          result.body.data.trace.teach_contract = true;
+        }
+        return sendJson(res, result.status, result.body);
+      }
+
+      const result = await buildMentorResponse();
+      return sendJson(res, result.status, result.body);
     } catch (err) {
       if (err && err.status === 429) {
+        const retryAfterSec = 20;
         const fallback = attachTutorDiagramIntent(
           { tutor: { text: 'Mentor is rate-limited. Please wait 20 seconds and retry.' } },
           payload
         );
-        return sendJson(res, 429, {
-          error: 'Mentor is rate-limited. Please wait and retry.',
-          data: {
-            structured: fallback,
-            trace: { rate_limited: true },
+        return sendJsonWithHeaders(
+          res,
+          429,
+          {
+            error: 'Mentor is rate-limited. Please wait and retry.',
+            retryAfterSec,
+            data: {
+              structured: fallback,
+              trace: { rate_limited: true, retry_after_sec: retryAfterSec, teach_contract: Boolean(isTeachContract) },
+            },
           },
-        });
+          { 'Retry-After': String(retryAfterSec) }
+        );
       }
       console.error(err);
       return sendJson(res, 500, {
