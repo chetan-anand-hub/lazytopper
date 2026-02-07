@@ -121,3 +121,15 @@ _codex_output/
 _debug_bundle/
 _handover_evidence/
 src/pages/TopicHub.tsx.bak2
+# --- HARD BOUNDARY OVERRIDE (last-match wins) ---
+.project_memory/**
+docs/session/**
+docs/ops/out/**
+RUN_*/**
+**/RUN_*/**
+.codex_runs/**
+Reports/**
+tools/.local_ops/**
+dist/**
+build/**
+node_modules/**
