@@ -18,9 +18,29 @@ import { useVibeMode } from "../context/vibeModeContext";
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
+import SharedTutorDrawerV2, {
+  type TutorMasteryState,
+  type TutorNodeProgress,
+} from "../components/tutor/TutorDrawerV2";
 import { MENTOR_ENDPOINT } from "../ai/aiClient";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
+import { navigateToPractice } from "../navigation/practiceNavigation";
+import {
+  ensureTrianglesMasterySnapshot,
+  getMasteryCounts,
+  getNodeMasteryRecord,
+  getNodeMasteryState,
+  loadTrianglesMasterySnapshot,
+  markNodeLearning,
+  pickWeakestNodeId,
+  saveTrianglesMasterySnapshot,
+  setLastGrindNodeId,
+  setLastTutorNodeId,
+  type TopicHubMasterySnapshot,
+  type TopicHubNodeMasteryState,
+  upsertNodeProgress,
+} from "../services/topicHubMastery";
 
 type TeachDiagram = {
   required: boolean;
@@ -435,6 +455,61 @@ function toTutorConceptCard(x: unknown): TutorConceptCard | null {
 
 function toNullableString(x: unknown): string | null {
   return typeof x === "string" ? x : null;
+}
+
+const masteryBadgeMeta: Record<
+  TopicHubNodeMasteryState,
+  { label: string; bg: string; color: string; border: string }
+> = {
+  unseen: {
+    label: "Unseen",
+    bg: "rgba(148,163,184,0.16)",
+    color: "rgba(30,41,59,0.9)",
+    border: "rgba(148,163,184,0.35)",
+  },
+  learning: {
+    label: "Learning",
+    bg: "rgba(59,130,246,0.12)",
+    color: "rgba(30,64,175,0.95)",
+    border: "rgba(59,130,246,0.35)",
+  },
+  checkpoint_passed: {
+    label: "Checkpoint Passed",
+    bg: "rgba(14,165,233,0.12)",
+    color: "rgba(12,74,110,0.95)",
+    border: "rgba(14,165,233,0.35)",
+  },
+  needs_practice: {
+    label: "Needs Practice",
+    bg: "rgba(245,158,11,0.16)",
+    color: "rgba(146,64,14,0.95)",
+    border: "rgba(245,158,11,0.40)",
+  },
+  mastered: {
+    label: "Mastered",
+    bg: "rgba(34,197,94,0.14)",
+    color: "rgba(20,83,45,0.95)",
+    border: "rgba(34,197,94,0.38)",
+  },
+};
+
+function mapGrindNodeToGuidedNodeId(grindNodeId: string): string {
+  const id = String(grindNodeId || "").toUpperCase();
+  if (id.startsWith("B")) return "gBPT";
+  if (id.startsWith("A")) return "gArea";
+  if (id === "S2") return "gAA";
+  if (id === "S3" || id === "S4") return "gCPST";
+  if (id.startsWith("S")) return "gQ1";
+  if (id.startsWith("P")) return "gEnd";
+  return "gQ1";
+}
+
+function toTutorMasteryState(state: TopicHubNodeMasteryState): TutorMasteryState {
+  if (state === "learning") return "learning";
+  if (state === "checkpoint_passed") return "checkpoint_passed";
+  if (state === "needs_practice") return "needs_practice";
+  if (state === "mastered") return "mastered";
+  return "unseen";
 }
 
 
@@ -872,6 +947,57 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const currentTutorNode = currentTutorNodeId ? guidedNodeById.get(currentTutorNodeId) : null;
   const currentTutorCore = currentTutorNodeId ? guidedCoreByNodeId[currentTutorNodeId] : null;
   const currentTutorCoreId = currentTutorNodeId ? guidedCoreIdByNodeId[currentTutorNodeId] : null;
+  const [trianglesMastery, setTrianglesMastery] = useState<TopicHubMasterySnapshot>(() =>
+    loadTrianglesMasterySnapshot()
+  );
+
+  const updateTrianglesMastery = useCallback(
+    (updater: (prev: TopicHubMasterySnapshot) => TopicHubMasterySnapshot) => {
+      if (!isTrianglesTopic) return;
+      setTrianglesMastery((prev) => {
+        const base = ensureTrianglesMasterySnapshot(prev);
+        const next = ensureTrianglesMasterySnapshot(updater(base));
+        saveTrianglesMasterySnapshot(next);
+        return next;
+      });
+    },
+    [isTrianglesTopic]
+  );
+
+  const tutorNodeMasteryState = useMemo(
+    () => getNodeMasteryState(trianglesMastery, currentTutorNodeId),
+    [trianglesMastery, currentTutorNodeId]
+  );
+  const weakestTutorNodeId = useMemo(
+    () => pickWeakestNodeId(guidedOrder, trianglesMastery),
+    [guidedOrder, trianglesMastery]
+  );
+  const masteryCounts = useMemo(
+    () => getMasteryCounts(guidedOrder, trianglesMastery),
+    [guidedOrder, trianglesMastery]
+  );
+  const weakestResourceNodes = useMemo(() => {
+    const ordered = guidedOrder
+      .map((id) => ({
+        id,
+        rec: getNodeMasteryRecord(trianglesMastery, id),
+        title: guidedNodeTitleById[id] || id,
+      }))
+      .filter((x) => x.id);
+    const rank: Record<TopicHubNodeMasteryState, number> = {
+      unseen: 0,
+      learning: 1,
+      needs_practice: 2,
+      checkpoint_passed: 3,
+      mastered: 4,
+    };
+    ordered.sort((a, b) => {
+      const ra = rank[(a.rec?.state || "unseen") as TopicHubNodeMasteryState];
+      const rb = rank[(b.rec?.state || "unseen") as TopicHubNodeMasteryState];
+      return ra - rb;
+    });
+    return ordered.filter((x) => (x.rec?.state || "unseen") !== "mastered").slice(0, 3);
+  }, [guidedOrder, guidedNodeTitleById, trianglesMastery]);
 
   const defaultGrindNodeId = useMemo(() => {
     const hw = grindMindmap?.highways || [];
@@ -915,13 +1041,47 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     setGrindDrawerOpen(false);
   }, []);
 
+  const setGrindNodeWithMastery = useCallback(
+    (nextNodeId: string) => {
+      const next = String(nextNodeId || "");
+      setGrindNodeId(next);
+      if (!isTrianglesTopic || !next) return;
+      updateTrianglesMastery((prev) => setLastGrindNodeId(prev, next));
+    },
+    [isTrianglesTopic, updateTrianglesMastery]
+  );
+
+  const setTutorNodeIndexWithMastery = useCallback(
+    (idx: number) => {
+      setTutorNodeIndex(idx);
+      const nextNodeId = guidedOrder[idx] || "";
+      if (!isTrianglesTopic || !nextNodeId) return;
+      updateTrianglesMastery((prev) =>
+        setLastTutorNodeId(markNodeLearning(prev, nextNodeId), nextNodeId)
+      );
+    },
+    [guidedOrder, isTrianglesTopic, updateTrianglesMastery]
+  );
+
   const openGrindDrawer = useCallback(
     (opts?: { nodeId?: string | null }) => {
-      const next = String(opts?.nodeId || grindNodeId || defaultGrindNodeId || "");
-      setGrindNodeId(next);
+      const next = String(
+        opts?.nodeId ||
+          (isTrianglesTopic ? trianglesMastery.lastGrindNodeId : "") ||
+          grindNodeId ||
+          defaultGrindNodeId ||
+          ""
+      );
+      setGrindNodeWithMastery(next);
       setGrindDrawerOpen(true);
     },
-    [defaultGrindNodeId, grindNodeId]
+    [
+      defaultGrindNodeId,
+      grindNodeId,
+      isTrianglesTopic,
+      setGrindNodeWithMastery,
+      trianglesMastery.lastGrindNodeId,
+    ]
   );
 
 
@@ -937,12 +1097,35 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const openTutorDrawer = useCallback(
     (opts?: { tab?: TutorTab; nodeId?: string | null }) => {
       const nextTab = opts?.tab || "teach";
-      const nodeIndex = resolveTutorNodeIndex(opts?.nodeId || currentTutorNodeId);
+      const requestedNodeId =
+        opts?.nodeId ||
+        (isTrianglesTopic
+          ? trianglesMastery.lastTutorNodeId || weakestTutorNodeId
+          : "") ||
+        currentTutorNodeId ||
+        guidedOrder[0] ||
+        "";
+      const nodeIndex = resolveTutorNodeIndex(requestedNodeId);
+      const resolvedNodeId = guidedOrder[nodeIndex] || requestedNodeId;
       setTutorTab(nextTab);
-      setTutorNodeIndex(nodeIndex);
+      setTutorNodeIndexWithMastery(nodeIndex);
       setTutorDrawerOpen(true);
+      if (isTrianglesTopic && resolvedNodeId) {
+        updateTrianglesMastery((prev) =>
+          setLastTutorNodeId(markNodeLearning(prev, resolvedNodeId), resolvedNodeId)
+        );
+      }
     },
-    [currentTutorNodeId, resolveTutorNodeIndex]
+    [
+      currentTutorNodeId,
+      guidedOrder,
+      isTrianglesTopic,
+      resolveTutorNodeIndex,
+      setTutorNodeIndexWithMastery,
+      trianglesMastery.lastTutorNodeId,
+      updateTrianglesMastery,
+      weakestTutorNodeId,
+    ]
   );
 
 const showInZombie = (sectionId: string) => {
@@ -953,6 +1136,41 @@ const showInZombie = (sectionId: string) => {
   const isLearn = activeTab === 'learn';
   const isGrind = activeTab === 'grind';
   const isResources = activeTab === 'resources';
+
+  const openPracticeFromTopicHub = useCallback(
+    (opts: { nodeId?: string; tab?: TopicTabKey; subtopicHint?: string }) => {
+      const nodeId = String(opts.nodeId || "").trim();
+      const nodeTitle = nodeId ? guidedNodeTitleById[nodeId] || nodeId : "";
+      const fallbackHint = nodeId && nodeTitle ? `${nodeId}:${nodeTitle}` : nodeId || undefined;
+      const backTab = opts.tab || activeTab;
+      navigateToPractice(navigate, {
+        grade,
+        subject: subjectTitle,
+        topicKey,
+        topicName: title,
+        backPath: `/topic-hub/${grade}/${subject}/${topicKey}?tab=${backTab}`,
+        backLabel: "Back to TopicHub",
+        subtopicHint: opts.subtopicHint || fallbackHint,
+      });
+    },
+    [activeTab, grade, guidedNodeTitleById, navigate, subject, subjectTitle, title, topicKey]
+  );
+
+  const onTutorNodeProgress = useCallback(
+    (progress: TutorNodeProgress) => {
+      if (!isTrianglesTopic || !progress?.nodeId) return;
+      updateTrianglesMastery((prev) => {
+        let next = upsertNodeProgress(prev, progress.nodeId, {
+          score: progress.score,
+          band: progress.band,
+          status: progress.status,
+        });
+        next = setLastTutorNodeId(next, progress.nodeId);
+        return next;
+      });
+    },
+    [isTrianglesTopic, updateTrianglesMastery]
+  );
 
   const tabButtonStyle = (active: boolean) => ({
     padding: '8px 12px',
@@ -1124,11 +1342,15 @@ const showInZombie = (sectionId: string) => {
                 <div style={{ fontSize: 13, opacity: 0.75 }}>
                   Start from basics and move step-by-step with the guided mindmap.
                 </div>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>
+                  Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
+                  {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoint passed
+                </div>
               </div>
               <button
                 type="button"
                 className="pill"
-                onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
+                onClick={() => openTutorDrawer({ tab: "teach" })}
               >
                 Let me teach you
               </button>
@@ -1247,6 +1469,10 @@ Use CBSE exam language and include a labelled diagram.`,
                     if (!node?.id) return;
                     openTutorDrawer({ tab: "teach", nodeId: node.id });
                   }}
+                  getNodeMasteryState={(nodeId) => getNodeMasteryState(trianglesMastery, nodeId)}
+                  onPracticeNode={(nodeId) =>
+                    openPracticeFromTopicHub({ nodeId, tab: "learn" })
+                  }
                 />
               </AccordionCard>
             ) : null}
@@ -1478,11 +1704,18 @@ Use CBSE exam language and include a labelled diagram.`,
               <button
                 type="button"
                 className="pill"
-                onClick={() =>
+                onClick={() => {
+                  if (isTrianglesTopic) {
+                    openPracticeFromTopicHub({
+                      tab: "learn",
+                      subtopicHint: `pattern:${String(exampleSection)}`,
+                    });
+                    return;
+                  }
                   navigate(`/practice/${grade}/${subjectRoute}?${qs}`, {
                     state: { topicKey, sectionFilter: exampleSection },
-                  })
-                }
+                  });
+                }}
                 title="Go to Practice page filtered to this Board pattern"
               >
                 Practice this type ?
@@ -1733,6 +1966,74 @@ Use CBSE exam language and include a labelled diagram.`,
 
           {isResources && (
             <>
+              {isTrianglesTopic ? (
+                <AccordionCard id="resources-recommended" title="Recommended next resources" defaultOpen>
+                  {weakestResourceNodes.length ? (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {weakestResourceNodes.map((item) => {
+                        const state = (item.rec?.state || "unseen") as TopicHubNodeMasteryState;
+                        const badge = masteryBadgeMeta[state];
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              borderRadius: 14,
+                              padding: "12px 12px",
+                              border: "1px solid rgba(0,0,0,0.08)",
+                              background: "rgba(0,0,0,0.02)",
+                            }}
+                          >
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <div style={{ fontWeight: 900 }}>{item.title}</div>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  background: badge.bg,
+                                  color: badge.color,
+                                  border: `1px solid ${badge.border}`,
+                                }}
+                              >
+                                {badge.label}
+                              </span>
+                            </div>
+                            <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="pill"
+                                style={{ padding: "7px 10px", fontSize: 13 }}
+                                onClick={() => openTutorDrawer({ tab: "teach", nodeId: item.id })}
+                              >
+                                Teach this
+                              </button>
+                              <button
+                                type="button"
+                                className="pill"
+                                style={{ padding: "7px 10px", fontSize: 13 }}
+                                onClick={() =>
+                                  openPracticeFromTopicHub({
+                                    nodeId: item.id,
+                                    tab: "resources",
+                                  })
+                                }
+                              >
+                                Practice this
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, opacity: 0.8 }}>
+                      Great work. All guided nodes are mastered.
+                    </div>
+                  )}
+                </AccordionCard>
+              ) : null}
+
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
                   Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
@@ -1908,19 +2209,34 @@ Use CBSE exam language and include a labelled diagram.`,
         onClose={closeGrindDrawer}
         mindmap={grindMindmap}
         nodeId={grindNodeId || defaultGrindNodeId}
-        setNodeId={setGrindNodeId}
+        setNodeId={setGrindNodeWithMastery}
         grade={grade}
         subjectTitle={subjectTitle}
         topicKey={topicKey}
         mode={mode}
+        getNodeMasteryState={(grindId) =>
+          getNodeMasteryState(trianglesMastery, mapGrindNodeToGuidedNodeId(grindId))
+        }
+        onPracticeNode={(grindId) =>
+          openPracticeFromTopicHub({
+            nodeId: mapGrindNodeToGuidedNodeId(grindId),
+            tab: "grind",
+            subtopicHint: `grind:${String(grindId)}`,
+          })
+        }
+        onOpenTutorNode={(grindId) => {
+          const guidedId = mapGrindNodeToGuidedNodeId(grindId);
+          setActiveTab("learn");
+          openTutorDrawer({ tab: "teach", nodeId: guidedId });
+        }}
       />
-      <TutorDrawerV2
+      <SharedTutorDrawerV2
         open={tutorDrawerOpen && isTrianglesTopic}
         onClose={closeTutorDrawer}
         tab={tutorTab}
         setTab={setTutorTab}
         nodeIndex={tutorNodeIndex}
-        setNodeIndex={setTutorNodeIndex}
+        setNodeIndex={setTutorNodeIndexWithMastery}
         nodeId={currentTutorNodeId}
         node={currentTutorNode ? { title: String(currentTutorNode.title), text: currentTutorNode.text } : null}
         core={toTutorConceptCard(currentTutorCore)}
@@ -1931,6 +2247,14 @@ Use CBSE exam language and include a labelled diagram.`,
         subjectTitle={subjectTitle}
         topicKey={topicKey}
         mode={mode}
+        nodeMasteryState={toTutorMasteryState(tutorNodeMasteryState)}
+        onNodeProgress={onTutorNodeProgress}
+        onPracticeThisNode={(nodeId) =>
+          openPracticeFromTopicHub({
+            nodeId,
+            tab: "learn",
+          })
+        }
       />
           <MentorSolveDrawer
         open={mentorDrawerOpen}
@@ -1948,7 +2272,7 @@ Use CBSE exam language and include a labelled diagram.`,
 }
 
 
-function TutorDrawerV2(props: {
+export function TutorDrawerV2(props: {
   open: boolean;
   onClose: () => void;
   tab: TutorTab;
@@ -2503,7 +2827,7 @@ function TutorDrawerV2(props: {
   const handleNextConcept = () => {
     if (actionsDisabled) return;
     const next = Math.min(nodeIndex + 1, Math.max(0, order.length - 1));
-    if (next !== nodeIndex) goToNodeIndex(next, "next_concept");
+    if (next !== nodeIndex) goToNodeIndex(next);
   };
 
   const renderTeach = () => {
@@ -2815,7 +3139,7 @@ function TutorDrawerV2(props: {
           <button
             type="button"
             className="pill"
-            onClick={() => goToNodeIndex(0, "start_from_basics")}
+            onClick={() => goToNodeIndex(0)}
             disabled={nodeIndex === 0 || actionsDisabled}
           >
             Start from basics
@@ -2830,7 +3154,7 @@ function TutorDrawerV2(props: {
           </button>
           <select
             value={nodeId || ""}
-            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value), "node_select")}
+            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value))}
             style={{
               borderRadius: 999,
               padding: "6px 10px",
@@ -4318,8 +4642,10 @@ function GuidedMindmapPanel(props: {
     core?: { title: string; means: string; when: string[]; exam: string; trap: string };
     coreId?: string;
   }) => void;
+  getNodeMasteryState?: (nodeId: string) => TopicHubNodeMasteryState;
+  onPracticeNode?: (nodeId: string) => void;
 }) {
-  const { data, onAskMentor } = props;
+  const { data, onAskMentor, getNodeMasteryState, onPracticeNode } = props;
   const nodes = useMemo(() => data.nodes || [], [data.nodes]);
   const [viewMode, setViewMode] = useState<"beginner" | "exam">("beginner");
   const [searchText, setSearchText] = useState("");
@@ -4433,9 +4759,28 @@ function GuidedMindmapPanel(props: {
       <div>
         <div style={{ fontWeight: 900, marginBottom: 8 }}>Recommended order</div>
         <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
-          {orderedNodes.map((n) => (
-            <li key={n.id}>{n.title}</li>
-          ))}
+          {orderedNodes.map((n) => {
+            const masteryState = getNodeMasteryState ? getNodeMasteryState(String(n.id)) : "unseen";
+            const badge = masteryBadgeMeta[masteryState];
+            return (
+              <li key={n.id}>
+                <span>{n.title}</span>{" "}
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    padding: "2px 7px",
+                    borderRadius: 999,
+                    background: badge.bg,
+                    color: badge.color,
+                    border: `1px solid ${badge.border}`,
+                  }}
+                >
+                  {badge.label}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </div>
 
@@ -4450,6 +4795,8 @@ function GuidedMindmapPanel(props: {
           const isActive = n.id === selectedId;
           const isGuided = guidedIdSet.has(String(n.id));
           const isMatch = searchTerm ? matchesSearch(n) : false;
+          const masteryState = getNodeMasteryState ? getNodeMasteryState(String(n.id)) : "unseen";
+          const badge = masteryBadgeMeta[masteryState];
           return (
             <button
               key={n.id}
@@ -4464,6 +4811,20 @@ function GuidedMindmapPanel(props: {
               title={n.type}
             >
               {n.title}
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  padding: "1px 6px",
+                  borderRadius: 999,
+                  background: badge.bg,
+                  color: badge.color,
+                  border: `1px solid ${badge.border}`,
+                }}
+              >
+                {badge.label}
+              </span>
             </button>
           );
         })}
@@ -4477,7 +4838,36 @@ function GuidedMindmapPanel(props: {
           background: "rgba(0,0,0,0.02)",
         }}
       >
-        <div style={{ fontWeight: 950, marginBottom: 6 }}>{selected?.title || "Select a node"}</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+          <div style={{ fontWeight: 950 }}>{selected?.title || "Select a node"}</div>
+          {selected ? (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                padding: "3px 8px",
+                borderRadius: 999,
+                background: masteryBadgeMeta[
+                  getNodeMasteryState ? getNodeMasteryState(String(selected.id)) : "unseen"
+                ].bg,
+                color: masteryBadgeMeta[
+                  getNodeMasteryState ? getNodeMasteryState(String(selected.id)) : "unseen"
+                ].color,
+                border: `1px solid ${
+                  masteryBadgeMeta[
+                    getNodeMasteryState ? getNodeMasteryState(String(selected.id)) : "unseen"
+                  ].border
+                }`,
+              }}
+            >
+              {
+                masteryBadgeMeta[
+                  getNodeMasteryState ? getNodeMasteryState(String(selected.id)) : "unseen"
+                ].label
+              }
+            </span>
+          ) : null}
+        </div>
         {core ? (
           <div style={{ display: "grid", gap: 8, fontSize: 14, lineHeight: 1.55 }}>
             <div>
@@ -4505,23 +4895,34 @@ function GuidedMindmapPanel(props: {
         ) : (
           <div style={{ opacity: 0.7 }}>Select a node to view details.</div>
         )}
-        {selected && onAskMentor ? (
-          <div style={{ marginTop: 10 }}>
+        {selected && (onAskMentor || onPracticeNode) ? (
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
               className="pill"
               style={{ padding: "7px 10px", fontSize: 13 }}
-              onClick={() =>
+              disabled={!onAskMentor}
+              onClick={() => {
+                if (!onAskMentor) return;
                 onAskMentor({
                   id: String(selected.id),
                   title: selected.title,
                   text: selected.text,
                   core,
                   coreId,
-                })
-              }
+                });
+              }}
             >
               Teach from this node ?
+            </button>
+            <button
+              type="button"
+              className="pill"
+              style={{ padding: "7px 10px", fontSize: 13 }}
+              disabled={!onPracticeNode}
+              onClick={() => onPracticeNode?.(String(selected.id))}
+            >
+              Practice this node
             </button>
           </div>
         ) : null}
@@ -4552,12 +4953,29 @@ function GrindDrawerV1(props: {
   subjectTitle: string;
   topicKey: string;
   mode: ModeKey;
+  getNodeMasteryState?: (grindNodeId: string) => TopicHubNodeMasteryState;
+  onPracticeNode?: (grindNodeId: string) => void;
+  onOpenTutorNode?: (grindNodeId: string) => void;
 }) {
-  const { open, onClose, mindmap, nodeId, setNodeId, grade, subjectTitle, topicKey } = props;
+  const {
+    open,
+    onClose,
+    mindmap,
+    nodeId,
+    setNodeId,
+    grade,
+    subjectTitle,
+    topicKey,
+    getNodeMasteryState,
+    onPracticeNode,
+    onOpenTutorNode,
+  } = props;
 
   const nodesById: Record<string, any> = mindmap?.nodesById || {};
   const highways: any[] = Array.isArray(mindmap?.highways) ? mindmap.highways : [];
   const activeNode = nodesById[nodeId] || null;
+  const activeMasteryState = getNodeMasteryState ? getNodeMasteryState(String(nodeId || "")) : "unseen";
+  const activeMasteryBadge = masteryBadgeMeta[activeMasteryState];
 
   const [doubtInput, setDoubtInput] = useState("");
   const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
@@ -4791,6 +5209,8 @@ function GrindDrawerV1(props: {
                     {order.map((id: string) => {
                       const n = nodesById[id];
                       const active = String(id) === String(nodeId);
+                      const masteryState = getNodeMasteryState ? getNodeMasteryState(String(id)) : "unseen";
+                      const badge = masteryBadgeMeta[masteryState];
                       return (
                         <button
                           key={id}
@@ -4805,7 +5225,22 @@ function GrindDrawerV1(props: {
                             cursor: 'pointer',
                           }}
                         >
-                          <div style={{ fontWeight: 900, fontSize: 13 }}>{String(n?.title || id)}</div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            <div style={{ fontWeight: 900, fontSize: 13 }}>{String(n?.title || id)}</div>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 900,
+                                padding: "1px 6px",
+                                borderRadius: 999,
+                                background: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                          </div>
                           <div style={{ fontSize: 12, opacity: 0.72, marginTop: 2 }}>
                             Weight {String(n?.examWeight || '')} • {String(n?.difficulty || '')}
                           </div>
@@ -4839,6 +5274,39 @@ function GrindDrawerV1(props: {
                           Types: {activeNode.questionTypes.join(', ')}
                         </span>
                       ) : null}
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 900,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: activeMasteryBadge.bg,
+                          color: activeMasteryBadge.color,
+                          border: `1px solid ${activeMasteryBadge.border}`,
+                        }}
+                      >
+                        {activeMasteryBadge.label}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="pill"
+                        style={{ padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => onPracticeNode?.(String(nodeId))}
+                        disabled={!onPracticeNode}
+                      >
+                        Practice this node
+                      </button>
+                      <button
+                        type="button"
+                        className="pill"
+                        style={{ padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => onOpenTutorNode?.(String(nodeId))}
+                        disabled={!onOpenTutorNode}
+                      >
+                        Teach this node
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -5046,12 +5514,49 @@ function GrindDrawerV1(props: {
                               <div style={contractSectionStyle}>
                                 <div style={{ fontWeight: 900 }}>Next</div>
                                 <div style={{ marginTop: 8, fontSize: 13 }}>
+                                  {(() => {
+                                    const recommendedNodeId = String(
+                                      trianglesContract.next.recommendedNodeId || ""
+                                    ).trim();
+                                    const hasRecommendedNode =
+                                      Boolean(recommendedNodeId) && Boolean(nodesById[recommendedNodeId]);
+                                    return (
+                                      <>
                                   <div>
                                     Recommended node: {String(trianglesContract.next.recommendedNodeId || 'Unknown')}
                                   </div>
                                   <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
                                     Reason: {String(trianglesContract.next.reason || 'No reason provided')}
                                   </div>
+                                        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                          <button
+                                            type="button"
+                                            className="pill"
+                                            style={{ padding: "7px 10px", fontSize: 13 }}
+                                            disabled={!hasRecommendedNode}
+                                            onClick={() => {
+                                              if (!hasRecommendedNode) return;
+                                              setNodeId(recommendedNodeId);
+                                            }}
+                                          >
+                                            Jump to recommended node
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="pill"
+                                            style={{ padding: "7px 10px", fontSize: 13 }}
+                                            disabled={!hasRecommendedNode || !onOpenTutorNode}
+                                            onClick={() => {
+                                              if (!hasRecommendedNode || !onOpenTutorNode) return;
+                                              onOpenTutorNode(recommendedNodeId);
+                                            }}
+                                          >
+                                            Teach recommended
+                                          </button>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             ) : null}

@@ -10,6 +10,22 @@ import type { MentorDiagramSpec, MentorStructured, TutorBlock } from "../../type
 
 type ModeKey = "zombie" | "beast";
 type TutorTab = "teach" | "examples";
+export type TutorMasteryState =
+  | "unseen"
+  | "learning"
+  | "checkpoint_passed"
+  | "needs_practice"
+  | "mastered";
+
+export type TutorNodeProgress = {
+  nodeId: string;
+  tab: TutorTab;
+  masteryState: TutorMasteryState;
+  score?: number;
+  band?: string;
+  status?: string;
+  source: "attempt_loop";
+};
 
 const getTutorObject = (structured?: MentorStructured | null): TutorBlock | null => {
   const tutor = structured?.tutor;
@@ -63,6 +79,51 @@ const getResponseText = (payload: unknown): string => {
   return dataBlock && typeof dataBlock.text === "string" ? dataBlock.text : "";
 };
 
+const deriveMasteryState = (status: string, score: number): TutorMasteryState => {
+  const norm = String(status || "").toLowerCase();
+  if (norm === "correct" || (Number.isFinite(score) && score >= 70)) return "mastered";
+  if (norm === "partially_correct" || (Number.isFinite(score) && score >= 50)) {
+    return "checkpoint_passed";
+  }
+  return "needs_practice";
+};
+
+const masteryMeta: Record<
+  TutorMasteryState,
+  { label: string; bg: string; color: string; border: string }
+> = {
+  unseen: {
+    label: "Unseen",
+    bg: "rgba(148,163,184,0.16)",
+    color: "rgba(30,41,59,0.9)",
+    border: "rgba(148,163,184,0.35)",
+  },
+  learning: {
+    label: "Learning",
+    bg: "rgba(59,130,246,0.12)",
+    color: "rgba(30,64,175,0.95)",
+    border: "rgba(59,130,246,0.35)",
+  },
+  checkpoint_passed: {
+    label: "Checkpoint Passed",
+    bg: "rgba(14,165,233,0.12)",
+    color: "rgba(12,74,110,0.95)",
+    border: "rgba(14,165,233,0.35)",
+  },
+  needs_practice: {
+    label: "Needs Practice",
+    bg: "rgba(245,158,11,0.16)",
+    color: "rgba(146,64,14,0.95)",
+    border: "rgba(245,158,11,0.40)",
+  },
+  mastered: {
+    label: "Mastered",
+    bg: "rgba(34,197,94,0.14)",
+    color: "rgba(20,83,45,0.95)",
+    border: "rgba(34,197,94,0.38)",
+  },
+};
+
 type TutorResponseEntry = {
   structured?: MentorStructured;
   diagramType?: string;
@@ -71,7 +132,7 @@ type TutorResponseEntry = {
   responseId?: string;
   summary?: string;
 };
-export default function TutorDrawerV2(props: {
+type TutorDrawerProps = {
   open: boolean;
   onClose: () => void;
   tab: TutorTab;
@@ -88,7 +149,12 @@ export default function TutorDrawerV2(props: {
   subjectTitle: string;
   topicKey: string;
   mode: ModeKey;
-}) {
+  nodeMasteryState?: TutorMasteryState;
+  onNodeProgress?: (progress: TutorNodeProgress) => void;
+  onPracticeThisNode?: (nodeId: string) => void;
+};
+
+export default function TutorDrawerV2(props: TutorDrawerProps) {
   const {
     open,
     onClose,
@@ -106,6 +172,9 @@ export default function TutorDrawerV2(props: {
     subjectTitle,
     topicKey,
     mode,
+    nodeMasteryState = "unseen",
+    onNodeProgress,
+    onPracticeThisNode,
   } = props;
 
   const [responses, setResponses] = useState<Record<string, TutorResponseEntry>>({});
@@ -123,10 +192,12 @@ export default function TutorDrawerV2(props: {
   const [coachHintLoading, setCoachHintLoading] = useState(false);
   const [coachHintWarning, setCoachHintWarning] = useState<string | null>(null);
   const [coachHintFallback, setCoachHintFallback] = useState(false);
+  const [showSoftGateWarning, setShowSoftGateWarning] = useState(false);
   const [hintVariant] = useState(() => getHintVariant());
   const isDev = Boolean(import.meta?.env?.DEV);
   const abortRef = useRef<AbortController | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
+  const lastProgressRef = useRef<string>("");
 
   const nodeTitle = String(node?.title || "Concept");
   const nodeText = String(node?.text || core?.means || "");
@@ -145,6 +216,42 @@ export default function TutorDrawerV2(props: {
   const currentResponse = currentKey ? responses[currentKey] : null;
   const currentError = currentKey ? errors[currentKey] : null;
   const isLoading = loadingKey === currentKey;
+  const canAdvanceWithoutWarning =
+    nodeMasteryState === "checkpoint_passed" || nodeMasteryState === "mastered";
+
+  useEffect(() => {
+    if (!nodeId || !onNodeProgress) return;
+    const structured = currentResponse?.structured;
+    if (!isRecord(structured)) return;
+    const loop = isRecord(structured.attempt_loop) ? structured.attempt_loop : null;
+    if (!loop) return;
+    const diagnosis = isRecord(loop.diagnosis) ? loop.diagnosis : null;
+    const rubric = isRecord(loop.rubric) ? loop.rubric : null;
+    const status = asString(diagnosis?.status);
+    const scoreRaw = Number(rubric?.total_score);
+    const score = Number.isFinite(scoreRaw) ? scoreRaw : Number.NaN;
+    const band = asString(rubric?.band);
+    const masteryState = deriveMasteryState(status, score);
+    const dedupeKey = [
+      nodeId,
+      tab,
+      masteryState,
+      Number.isFinite(score) ? String(score) : "",
+      status,
+      band,
+    ].join("|");
+    if (lastProgressRef.current === dedupeKey) return;
+    lastProgressRef.current = dedupeKey;
+    onNodeProgress({
+      nodeId,
+      tab,
+      masteryState,
+      score: Number.isFinite(score) ? score : undefined,
+      band: band || undefined,
+      status: status || undefined,
+      source: "attempt_loop",
+    });
+  }, [nodeId, tab, currentResponse, onNodeProgress]);
 
   const cancelInFlight = useCallback(() => {
     if (abortRef.current) {
@@ -448,6 +555,7 @@ export default function TutorDrawerV2(props: {
     setDoubtAnswer(null);
     setDoubtError(null);
     setDoubtInput("");
+    setShowSoftGateWarning(false);
     setFeedbackChoice(null);
     setFeedbackText("");
     setFeedbackStatus("idle");
@@ -455,6 +563,7 @@ export default function TutorDrawerV2(props: {
     setCoachHintWarning(null);
     setCoachHintLoading(false);
     setCoachHintFallback(false);
+    lastProgressRef.current = "";
   }, [tab, nodeId]);
 
   useEffect(() => {
@@ -484,11 +593,16 @@ export default function TutorDrawerV2(props: {
   const goToNodeIndex = (idx: number) => {
     if (idx < 0 || idx >= order.length) return;
     cancelInFlight();
+    setShowSoftGateWarning(false);
     setNodeIndex(idx);
   };
 
-  const handleNextConcept = () => {
+  const handleNextConcept = (force = false) => {
     const next = Math.min(nodeIndex + 1, Math.max(0, order.length - 1));
+    if (!force && !canAdvanceWithoutWarning) {
+      setShowSoftGateWarning(true);
+      return;
+    }
     if (next !== nodeIndex) goToNodeIndex(next);
   };
 
@@ -715,10 +829,21 @@ export default function TutorDrawerV2(props: {
           <button
             type="button"
             className="pill"
-            onClick={handleNextConcept}
+            onClick={() => handleNextConcept()}
             disabled={nodeIndex >= order.length - 1}
           >
             Continue
+          </button>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => {
+              if (!nodeId || !onPracticeThisNode) return;
+              onPracticeThisNode(nodeId);
+            }}
+            disabled={!nodeId || !onPracticeThisNode}
+          >
+            Practice this node
           </button>
           <button
             type="button"
@@ -873,6 +998,10 @@ export default function TutorDrawerV2(props: {
     return tab === "teach" ? renderTeach() : renderExamples();
   };
 
+  const inputPlaceholder =
+    tab === "teach" ? "Answer checkpoint or ask a doubt..." : "Ask a doubt about this step...";
+  const sendButtonLabel = tab === "teach" ? "Submit" : "Send";
+
   return (
     <div
       style={{
@@ -901,6 +1030,19 @@ export default function TutorDrawerV2(props: {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor</div>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: masteryMeta[nodeMasteryState].bg,
+              color: masteryMeta[nodeMasteryState].color,
+              border: `1px solid ${masteryMeta[nodeMasteryState].border}`,
+            }}
+          >
+            {masteryMeta[nodeMasteryState].label}
+          </span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
               type="button"
@@ -934,6 +1076,56 @@ export default function TutorDrawerV2(props: {
           You're learning: <b>{nodeTitle}</b> - Step {nodeIndex + 1} of {Math.max(1, order.length)}
         </div>
 
+        {showSoftGateWarning ? (
+          <div
+            style={{
+              marginTop: 10,
+              borderRadius: 12,
+              padding: "10px 12px",
+              border: "1px solid rgba(245,158,11,0.45)",
+              background: "rgba(245,158,11,0.12)",
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>Checkpoint not yet passed for this node.</div>
+            <div style={{ marginTop: 4, fontSize: 13, opacity: 0.88 }}>
+              You can still continue, but mastery will improve faster if you checkpoint first.
+            </div>
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => {
+                  setDoubtInput("Checkpoint attempt: ");
+                  doubtInputRef.current?.focus();
+                }}
+              >
+                Try checkpoint
+              </button>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
+              >
+                Next hint
+              </button>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => {
+                  if (!nodeId || !onPracticeThisNode) return;
+                  onPracticeThisNode(nodeId);
+                }}
+                disabled={!nodeId || !onPracticeThisNode}
+              >
+                Practice this node
+              </button>
+              <button type="button" className="pill" onClick={() => handleNextConcept(true)}>
+                Continue anyway
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -946,7 +1138,7 @@ export default function TutorDrawerV2(props: {
           <button
             type="button"
             className="pill"
-            onClick={handleNextConcept}
+            onClick={() => handleNextConcept()}
             disabled={nodeIndex >= order.length - 1}
           >
             Next concept
@@ -1024,7 +1216,7 @@ export default function TutorDrawerV2(props: {
             ref={doubtInputRef}
             value={doubtInput}
             onChange={(e) => setDoubtInput(e.target.value)}
-            placeholder="Ask a doubt about this step..."
+            placeholder={inputPlaceholder}
             onKeyDown={(e) => {
               if (e.key === "Enter") sendDoubt(doubtInput);
             }}
@@ -1045,7 +1237,7 @@ export default function TutorDrawerV2(props: {
             onClick={() => sendDoubt(doubtInput)}
             disabled={doubtLoading || !doubtInput.trim()}
           >
-            Send
+            {sendButtonLabel}
           </button>
         </div>
 
