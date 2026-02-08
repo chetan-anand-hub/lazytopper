@@ -169,6 +169,14 @@ async function run() {
       expectedTypeContains: "circuit",
     },
     {
+      id: "life_processes",
+      subject: "Science",
+      topicKey: "life-processes",
+      chapter: "life-processes",
+      questionText: "Teach life processes with a labelled biology flow diagram.",
+      expectedTypeContains: "biology_process",
+    },
+    {
       id: "magnetic_effects",
       subject: "Science",
       topicKey: "magnetic-effects-of-electric-current",
