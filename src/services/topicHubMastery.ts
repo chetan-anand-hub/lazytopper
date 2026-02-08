@@ -16,7 +16,7 @@ export interface TopicHubNodeMasteryRecord {
 
 export interface TopicHubMasterySnapshot {
   version: 1;
-  topicKey: "triangles";
+  topicKey: string;
   updatedAt: string;
   lastTutorNodeId?: string;
   lastGrindNodeId?: string;
@@ -30,6 +30,8 @@ export interface TopicHubNodeProgressInput {
 }
 
 const STORAGE_KEY = "lazytopper.topicHub.triangles.mastery.v1";
+const STORAGE_PREFIX = "lazytopper.topicHub";
+const STORAGE_VERSION = 1;
 
 const stateRank: Record<TopicHubNodeMasteryState, number> = {
   unseen: 0,
@@ -70,9 +72,14 @@ function sanitizeNodeRecord(value: unknown): TopicHubNodeMasteryRecord {
 }
 
 export function createEmptyTrianglesMastery(): TopicHubMasterySnapshot {
+  return createEmptyTopicMastery("triangles");
+}
+
+export function createEmptyTopicMastery(topicKey: string): TopicHubMasterySnapshot {
+  const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey);
   return {
-    version: 1,
-    topicKey: "triangles",
+    version: STORAGE_VERSION,
+    topicKey: normalizedTopicKey,
     updatedAt: nowIso(),
     nodes: {},
   };
@@ -81,7 +88,29 @@ export function createEmptyTrianglesMastery(): TopicHubMasterySnapshot {
 export function ensureTrianglesMasterySnapshot(
   value?: TopicHubMasterySnapshot | null
 ): TopicHubMasterySnapshot {
-  if (!value) return createEmptyTrianglesMastery();
+  return ensureTopicMasterySnapshot("triangles", value);
+}
+
+function normalizeTopicKeyForStorage(topicKey: string | null | undefined): string {
+  const cleaned = String(topicKey || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return cleaned || "topic";
+}
+
+function getStorageKeyForTopic(topicKey: string): string {
+  const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey);
+  return `${STORAGE_PREFIX}.${normalizedTopicKey}.mastery.v${STORAGE_VERSION}`;
+}
+
+export function ensureTopicMasterySnapshot(
+  topicKey: string,
+  value?: TopicHubMasterySnapshot | null
+): TopicHubMasterySnapshot {
+  const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey);
+  if (!value) return createEmptyTopicMastery(normalizedTopicKey);
   const nodes: Record<string, TopicHubNodeMasteryRecord> = {};
   const src = isRecord(value.nodes) ? value.nodes : {};
   Object.keys(src).forEach((nodeId) => {
@@ -89,8 +118,8 @@ export function ensureTrianglesMasterySnapshot(
     nodes[String(nodeId)] = sanitizeNodeRecord(src[nodeId]);
   });
   return {
-    version: 1,
-    topicKey: "triangles",
+    version: STORAGE_VERSION,
+    topicKey: normalizedTopicKey,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : nowIso(),
     lastTutorNodeId:
       typeof value.lastTutorNodeId === "string" && value.lastTutorNodeId.trim()
@@ -105,24 +134,46 @@ export function ensureTrianglesMasterySnapshot(
 }
 
 export function loadTrianglesMasterySnapshot(): TopicHubMasterySnapshot {
-  if (typeof window === "undefined") return createEmptyTrianglesMastery();
+  return loadTopicMasterySnapshot("triangles");
+}
+
+export function loadTopicMasterySnapshot(topicKey: string): TopicHubMasterySnapshot {
+  const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey);
+  if (typeof window === "undefined") return createEmptyTopicMastery(normalizedTopicKey);
+  const storageKey = getStorageKeyForTopic(normalizedTopicKey);
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createEmptyTrianglesMastery();
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return createEmptyTopicMastery(normalizedTopicKey);
     const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed)) return createEmptyTrianglesMastery();
-    const snapshot = ensureTrianglesMasterySnapshot(parsed as unknown as TopicHubMasterySnapshot);
-    if (snapshot.topicKey !== "triangles") return createEmptyTrianglesMastery();
+    if (!isRecord(parsed)) return createEmptyTopicMastery(normalizedTopicKey);
+    const snapshot = ensureTopicMasterySnapshot(
+      normalizedTopicKey,
+      parsed as unknown as TopicHubMasterySnapshot
+    );
+    if (snapshot.topicKey !== normalizedTopicKey) return createEmptyTopicMastery(normalizedTopicKey);
     return snapshot;
   } catch {
-    return createEmptyTrianglesMastery();
+    return createEmptyTopicMastery(normalizedTopicKey);
   }
 }
 
 export function saveTrianglesMasterySnapshot(snapshot: TopicHubMasterySnapshot): void {
+  saveTopicMasterySnapshot(snapshot, "triangles");
+}
+
+export function saveTopicMasterySnapshot(
+  snapshot: TopicHubMasterySnapshot,
+  topicKey?: string
+): void {
   if (typeof window === "undefined") return;
+  const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey || snapshot.topicKey);
+  const storageKey = getStorageKeyForTopic(normalizedTopicKey);
+  const ensured = ensureTopicMasterySnapshot(normalizedTopicKey, snapshot);
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    window.localStorage.setItem(storageKey, JSON.stringify(ensured));
+    if (storageKey !== STORAGE_KEY && normalizedTopicKey === "triangles") {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ensured));
+    }
   } catch {
     // Ignore write errors to avoid breaking tutor flow.
   }
@@ -165,7 +216,7 @@ export function markNodeLearning(
 ): TopicHubMasterySnapshot {
   const key = String(nodeId || "").trim();
   if (!key) return snapshot;
-  const next = ensureTrianglesMasterySnapshot(snapshot);
+  const next = ensureTopicMasterySnapshot(snapshot.topicKey, snapshot);
   const prev = getNodeMasteryRecord(next, key);
   const prevAttempts = prev?.attempts ?? 0;
   next.nodes[key] = {
@@ -189,7 +240,7 @@ export function setLastTutorNodeId(
 ): TopicHubMasterySnapshot {
   const key = String(nodeId || "").trim();
   if (!key) return snapshot;
-  const next = ensureTrianglesMasterySnapshot(snapshot);
+  const next = ensureTopicMasterySnapshot(snapshot.topicKey, snapshot);
   next.lastTutorNodeId = key;
   next.updatedAt = nowIso();
   return next;
@@ -201,7 +252,7 @@ export function setLastGrindNodeId(
 ): TopicHubMasterySnapshot {
   const key = String(nodeId || "").trim();
   if (!key) return snapshot;
-  const next = ensureTrianglesMasterySnapshot(snapshot);
+  const next = ensureTopicMasterySnapshot(snapshot.topicKey, snapshot);
   next.lastGrindNodeId = key;
   next.updatedAt = nowIso();
   return next;
@@ -214,7 +265,7 @@ export function upsertNodeProgress(
 ): TopicHubMasterySnapshot {
   const key = String(nodeId || "").trim();
   if (!key) return snapshot;
-  const next = ensureTrianglesMasterySnapshot(snapshot);
+  const next = ensureTopicMasterySnapshot(snapshot.topicKey, snapshot);
   const prev = getNodeMasteryRecord(next, key);
   const score = Number(input.score);
   const state = deriveMasteryStateFromProgress(input);
@@ -236,7 +287,11 @@ export function pickWeakestNodeId(
 ): string {
   const order = Array.isArray(orderedNodeIds) ? orderedNodeIds : [];
   if (!order.length) return "";
-  const snap = ensureTrianglesMasterySnapshot(snapshot || createEmptyTrianglesMastery());
+  const topicKey = snapshot?.topicKey || "triangles";
+  const snap = ensureTopicMasterySnapshot(
+    topicKey,
+    snapshot || createEmptyTopicMastery(topicKey)
+  );
   let bestId = order[0];
   let bestRank = Number.POSITIVE_INFINITY;
   order.forEach((nodeId) => {

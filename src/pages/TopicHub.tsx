@@ -27,14 +27,14 @@ import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
 import { navigateToPractice } from "../navigation/practiceNavigation";
 import {
-  ensureTrianglesMasterySnapshot,
+  ensureTopicMasterySnapshot,
   getMasteryCounts,
   getNodeMasteryRecord,
   getNodeMasteryState,
-  loadTrianglesMasterySnapshot,
+  loadTopicMasterySnapshot,
   markNodeLearning,
   pickWeakestNodeId,
-  saveTrianglesMasterySnapshot,
+  saveTopicMasterySnapshot,
   setLastGrindNodeId,
   setLastTutorNodeId,
   type TopicHubMasterySnapshot,
@@ -69,6 +69,15 @@ function ensureMinList(list: string[], min: number, makeItem: (i: number) => str
   const out = Array.isArray(list) ? list.slice() : [];
   while (out.length < min) out.push(makeItem(out.length));
   return out;
+}
+
+function toSafeNodeId(seed: string, fallback: string): string {
+  const base = String(seed || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return base || fallback;
 }
 
 function inferDiagramTypeFromText(text: string) {
@@ -520,7 +529,6 @@ export default function TopicHub() {
   const grade = String(params.grade || sp.get("grade") || "10");
   const subject = asSubjectKey(String(params.subject || sp.get("subject") || "maths"));
   const subjectTitle = subject === "science" ? "Science" : "Maths";
-  const subjectRoute = String(params.subject || subjectTitle);
 
   // Support both route param and legacy query params.
   const rawTopicKey =
@@ -682,7 +690,10 @@ const isDiagramTopic = useMemo(() => {
   return /triangle|triangles|similar|similarity|circle|construction|quadrilateral|geometry|diagram|fig\.?/i.test(t);
 }, [title, topicKey]);
 
-const isTrianglesTopic = useMemo(() => /triangles/i.test(String(title || "")), [title]);
+const isTrianglesTopic = useMemo(
+  () => /triangles/i.test(`${String(topicKey || "")} ${String(title || "")}`),
+  [title, topicKey]
+);
 
 const proofWritingTemplates = useMemo(() => {
   if (!isTrianglesTopic) return [];
@@ -914,7 +925,6 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const [selectedCompetencyIdx, setSelectedCompetencyIdx] = useState(0);
   useEffect(() => {
     // Keep competency card reset when topic changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedCompetencyIdx(0);
   }, [topicKey]);
 
@@ -925,10 +935,109 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const mindMap = (v2Data as any).mindMap || (v2Data as any).mindmap || null;
   const formulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
   const videos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
-  const guidedMindmap = topicKey === "triangles" ? trianglesGuidedMindmap : null;
-  const grindMindmap = topicKey === "triangles" ? trianglesGrindMindmap : null;
-  const guidedOrder = useMemo(() => guidedMindmap?.recommendedOrder || [], [guidedMindmap]);
-  const guidedNodes = useMemo(() => guidedMindmap?.nodes || [], [guidedMindmap]);
+  const guidedMindmap = isTrianglesTopic ? trianglesGuidedMindmap : null;
+  const grindMindmap = isTrianglesTopic ? trianglesGrindMindmap : null;
+  const fallbackGuidedNodes = useMemo(() => {
+    const out: Array<{
+      id: string;
+      title: string;
+      text: string;
+      type: string;
+      core: { title: string; means: string; when: string[]; exam: string; trap: string };
+      coreId: string;
+    }> = [];
+    const seen = new Set<string>();
+
+    definitions.slice(0, 5).forEach((entry, idx) => {
+      const nodeTitle = String(entry?.title || `Definition ${idx + 1}`).trim();
+      if (!nodeTitle) return;
+      const nodeText =
+        String(entry?.description || entry?.examTip || "").trim() ||
+        `Understand ${nodeTitle} and apply it in Class ${grade} ${subjectTitle} exam writing.`;
+      const id = toSafeNodeId(`def_${topicKey}_${nodeTitle}`, `def_${idx + 1}`);
+      if (seen.has(id)) return;
+      seen.add(id);
+      out.push({
+        id,
+        title: nodeTitle,
+        text: nodeText,
+        type: "concept",
+        core: {
+          title: nodeTitle,
+          means: nodeText,
+          when: [`Use while solving ${title} questions.`],
+          exam:
+            String(entry?.examTip || "").trim() ||
+            `Exam line: define ${nodeTitle} before applying any theorem or formula.`,
+          trap: `Common mistake: using ${nodeTitle} without correct condition or final conclusion.`,
+        },
+        coreId: `core_${id}`,
+      });
+    });
+
+    quickQuiz.slice(0, 2).forEach((item, idx) => {
+      const qTitle = String(item?.title || `Quick check ${idx + 1}`).trim();
+      const qText = String(item?.question || "").trim();
+      if (!qText) return;
+      const id = toSafeNodeId(`quiz_${topicKey}_${qTitle}`, `quiz_${idx + 1}`);
+      if (seen.has(id)) return;
+      seen.add(id);
+      out.push({
+        id,
+        title: qTitle,
+        text: qText,
+        type: "exam",
+        core: {
+          title: qTitle,
+          means: `Use this checkpoint to validate your ${title} understanding.`,
+          when: [`After finishing one micro-lesson in ${title}.`],
+          exam: "Exam line: answer in Given -> To Prove/Find -> Therefore/Hence style.",
+          trap: "Common mistake: writing final answer without theorem/reason.",
+        },
+        coreId: `core_${id}`,
+      });
+    });
+
+    if (!out.length) {
+      const fallbackTitle = `${title} basics`;
+      const fallbackText =
+        String(overview[0] || "").trim() ||
+        `Build one clear concept, one exam line, and one checkpoint for ${title}.`;
+      const id = toSafeNodeId(`intro_${topicKey}`, "intro_1");
+      out.push({
+        id,
+        title: fallbackTitle,
+        text: fallbackText,
+        type: "concept",
+        core: {
+          title: fallbackTitle,
+          means: fallbackText,
+          when: [`Start revision for ${title}.`],
+          exam: "Exam line: write concise steps with explicit reason/theorem.",
+          trap: "Common mistake: jumping to answer without setup.",
+        },
+        coreId: `core_${id}`,
+      });
+    }
+
+    return out.slice(0, 9);
+  }, [definitions, grade, overview, quickQuiz, subjectTitle, title, topicKey]);
+  const guidedOrder = useMemo(() => {
+    const mindmapOrder = guidedMindmap?.recommendedOrder || [];
+    if (mindmapOrder.length) return mindmapOrder.map((id) => String(id));
+    return fallbackGuidedNodes.map((node) => node.id);
+  }, [fallbackGuidedNodes, guidedMindmap]);
+  const guidedNodes = useMemo(() => {
+    const mindmapNodes = guidedMindmap?.nodes || [];
+    if (mindmapNodes.length) return mindmapNodes;
+    return fallbackGuidedNodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      title: node.title,
+      text: node.text,
+      links: [],
+    }));
+  }, [fallbackGuidedNodes, guidedMindmap]);
   const guidedNodeById = useMemo(() => {
     const map = new Map<string, (typeof guidedNodes)[number]>();
     guidedNodes.forEach((n) => map.set(String(n.id), n));
@@ -941,46 +1050,102 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     });
     return out;
   }, [guidedNodes]);
-  const guidedCoreByNodeId: Record<string, unknown> = guidedMindmap?.coreByNodeId || {};
-  const guidedCoreIdByNodeId: Record<string, unknown> = guidedMindmap?.coreIdByNodeId || {};
+  const fallbackCoreByNodeId = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    fallbackGuidedNodes.forEach((node) => {
+      out[node.id] = node.core;
+    });
+    return out;
+  }, [fallbackGuidedNodes]);
+  const fallbackCoreIdByNodeId = useMemo(() => {
+    const out: Record<string, string> = {};
+    fallbackGuidedNodes.forEach((node) => {
+      out[node.id] = node.coreId;
+    });
+    return out;
+  }, [fallbackGuidedNodes]);
+  const guidedCoreByNodeId: Record<string, unknown> = guidedMindmap?.coreByNodeId || fallbackCoreByNodeId;
+  const guidedCoreIdByNodeId: Record<string, unknown> = guidedMindmap?.coreIdByNodeId || fallbackCoreIdByNodeId;
+  const guidedPanelData = useMemo(() => {
+    const nodes = guidedNodes.map((node) => ({
+      id: String(node.id),
+      type: String((node as { type?: string }).type || "concept"),
+      title: String(node.title || node.id),
+      text: node.text,
+      links: Array.isArray((node as { links?: unknown[] }).links)
+        ? ((node as { links?: unknown[] }).links || []).map((x) => String(x))
+        : [],
+    }));
+    const coreByNodeId: Record<
+      string,
+      { title: string; means: string; when: string[]; exam: string; trap: string }
+    > = {};
+    const coreIdByNodeId: Record<string, string> = {};
+    guidedOrder.forEach((id) => {
+      const raw = (guidedCoreByNodeId as Record<string, any>)[id] || {};
+      const titleText = guidedNodeTitleById[id] || id;
+      coreByNodeId[id] = {
+        title: String(raw.title || titleText),
+        means: String(raw.means || raw.text || `Understand ${titleText}.`),
+        when: Array.isArray(raw.when) ? raw.when.map((x: unknown) => String(x)) : [],
+        exam:
+          String(raw.exam || "").trim() ||
+          `Exam line: state the key rule and conclude for ${titleText}.`,
+        trap:
+          String(raw.trap || "").trim() ||
+          "Common mistake: skipping reason/theorem or final conclusion line.",
+      };
+      coreIdByNodeId[id] = String(
+        (guidedCoreIdByNodeId as Record<string, unknown>)[id] || `core_${id}`
+      );
+    });
+    return {
+      recommendedOrder: guidedOrder,
+      nodes,
+      coreByNodeId,
+      coreIdByNodeId,
+    };
+  }, [guidedCoreByNodeId, guidedCoreIdByNodeId, guidedNodeTitleById, guidedNodes, guidedOrder]);
   const currentTutorNodeId = guidedOrder[tutorNodeIndex] || guidedOrder[0];
   const currentTutorNode = currentTutorNodeId ? guidedNodeById.get(currentTutorNodeId) : null;
   const currentTutorCore = currentTutorNodeId ? guidedCoreByNodeId[currentTutorNodeId] : null;
   const currentTutorCoreId = currentTutorNodeId ? guidedCoreIdByNodeId[currentTutorNodeId] : null;
-  const [trianglesMastery, setTrianglesMastery] = useState<TopicHubMasterySnapshot>(() =>
-    loadTrianglesMasterySnapshot()
+  const [topicMastery, setTopicMastery] = useState<TopicHubMasterySnapshot>(() =>
+    loadTopicMasterySnapshot(topicKey)
   );
+  useEffect(() => {
+    setTopicMastery(loadTopicMasterySnapshot(topicKey));
+  }, [topicKey]);
 
-  const updateTrianglesMastery = useCallback(
+  const updateTopicMastery = useCallback(
     (updater: (prev: TopicHubMasterySnapshot) => TopicHubMasterySnapshot) => {
-      if (!isTrianglesTopic) return;
-      setTrianglesMastery((prev) => {
-        const base = ensureTrianglesMasterySnapshot(prev);
-        const next = ensureTrianglesMasterySnapshot(updater(base));
-        saveTrianglesMasterySnapshot(next);
+      setTopicMastery((prev) => {
+        const base = ensureTopicMasterySnapshot(topicKey, prev);
+        const next = ensureTopicMasterySnapshot(topicKey, updater(base));
+        saveTopicMasterySnapshot(next, topicKey);
         return next;
       });
     },
-    [isTrianglesTopic]
+    [topicKey]
   );
 
   const tutorNodeMasteryState = useMemo(
-    () => getNodeMasteryState(trianglesMastery, currentTutorNodeId),
-    [trianglesMastery, currentTutorNodeId]
+    () => getNodeMasteryState(topicMastery, currentTutorNodeId),
+    [topicMastery, currentTutorNodeId]
   );
   const weakestTutorNodeId = useMemo(
-    () => pickWeakestNodeId(guidedOrder, trianglesMastery),
-    [guidedOrder, trianglesMastery]
+    () => pickWeakestNodeId(guidedOrder, topicMastery),
+    [guidedOrder, topicMastery]
   );
   const masteryCounts = useMemo(
-    () => getMasteryCounts(guidedOrder, trianglesMastery),
-    [guidedOrder, trianglesMastery]
+    () => getMasteryCounts(guidedOrder, topicMastery),
+    [guidedOrder, topicMastery]
   );
   const weakestResourceNodes = useMemo(() => {
     const ordered = guidedOrder
       .map((id) => ({
         id,
-        rec: getNodeMasteryRecord(trianglesMastery, id),
+        rec: getNodeMasteryRecord(topicMastery, id),
         title: guidedNodeTitleById[id] || id,
       }))
       .filter((x) => x.id);
@@ -997,12 +1162,12 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       return ra - rb;
     });
     return ordered.filter((x) => (x.rec?.state || "unseen") !== "mastered").slice(0, 3);
-  }, [guidedOrder, guidedNodeTitleById, trianglesMastery]);
+  }, [guidedOrder, guidedNodeTitleById, topicMastery]);
   const revisionCockpitNodes = useMemo(() => {
     const fallback = guidedOrder.slice(0, 3).map((id) => ({
       id,
       title: guidedNodeTitleById[id] || id,
-      state: getNodeMasteryState(trianglesMastery, id),
+      state: getNodeMasteryState(topicMastery, id),
     }));
     const fromWeakest = weakestResourceNodes.map((item) => ({
       id: item.id,
@@ -1017,7 +1182,7 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       return true;
     });
     return unique.slice(0, 3);
-  }, [guidedOrder, guidedNodeTitleById, trianglesMastery, weakestResourceNodes]);
+  }, [guidedOrder, guidedNodeTitleById, topicMastery, weakestResourceNodes]);
   const weakestProgressionHints = useMemo(() => {
     if (!revisionCockpitNodes.length) {
       return [
@@ -1063,7 +1228,6 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   useEffect(() => {
     if (!grindMindmap) {
       // Keep drawer state aligned when grind data is unavailable.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGrindDrawerOpen(false);
       setGrindNodeId("");
       return;
@@ -1096,29 +1260,29 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     (nextNodeId: string) => {
       const next = String(nextNodeId || "");
       setGrindNodeId(next);
-      if (!isTrianglesTopic || !next) return;
-      updateTrianglesMastery((prev) => setLastGrindNodeId(prev, next));
+      if (!next) return;
+      updateTopicMastery((prev) => setLastGrindNodeId(prev, next));
     },
-    [isTrianglesTopic, updateTrianglesMastery]
+    [updateTopicMastery]
   );
 
   const setTutorNodeIndexWithMastery = useCallback(
     (idx: number) => {
       setTutorNodeIndex(idx);
       const nextNodeId = guidedOrder[idx] || "";
-      if (!isTrianglesTopic || !nextNodeId) return;
-      updateTrianglesMastery((prev) =>
+      if (!nextNodeId) return;
+      updateTopicMastery((prev) =>
         setLastTutorNodeId(markNodeLearning(prev, nextNodeId), nextNodeId)
       );
     },
-    [guidedOrder, isTrianglesTopic, updateTrianglesMastery]
+    [guidedOrder, updateTopicMastery]
   );
 
   const openGrindDrawer = useCallback(
     (opts?: { nodeId?: string | null }) => {
       const next = String(
         opts?.nodeId ||
-          (isTrianglesTopic ? trianglesMastery.lastGrindNodeId : "") ||
+          topicMastery.lastGrindNodeId ||
           grindNodeId ||
           defaultGrindNodeId ||
           ""
@@ -1129,9 +1293,8 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     [
       defaultGrindNodeId,
       grindNodeId,
-      isTrianglesTopic,
       setGrindNodeWithMastery,
-      trianglesMastery.lastGrindNodeId,
+      topicMastery.lastGrindNodeId,
     ]
   );
 
@@ -1150,9 +1313,8 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       const nextTab = opts?.tab || "teach";
       const requestedNodeId =
         opts?.nodeId ||
-        (isTrianglesTopic
-          ? trianglesMastery.lastTutorNodeId || weakestTutorNodeId
-          : "") ||
+        topicMastery.lastTutorNodeId ||
+        weakestTutorNodeId ||
         currentTutorNodeId ||
         guidedOrder[0] ||
         "";
@@ -1161,20 +1323,18 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       setTutorTab(nextTab);
       setTutorNodeIndexWithMastery(nodeIndex);
       setTutorDrawerOpen(true);
-      if (isTrianglesTopic && resolvedNodeId) {
-        updateTrianglesMastery((prev) =>
-          setLastTutorNodeId(markNodeLearning(prev, resolvedNodeId), resolvedNodeId)
-        );
-      }
+      if (!resolvedNodeId) return;
+      updateTopicMastery((prev) =>
+        setLastTutorNodeId(markNodeLearning(prev, resolvedNodeId), resolvedNodeId)
+      );
     },
     [
       currentTutorNodeId,
       guidedOrder,
-      isTrianglesTopic,
       resolveTutorNodeIndex,
       setTutorNodeIndexWithMastery,
-      trianglesMastery.lastTutorNodeId,
-      updateTrianglesMastery,
+      topicMastery.lastTutorNodeId,
+      updateTopicMastery,
       weakestTutorNodeId,
     ]
   );
@@ -1209,8 +1369,8 @@ const showInZombie = (sectionId: string) => {
 
   const onTutorNodeProgress = useCallback(
     (progress: TutorNodeProgress) => {
-      if (!isTrianglesTopic || !progress?.nodeId) return;
-      updateTrianglesMastery((prev) => {
+      if (!progress?.nodeId) return;
+      updateTopicMastery((prev) => {
         let next = upsertNodeProgress(prev, progress.nodeId, {
           score: progress.score,
           band: progress.band,
@@ -1220,7 +1380,7 @@ const showInZombie = (sectionId: string) => {
         return next;
       });
     },
-    [isTrianglesTopic, updateTrianglesMastery]
+    [updateTopicMastery]
   );
 
   const tabButtonStyle = (active: boolean) => ({
@@ -1373,7 +1533,7 @@ const showInZombie = (sectionId: string) => {
 
         {/* Content */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
-          {isLearn && isTrianglesTopic ? (
+          {isLearn ? (
             <div
               style={{
                 borderRadius: 18,
@@ -1411,7 +1571,7 @@ const showInZombie = (sectionId: string) => {
                   className="pill"
                   onClick={() => {
                     setActiveTab("grind");
-                    openGrindDrawer();
+                    if (isTrianglesTopic) openGrindDrawer();
                   }}
                 >
                   Practice via Grind
@@ -1420,7 +1580,7 @@ const showInZombie = (sectionId: string) => {
             </div>
           ) : null}
 
-          {isGrind && isTrianglesTopic ? (
+          {isGrind ? (
             <div
               style={{
                 borderRadius: 18,
@@ -1436,14 +1596,28 @@ const showInZombie = (sectionId: string) => {
               }}
             >
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16 }}>Triangles Grind</div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>
+                  {isTrianglesTopic ? "Triangles Grind" : `${title} Grind`}
+                </div>
                 <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  Marks-roadmap practice: rubrics, board skeletons, traps, and micro-drills.
+                  {isTrianglesTopic
+                    ? "Marks-roadmap practice: rubrics, board skeletons, traps, and micro-drills."
+                    : "Practice with exam-writing focus, quick checks, and handoff to practice sets."}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className="pill" onClick={() => openGrindDrawer({ nodeId: defaultGrindNodeId })}>
-                  Start grind
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => {
+                    if (isTrianglesTopic) {
+                      openGrindDrawer({ nodeId: defaultGrindNodeId });
+                      return;
+                    }
+                    openPracticeFromTopicHub({ tab: "grind" });
+                  }}
+                >
+                  {isTrianglesTopic ? "Start grind" : "Open practice"}
                 </button>
                 <button
                   type="button"
@@ -1487,27 +1661,9 @@ const showInZombie = (sectionId: string) => {
                 <button
                   type="button"
                   className="pill"
-                  onClick={() => {
-                    if (isTrianglesTopic) {
-                      openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
-                      return;
-                    }
-                    openMentorDrawer({
-                      title: `${title}   Key definitions`,
-                      question: `Teach the key definitions in ${title} (Class ${grade} ${subjectTitle}).
-Cover exactly:
-1) Similar triangles (definition)
-2) Corresponding sides/angles (definition + ordering)
-3) Similarity criteria: AA, SAS, SSS (one line each)
-4) CPST meaning (one line)
-Use CBSE exam language and include a labelled diagram.`,
-                      solveStyle: "socratic",
-                      section: "learn",
-                      subSection: "key-definitions",
-                    });
-                  }}
+                  onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
                 >
-                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
+                  Open Tutor
                 </button>
               </div>
 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
@@ -1536,15 +1692,19 @@ Use CBSE exam language and include a labelled diagram.`,
             </AccordionCard>
           )}
 
-            {isLearn && guidedMindmap ? (
-              <AccordionCard id="guided-learning-path" title="Guided learning path (Triangles)" defaultOpen={false}>
+            {isLearn && guidedOrder.length > 0 ? (
+              <AccordionCard
+                id="guided-learning-path"
+                title={isTrianglesTopic ? "Guided learning path (Triangles)" : "Guided learning path"}
+                defaultOpen={false}
+              >
                 <GuidedMindmapPanel
-                  data={guidedMindmap}
+                  data={guidedPanelData}
                   onAskMentor={(node) => {
                     if (!node?.id) return;
                     openTutorDrawer({ tab: "teach", nodeId: node.id });
                   }}
-                  getNodeMasteryState={(nodeId) => getNodeMasteryState(trianglesMastery, nodeId)}
+                  getNodeMasteryState={(nodeId) => getNodeMasteryState(topicMastery, nodeId)}
                   onPracticeNode={(nodeId) =>
                     openPracticeFromTopicHub({ nodeId, tab: "learn" })
                   }
@@ -1609,25 +1769,9 @@ Use CBSE exam language and include a labelled diagram.`,
                 <button
                   type="button"
                   className="pill"
-                  onClick={() => {
-                    if (isTrianglesTopic) {
-                      openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
-                      return;
-                    }
-                    openMentorDrawer({
-                    title: `${title} - Common misconceptions`,
-                      question: `Act like a CBSE Class ${grade} teacher. For ${title}:
-
-1) List the TOP 5 common misconceptions students have.
-2) For each, show the WRONG thinking, then the CORRECT thinking.
-3) Give 1 short example per misconception.
-4) If geometry, include a labelled diagram description wherever it helps.
-5) End with a 30-second revision checklist.`,
-                      solveStyle: "socratic",
-                    });
-                  }}
+                  onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
                 >
-                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
+                  Open Tutor
                 </button>
               </div>
 <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -1678,29 +1822,11 @@ Use CBSE exam language and include a labelled diagram.`,
                   className="pill"
                   style={{ padding: "7px 10px", fontSize: 13 }}
                   onClick={() => {
-                    if (isTrianglesTopic) {
-                      openTutorDrawer({ tab: "examples", nodeId: guidedOrder[0] });
-                      return;
-                    }
-                    const joined = scoreTips.slice(0, 10).map((x, i) => `${i + 1}. ${String(x || "")}`).join("\n");
-                    openMentorDrawer({
-                      title: `Score tips · ${title}`,
-                      question:
-                        `You are a CBSE Class ${grade} ${subjectTitle} mentor.\n` +
-                        `Using these score tips, teach me how to write answers for FULL marks.\n\n` +
-                        `Score tips:\n${joined}\n\n` +
-                        `Do this: (1) explain each tip in simple words, (2) show one worked example using the tips, ` +
-                        `(3) show how marks are awarded step-by-step (board style).\n\n` +
-                        `If a diagram is needed, include a simple labelled ASCII sketch and tell me what to draw in the exam.`,
-                      solveStyle: "board",
-                      section: "score-tips",
-                      anchor: `scoreTips:${topicKey}`,
-                      contextText: joined,
-                    });
+                    openTutorDrawer({ tab: "examples", nodeId: guidedOrder[0] });
                   }}
                   title="Ask mentor to explain how to use these score tips and show a board-style example with marks"
                 >
-                  {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
+                  Open Tutor
                 </button>
               </div>
             </AccordionCard>
@@ -1728,10 +1854,6 @@ Use CBSE exam language and include a labelled diagram.`,
         typeof picked?.marks === "number"
           ? picked.marks
           : (marksBySection as any)?.[exampleSection];
-
-      const qs = `topic=${encodeURIComponent(String(title || topicKey || ""))}&section=${encodeURIComponent(
-        String(exampleSection)
-      )}`;
 
       return (
         <>
@@ -1779,18 +1901,12 @@ Use CBSE exam language and include a labelled diagram.`,
               <button
                 type="button"
                 className="pill"
-                onClick={() => {
-                  if (isTrianglesTopic) {
-                    openPracticeFromTopicHub({
-                      tab: "learn",
-                      subtopicHint: `pattern:${String(exampleSection)}`,
-                    });
-                    return;
-                  }
-                  navigate(`/practice/${grade}/${subjectRoute}?${qs}`, {
-                    state: { topicKey, sectionFilter: exampleSection },
-                  });
-                }}
+                onClick={() =>
+                  openPracticeFromTopicHub({
+                    tab: "learn",
+                    subtopicHint: `pattern:${String(exampleSection)}`,
+                  })
+                }
                 title="Go to Practice page filtered to this Board pattern"
               >
                 Practice this type ?
@@ -1890,7 +2006,6 @@ Use CBSE exam language and include a labelled diagram.`,
                 const safeIdx = Math.max(0, Math.min(selectedCompetencyIdx, Math.max(0, list.length - 1)));
                 const selected = list[safeIdx] as any;
                 const cid = String(selected?.id || `C${safeIdx + 1}`);
-                const desc = String(selected?.description || "");
                 const bloom = selected?.bloomLevel ? String(selected.bloomLevel) : "";
 
                 return (
@@ -1901,27 +2016,12 @@ Use CBSE exam language and include a labelled diagram.`,
                         className="pill"
                         style={{ padding: "7px 10px", fontSize: 13 }}
                         onClick={() => {
-                          if (isTrianglesTopic) {
-                            openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
-                            return;
-                          }
                           if (!list.length) return;
-                          openMentorDrawer({
-                            title: `NCERT competency · ${cid}`,
-                            question:
-                              `Explain the NCERT competency ${cid} for Class ${grade} ${subjectTitle}.\n` +
-                              `Competency: ${desc}\n\n` +
-                              `Do this: (1) explain in simple words, (2) give 1 quick example, (3) give 1 common mistake + fix.\n\n` +
-                              `IMPORTANT: If you output JSON, do NOT wrap it in \`\`\` code fences.`,
-                            solveStyle: "socratic",
-                            section: "learn",
-                            anchor: `competency:${cid}`,
-                            contextText: desc,
-                          });
+                          openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] });
                         }}
                         title="Ask mentor to explain the selected competency with an example and a common mistake"
                       >
-                        {isTrianglesTopic ? "Open Tutor ->" : "Ask Mentor ->"}
+                        Open Tutor
                       </button>
 
                       <div style={{ fontSize: 12, opacity: 0.75 }}>
@@ -2041,8 +2141,7 @@ Use CBSE exam language and include a labelled diagram.`,
 
           {isResources && (
             <>
-              {isTrianglesTopic ? (
-                <AccordionCard id="resources-recommended" title="Recommended next resources" defaultOpen>
+              <AccordionCard id="resources-recommended" title="Recommended next resources" defaultOpen>
                   {weakestResourceNodes.length ? (
                     <div style={{ display: "grid", gap: 10 }}>
                       {weakestResourceNodes.map((item) => {
@@ -2088,9 +2187,11 @@ Use CBSE exam language and include a labelled diagram.`,
                                 className="pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
-                                  const grindId = guidedToGrindNodeId[item.id] || defaultGrindNodeId;
                                   setActiveTab("grind");
-                                  openGrindDrawer({ nodeId: grindId });
+                                  if (isTrianglesTopic) {
+                                    const grindId = guidedToGrindNodeId[item.id] || defaultGrindNodeId;
+                                    openGrindDrawer({ nodeId: grindId });
+                                  }
                                 }}
                               >
                                 Grind this
@@ -2118,11 +2219,9 @@ Use CBSE exam language and include a labelled diagram.`,
                       Great work. All guided nodes are mastered.
                     </div>
                   )}
-                </AccordionCard>
-              ) : null}
+              </AccordionCard>
 
-              {isTrianglesTopic ? (
-                <AccordionCard id="resources-revision-cockpit" title="10-minute revision cockpit" defaultOpen>
+              <AccordionCard id="resources-revision-cockpit" title="10-minute revision cockpit" defaultOpen>
                   <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
                     Human-tutor loop: Teach {"->"} Grind {"->"} Checkpoint {"->"} Practice.
                   </div>
@@ -2180,7 +2279,9 @@ Use CBSE exam language and include a labelled diagram.`,
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
                                   setActiveTab("grind");
-                                  openGrindDrawer({ nodeId: grindId });
+                                  if (isTrianglesTopic) {
+                                    openGrindDrawer({ nodeId: grindId });
+                                  }
                                 }}
                               >
                                 Open Grind
@@ -2206,11 +2307,13 @@ Use CBSE exam language and include a labelled diagram.`,
                       );
                     })}
                   </div>
-                </AccordionCard>
-              ) : null}
+              </AccordionCard>
 
-              {isTrianglesTopic ? (
-                <AccordionCard id="resources-exam-day-pack" title="Exam-day pack (Triangles)" defaultOpen={false}>
+              <AccordionCard
+                id="resources-exam-day-pack"
+                title={isTrianglesTopic ? "Exam-day pack (Triangles)" : `Exam-day pack (${title})`}
+                defaultOpen={false}
+              >
                   <div style={{ display: "grid", gap: 10 }}>
                     <div
                       style={{
@@ -2222,7 +2325,9 @@ Use CBSE exam language and include a labelled diagram.`,
                     >
                       <div style={{ fontWeight: 900 }}>2-minute formula + theorem sweep</div>
                       <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}>
-                        AA / SAS / SSS similarity + BPT + area-ratio logic + CPST usage.
+                        {isTrianglesTopic
+                          ? "AA / SAS / SSS similarity + BPT + area-ratio logic + CPST usage."
+                          : `Revisit core definitions, theorem rules, and one high-yield formula for ${title}.`}
                       </div>
                     </div>
                     <div
@@ -2248,7 +2353,9 @@ Use CBSE exam language and include a labelled diagram.`,
                     >
                       <div style={{ fontWeight: 900 }}>3-minute trap check</div>
                       <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}>
-                        Recheck correspondence order, theorem name, and final conclusion sentence.
+                        {isTrianglesTopic
+                          ? "Recheck correspondence order, theorem name, and final conclusion sentence."
+                          : `Recheck common mistakes in ${title}: setup, unit/logic, and final answer line.`}
                       </div>
                     </div>
                     <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2264,18 +2371,16 @@ Use CBSE exam language and include a labelled diagram.`,
                         className="pill"
                         onClick={() => {
                           setActiveTab("grind");
-                          openGrindDrawer({ nodeId: defaultGrindNodeId });
+                          if (isTrianglesTopic) openGrindDrawer({ nodeId: defaultGrindNodeId });
                         }}
                       >
                         Open exam grind
                       </button>
                     </div>
                   </div>
-                </AccordionCard>
-              ) : null}
+              </AccordionCard>
 
-              {isTrianglesTopic ? (
-                <AccordionCard id="resources-progression-hints" title="Weakest-node progression hints" defaultOpen={false}>
+              <AccordionCard id="resources-progression-hints" title="Weakest-node progression hints" defaultOpen={false}>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {weakestProgressionHints.map((hint, idx) => (
                       <li key={idx} style={{ marginBottom: 8, lineHeight: 1.5 }}>
@@ -2283,26 +2388,23 @@ Use CBSE exam language and include a labelled diagram.`,
                       </li>
                     ))}
                   </ul>
-                </AccordionCard>
-              ) : null}
+              </AccordionCard>
 
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
                   Quick revision kit for <b>{title}</b> - concept map, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  {isTrianglesTopic ? (
-                    <button
-                      type="button"
-                      className="pill"
-                      onClick={() => {
-                        setActiveTab("learn");
-                        openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
-                      }}
-                    >
-                      Resume weakest concept
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="pill"
+                    onClick={() => {
+                      setActiveTab("learn");
+                      openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
+                    }}
+                  >
+                    Resume weakest concept
+                  </button>
                   <button
                     type="button"
                     className="pill"
@@ -2479,7 +2581,7 @@ Use CBSE exam language and include a labelled diagram.`,
         topicKey={topicKey}
         mode={mode}
         getNodeMasteryState={(grindId) =>
-          getNodeMasteryState(trianglesMastery, mapGrindNodeToGuidedNodeId(grindId))
+          getNodeMasteryState(topicMastery, mapGrindNodeToGuidedNodeId(grindId))
         }
         onPracticeNode={(grindId) =>
           openPracticeFromTopicHub({
@@ -2495,7 +2597,7 @@ Use CBSE exam language and include a labelled diagram.`,
         }}
       />
       <SharedTutorDrawerV2
-        open={tutorDrawerOpen && isTrianglesTopic}
+        open={tutorDrawerOpen}
         onClose={closeTutorDrawer}
         tab={tutorTab}
         setTab={setTutorTab}
