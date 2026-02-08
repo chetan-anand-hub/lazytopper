@@ -1008,6 +1008,15 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     const keys = grindMindmap ? Object.keys(grindMindmap.nodesById || {}) : [];
     return keys[0] ? String(keys[0]) : "";
   }, [grindMindmap]);
+  const guidedToGrindNodeId = useMemo(() => {
+    const map: Record<string, string> = {};
+    const keys = grindMindmap ? Object.keys(grindMindmap.nodesById || {}) : [];
+    keys.forEach((grindId) => {
+      const guidedId = mapGrindNodeToGuidedNodeId(grindId);
+      if (!map[guidedId]) map[guidedId] = String(grindId);
+    });
+    return map;
+  }, [grindMindmap]);
 
   useEffect(() => {
     if (!grindMindmap) {
@@ -2031,6 +2040,18 @@ Use CBSE exam language and include a labelled diagram.`,
                                 onClick={() => openTutorDrawer({ tab: "teach", nodeId: item.id })}
                               >
                                 Teach this
+                              </button>
+                              <button
+                                type="button"
+                                className="pill"
+                                style={{ padding: "7px 10px", fontSize: 13 }}
+                                onClick={() => {
+                                  const grindId = guidedToGrindNodeId[item.id] || defaultGrindNodeId;
+                                  setActiveTab("grind");
+                                  openGrindDrawer({ nodeId: grindId });
+                                }}
+                              >
+                                Grind this
                               </button>
                               <button
                                 type="button"
@@ -5016,14 +5037,36 @@ function GrindDrawerV1(props: {
   const [doubtInput, setDoubtInput] = useState("");
   const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
   const [doubtError, setDoubtError] = useState<string | null>(null);
+  const [doubtWarning, setDoubtWarning] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const safeJsonParse = useCallback((raw: string) => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const parseMentorPayload = useCallback(
+    async (res: Response): Promise<any> => {
+      const raw = await res.text();
+      const trimmed = String(raw || "").trim();
+      if (!trimmed) return {};
+      const parsed = safeJsonParse(trimmed);
+      if (parsed !== null) return parsed;
+      return { data: { text: trimmed }, message: trimmed };
+    },
+    [safeJsonParse]
+  );
 
   useEffect(() => {
     if (!open) {
       setDoubtInput("");
       setDoubtAnswer(null);
       setDoubtError(null);
+      setDoubtWarning(null);
       setDoubtLoading(false);
       if (abortRef.current) abortRef.current.abort();
       abortRef.current = null;
@@ -5034,6 +5077,7 @@ function GrindDrawerV1(props: {
     // Clear inline doubt thread when switching nodes
     setDoubtAnswer(null);
     setDoubtError(null);
+    setDoubtWarning(null);
   }, [nodeId]);
 
   const stop = () => {
@@ -5049,6 +5093,7 @@ function GrindDrawerV1(props: {
 
     setDoubtLoading(true);
     setDoubtError(null);
+    setDoubtWarning(null);
     setDoubtAnswer(null);
 
     stop();
@@ -5114,11 +5159,17 @@ function GrindDrawerV1(props: {
         signal: controller.signal,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Mentor request failed.');
-
+      const data = await parseMentorPayload(res);
       const txt = String(data?.data?.text || '').trim();
       const structured = data?.data?.structured;
+      const rateLimitedWithFallback = res.status === 429 && Boolean(structured || txt);
+      if (!res.ok && !rateLimitedWithFallback) {
+        throw new Error(String(data?.error || data?.message || 'Mentor request failed.'));
+      }
+      if (res.status === 429) {
+        setDoubtWarning('Mentor is rate-limited. Showing fallback guidance.');
+      }
+
       if (txt) setDoubtAnswer(txt);
       else if (structured) setDoubtAnswer(JSON.stringify(structured, null, 2));
       else setDoubtAnswer('No answer returned. Please retry.');
@@ -5421,6 +5472,12 @@ function GrindDrawerV1(props: {
                       <input
                         value={doubtInput}
                         onChange={(e) => setDoubtInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void submitDoubt();
+                          }
+                        }}
                         placeholder="Type your doubt..."
                         style={{
                           flex: 1,
@@ -5440,8 +5497,29 @@ function GrindDrawerV1(props: {
                         </button>
                       ) : null}
                     </div>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {[
+                        'Give me a 3-mark board skeleton answer for this node.',
+                        'Check this step and tell me one mistake.',
+                        'What is the biggest trap in this node and how to avoid it?',
+                      ].map((prompt) => (
+                        <button
+                          key={prompt}
+                          type="button"
+                          className="pill"
+                          style={{ padding: '6px 10px', fontSize: 12 }}
+                          onClick={() => setDoubtInput(prompt)}
+                          disabled={doubtLoading}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
                     {doubtError ? (
                       <div style={{ marginTop: 10, color: 'rgba(185,28,28,0.95)', fontSize: 13 }}>{doubtError}</div>
+                    ) : null}
+                    {doubtWarning ? (
+                      <div style={{ marginTop: 10, color: 'rgba(146,64,14,0.95)', fontSize: 13 }}>{doubtWarning}</div>
                     ) : null}
                     {doubtAnswer ? (
                       trianglesContract ? (
