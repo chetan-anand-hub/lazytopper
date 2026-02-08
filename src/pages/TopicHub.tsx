@@ -513,26 +513,6 @@ function mapGrindNodeToGuidedNodeId(grindNodeId: string): string {
   return String(grindNodeId || "").trim();
 }
 
-const PRIORITY_TOPIC_GRIND_KEYS = new Set([
-  "pair-of-linear-equations",
-  "quadratic-equations",
-  "trigonometry",
-  "electricity",
-  "life-processes",
-  "chemical-reactions-equations",
-  "carbon-and-its-compounds",
-  "magnetic-effects-of-electric-current",
-  "maths_introduction_trigonometry",
-  "maths_applications_trigonometry",
-  "science_light_reflection_refraction",
-]);
-
-function isPriorityTopicForGrind(topicKey: string): boolean {
-  const key = String(topicKey || "").trim().toLowerCase();
-  if (!key) return false;
-  return PRIORITY_TOPIC_GRIND_KEYS.has(key);
-}
-
 function toTutorMasteryState(state: TopicHubNodeMasteryState): TutorMasteryState {
   if (state === "learning") return "learning";
   if (state === "checkpoint_passed") return "checkpoint_passed";
@@ -956,10 +936,6 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const formulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
   const videos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
   const guidedMindmap = isTrianglesTopic ? trianglesGuidedMindmap : null;
-  const isPriorityNonTrianglesTopic = useMemo(
-    () => !isTrianglesTopic && isPriorityTopicForGrind(topicKey),
-    [isTrianglesTopic, topicKey]
-  );
   const fallbackGuidedNodes = useMemo(() => {
     const out: Array<{
       id: string;
@@ -1090,7 +1066,7 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const guidedCoreByNodeId: Record<string, unknown> = guidedMindmap?.coreByNodeId || fallbackCoreByNodeId;
   const guidedCoreIdByNodeId: Record<string, unknown> = guidedMindmap?.coreIdByNodeId || fallbackCoreIdByNodeId;
   const fallbackGrindMindmap = useMemo(() => {
-    if (!isPriorityNonTrianglesTopic || !guidedOrder.length) return null;
+    if (isTrianglesTopic || !guidedOrder.length) return null;
     const order = guidedOrder.slice(0, Math.min(6, guidedOrder.length));
     const nodesById: Record<string, any> = {};
     order.forEach((id, idx) => {
@@ -1154,7 +1130,7 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       ],
       nodesById,
     };
-  }, [guidedNodeById, guidedNodeTitleById, guidedOrder, isPriorityNonTrianglesTopic, title]);
+  }, [guidedNodeById, guidedNodeTitleById, guidedOrder, isTrianglesTopic, title]);
   const grindMindmap = useMemo(
     () => (isTrianglesTopic ? trianglesGrindMindmap : fallbackGrindMindmap),
     [fallbackGrindMindmap, isTrianglesTopic]

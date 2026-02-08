@@ -710,12 +710,63 @@ function resolvePriorityGrindTopicKey(topicKey) {
   return '';
 }
 
+function toTitleCaseFromTopicKey(topicKey) {
+  const raw = String(topicKey || '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  if (!raw) return 'Selected Topic';
+  return raw
+    .split(/\s+/)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function buildGenericTopicGrindProfile({ topicKey, topicLabel, nodeTitle }) {
+  const label = String(topicLabel || '').trim() || toTitleCaseFromTopicKey(topicKey);
+  const node = String(nodeTitle || '').trim() || 'selected node';
+  return {
+    label,
+    marks: 3,
+    given: [
+      `List the given data/conditions from ${node}.`,
+      `State what needs to be proved/found in ${label}.`,
+    ],
+    toProve: ['Write a complete exam-format answer with one justified core step.'],
+    figureHints: ['Use a neat labelled diagram/table only if the question demands it.'],
+    steps: [
+      'Write Given and Required clearly.',
+      'Apply the correct concept/formula/theorem with one reason.',
+      'Conclude with Therefore/Hence and final answer.',
+    ],
+    checkpoints: [
+      'Given and target are correctly identified.',
+      'Core step uses correct rule/formula/theorem.',
+      'Conclusion is exam-ready and complete.',
+    ],
+    traps: [
+      { trap: 'Skipping reason/theorem name.', fix: 'Name the rule before applying it.' },
+      { trap: 'Writing final answer without setup.', fix: 'Show at least one justified intermediate step.' },
+    ],
+    drills: [
+      { prompt: `Write a 3-line board answer for ${node}.`, answerKey: 'Given -> Core step with reason -> Therefore/Hence.' },
+      { prompt: `List one common trap in ${label} and fix it.`, answerKey: 'Trap + one-line correction strategy.' },
+    ],
+    nextNodeId: String(topicKey || '').trim() || 'next-node',
+    nextReason: `Continue with the next ${label} node to reinforce exam-writing consistency.`,
+  };
+}
+
 function buildGrindTopicContractFallback(payload) {
   const rawTopicKey = payload?.topicKey || payload?.chapter || payload?.topic || '';
+  const normalizedTopicKey = normalizeTopicKeyInput(rawTopicKey);
   const resolvedTopicKey = resolvePriorityGrindTopicKey(rawTopicKey);
-  if (!resolvedTopicKey) return null;
-  const profile = PRIORITY_GRIND_TOPIC_PROFILES[resolvedTopicKey];
-  if (!profile) return null;
+  const profile =
+    (resolvedTopicKey && PRIORITY_GRIND_TOPIC_PROFILES[resolvedTopicKey]) ||
+    buildGenericTopicGrindProfile({
+      topicKey: normalizedTopicKey || 'selected-topic',
+      topicLabel: rawTopicKey,
+      nodeTitle: payload?.mindmapNodeTitle || payload?.cardTitle || '',
+    });
 
   const nodeId = String(payload?.mindmapNodeId || payload?.cardId || 'node_1').trim() || 'node_1';
   const nodeTitle =
@@ -727,7 +778,7 @@ function buildGrindTopicContractFallback(payload) {
 
   return {
     type: 'grind_topic_v1',
-    topicKey: resolvedTopicKey,
+    topicKey: resolvedTopicKey || normalizedTopicKey || 'selected-topic',
     node: { id: nodeId, title: nodeTitle },
     board: {
       given: profile.given,
@@ -757,17 +808,12 @@ function buildGrindTopicUserPrompt(payload) {
   const grade = String(payload?.grade || '10').trim();
   return [
     `Create a ${subject} Class ${grade} grind contract for "${nodeTitle}".`,
-    profile ? `Priority topic profile: ${profile.label}.` : '',
+    profile ? `Priority topic profile: ${profile.label}.` : `General topic profile: ${String(rawTopicKey || 'selected-topic')}.`,
     payload?.mindmapNodeText ? `Node notes: ${String(payload.mindmapNodeText).trim()}` : '',
     payload?.doubtContext ? `Doubt context: ${String(payload.doubtContext).trim()}` : '',
   ]
     .filter(Boolean)
     .join('\n\n');
-}
-
-function isPriorityGrindTopicPayload(payload) {
-  const rawTopicKey = payload?.topicKey || payload?.chapter || payload?.topic || '';
-  return Boolean(resolvePriorityGrindTopicKey(rawTopicKey));
 }
 
 function isLearnMisconceptionPayload(payload) {
@@ -1496,7 +1542,8 @@ function inferDiagramType(payload) {
     .flat()
     .map((v) => String(v || '').toLowerCase())
     .join(' ');
-  if (hint.includes('trigon') || hint.includes('sin') || hint.includes('cos') || hint.includes('tan') || hint.includes('height') || hint.includes('distance')) {
+  const hasTrigWord = /\b(trigonometry|trigonometric|sin|cos|tan|sine|cosine|tangent|theta)\b/.test(hint);
+  if (hint.includes('trigon') || hasTrigWord || hint.includes('height') || hint.includes('distance')) {
     return 'trigonometric_triangle';
   }
   if (hint.includes('circle') || hint.includes('chord') || hint.includes('tangent')) return 'circle';
@@ -1506,6 +1553,9 @@ function inferDiagramType(payload) {
   }
   if (hint.includes('ray') || hint.includes('reflection') || hint.includes('refraction') || hint.includes('lens') || hint.includes('mirror') || hint.includes('optics')) {
     return 'ray_diagram';
+  }
+  if (hint.includes('magnetic') || hint.includes('magnet') || hint.includes('solenoid') || hint.includes('field')) {
+    return 'magnetic_field';
   }
   if (hint.includes('circuit') || hint.includes('electric') || hint.includes('current') || hint.includes('resistance') || hint.includes('ammeter') || hint.includes('voltmeter')) {
     return 'circuit';
@@ -1527,6 +1577,7 @@ function diagramLabelsForType(diagramType) {
   if (t === 'coordinate_plane') return { O: 'O', X: 'x', Y: 'y', P: 'P' };
   if (t === 'mensuration_solid') return { H: 'h', R: 'r' };
   if (t === 'ray_diagram') return { O: 'O', F: 'F', F2: '2F' };
+  if (t === 'magnetic_field') return { P: 'Conductor', B1: 'B1', B2: 'B2' };
   if (t === 'circuit') return { A: 'A', B: 'B', V: 'V' };
   return { A: 'A', B: 'B', C: 'C' };
 }
@@ -1543,7 +1594,7 @@ function diagramSpecForPayload(payload) {
     payload?.contextText ||
     '';
   try {
-    return getDiagramTemplate(topicKey, nodeId, title);
+    return getDiagramTemplate(topicKey, nodeId, title, inferDiagramType(payload));
   } catch {
     return null;
   }
@@ -4152,11 +4203,6 @@ async function handleRequest(req, res) {
     let handlerUsed = persona && typeof persona === 'object' ? 'persona_prompt' : `prompt_builder:${normalisedMode}`;
     if (isTrianglesEvaluation) handlerUsed = 'triangles_evaluation';
     if (normalisedMode === 'grind_topic_v1') {
-      if (!isPriorityGrindTopicPayload(payload)) {
-        return sendJson(res, 422, {
-          error: 'grind_topic_v1 is enabled only for priority non-triangles topics.',
-        });
-      }
       const contract = buildGrindTopicContractFallback(payload);
       if (!contract) {
         return sendJson(res, 500, { error: 'Failed to prepare topic grind contract.' });
