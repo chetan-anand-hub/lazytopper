@@ -59,6 +59,17 @@ const safeJsonParse = (raw: string): unknown | null => {
     return null;
   }
 };
+const parseResponsePayload = async (res: Response): Promise<unknown> => {
+  const raw = await res.text();
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return {};
+  const parsed = safeJsonParse(trimmed);
+  if (parsed !== null) return parsed;
+  return {
+    data: { text: trimmed },
+    message: trimmed,
+  };
+};
 const getResponseError = (payload: unknown, fallback: string) => {
   if (!isRecord(payload)) return fallback;
   if (typeof payload.error === "string") return payload.error;
@@ -77,6 +88,57 @@ const getResponseText = (payload: unknown): string => {
   if (!isRecord(payload)) return "";
   const dataBlock = isRecord(payload.data) ? payload.data : null;
   return dataBlock && typeof dataBlock.text === "string" ? dataBlock.text : "";
+};
+const MENTOR_REQUEST_TIMEOUT_MS = 30_000;
+const fetchMentorPayload = async (
+  body: unknown,
+  externalSignal?: AbortSignal
+): Promise<{ res: Response; data: unknown }> => {
+  const controller = new AbortController();
+  let timedOut = false;
+  const relayAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener("abort", relayAbort, { once: true });
+    }
+  }
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, MENTOR_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(MENTOR_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await parseResponsePayload(res);
+    return { res, data };
+  } catch (err) {
+    if (timedOut && getErrorName(err) === "AbortError") {
+      throw new Error("Mentor request timed out. Please retry.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", relayAbort);
+    }
+  }
+};
+const toTutorErrorMessage = (err: unknown, fallback: string): string => {
+  const msg = getErrorMessage(err, fallback);
+  if (/timed out|timeout/i.test(msg)) {
+    return "Mentor is taking too long. Please retry.";
+  }
+  if (/unexpected end of json input/i.test(msg)) return fallback;
+  if (/failed to fetch|networkerror|network request failed/i.test(msg)) {
+    return "Network issue while contacting mentor. Please retry.";
+  }
+  return msg;
 };
 
 const deriveMasteryState = (status: string, score: number): TutorMasteryState => {
@@ -132,6 +194,10 @@ type TutorResponseEntry = {
   responseId?: string;
   summary?: string;
 };
+type TutorChatTurn = {
+  role: "user" | "assistant";
+  text: string;
+};
 type TutorDrawerProps = {
   open: boolean;
   onClose: () => void;
@@ -181,9 +247,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [doubtInput, setDoubtInput] = useState("");
-  const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
   const [doubtError, setDoubtError] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
+  const [chatTurns, setChatTurns] = useState<TutorChatTurn[]>([]);
+  const [showLessonPack, setShowLessonPack] = useState(true);
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackChoice, setFeedbackChoice] = useState<"yes" | "no" | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -197,6 +265,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const isDev = Boolean(import.meta?.env?.DEV);
   const abortRef = useRef<AbortController | null>(null);
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
   const lastProgressRef = useRef<string>("");
 
   const nodeTitle = String(node?.title || "Concept");
@@ -265,6 +334,38 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
 
   const formatDoubtStructured = (obj: unknown) => {
     if (!isRecord(obj)) return "";
+    const tutorObj = getTutorObject(obj as MentorStructured);
+    const attemptLoop = isRecord(tutorObj?.attempt_loop) ? tutorObj.attempt_loop : null;
+    if (attemptLoop) {
+      const diagnosis = isRecord(attemptLoop.diagnosis) ? attemptLoop.diagnosis : null;
+      const nextAction = isRecord(attemptLoop.next_action) ? attemptLoop.next_action : null;
+      const hintLadder = isRecord(attemptLoop.hint_ladder) ? attemptLoop.hint_ladder : null;
+      const rubric = isRecord(attemptLoop.rubric) ? attemptLoop.rubric : null;
+      const statusRaw = asString(diagnosis?.status);
+      const status =
+        statusRaw
+          ? statusRaw
+              .split("_")
+              .filter(Boolean)
+              .join(" ")
+          : "";
+      const misconception = asString(diagnosis?.misconception_summary);
+      const nextPrompt = asString(nextAction?.prompt);
+      const hintText =
+        asString(hintLadder?.hint) ||
+        (isRecord(hintLadder?.last_hint) ? asString(hintLadder.last_hint.text) : "");
+      const score = Number(rubric?.total_score);
+      const lines: string[] = [];
+      if (status) lines.push(`Checkpoint verdict: ${status}.`);
+      if (misconception) lines.push(`Issue spotted: ${misconception}`);
+      if (nextPrompt) lines.push(`Next step: ${nextPrompt}`);
+      if (hintText) lines.push(`Hint: ${hintText}`);
+      if (Number.isFinite(score)) lines.push(`Score now: ${score}/100.`);
+      if (lines.length) return lines.join("\n");
+    }
+    if (isRecord(tutorObj?.socratic) && asString(tutorObj.socratic.response)) {
+      return asString(tutorObj.socratic.response);
+    }
     const tutorText = getTutorText(obj as MentorStructured);
     if (tutorText) return tutorText;
     const kind = asString(obj.kind);
@@ -279,12 +380,22 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     }
     if (kind === "learn_teach") {
       const teach = isRecord(obj.teach) ? obj.teach : {};
-      const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation.slice(0, 4) : [];
-      const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence.slice(0, 2) : [];
+      const keyIdeas = Array.isArray(teach.keyIdeas)
+        ? teach.keyIdeas.slice(0, 4)
+        : Array.isArray(teach.simpleExplanation)
+          ? teach.simpleExplanation.slice(0, 4)
+          : [];
+      const exam = Array.isArray(teach.cbseExamSentence)
+        ? teach.cbseExamSentence.slice(0, 2)
+        : Array.isArray(teach.examLines)
+          ? teach.examLines.slice(0, 2)
+          : [];
+      const checkpoint = isRecord(obj.checkpoint) ? obj.checkpoint : isRecord(teach.checkpoint) ? teach.checkpoint : {};
       const lines = [];
-      simple.forEach((b) => lines.push(`- ${String(b)}`));
+      keyIdeas.forEach((b) => lines.push(`- ${String(b)}`));
       exam.forEach((l) => lines.push(`Exam line: ${String(l)}`));
-      if (obj.checkQuestion) lines.push(`Quick check: ${String(obj.checkQuestion)}`);
+      if (checkpoint.question) lines.push(`Quick check: ${String(checkpoint.question)}`);
+      else if (obj.checkQuestion) lines.push(`Quick check: ${String(obj.checkQuestion)}`);
       return lines.join("\n");
     }
     return "";
@@ -316,7 +427,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       hintLadderState?: unknown,
       hintLevel?: number
     ) => {
-      const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
+      const modeApi = "learn_teach";
       return {
         mode: modeApi,
         payload: {
@@ -327,14 +438,14 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           cardTitle: nodeTitle,
           cardName: nodeTitle,
           section: "learn",
-          subSection: nextTab === "teach" ? "mindmap" : "board-examples",
+          subSection: nextTab === "teach" ? "teach" : "board-examples",
           selectedTab: nextTab,
           selectedMode: modeApi,
           mindmapNodeId: nodeId,
           mindmapNodeTitle: nodeTitle,
           mindmapNodeText: nodeText,
           mindmapCoreId: coreId,
-          explainType: "mindmap_node",
+          explainType: nextTab === "teach" ? "teach_contract" : "board_examples",
           contextText: coreText || nodeText,
           stepIndex: nodeIndex,
           vibe: mode,
@@ -380,19 +491,15 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         const hintLadderState =
           opts?.requestNextHint && isRecord(attemptLoop) ? attemptLoop.hint_ladder : undefined;
         const body = buildPayload(nextTab, undefined, opts?.prompt, opts?.requestNextHint, hintLadderState);
-        const res = await fetch(MENTOR_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
-
+        const { res, data } = await fetchMentorPayload(body, controller.signal);
         const nextStructured = getResponseStructured(data);
+        const rateLimitedWithFallback = res.status === 429 && Boolean(nextStructured);
+        if (!res.ok && !rateLimitedWithFallback) {
+          throw new Error(getResponseError(data, "Mentor request failed."));
+        }
         if (!nextStructured) throw new Error("Mentor response incomplete. Please retry.");
 
-        const modeApi = nextTab === "teach" ? "learn_mindmap" : "learn_teach";
+        const modeApi = "learn_teach";
         const meta = extractDiagramMeta(nextStructured);
         const tutorObj = getTutorObject(nextStructured);
         const check = tutorObj ? { ok: true, issues: [] } : validateTutorStructured(modeApi, nextStructured, body.payload);
@@ -417,12 +524,13 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         if (getErrorName(err) === "AbortError") return;
         setErrors((prev) => ({
           ...prev,
-          [key]: getErrorMessage(err, "Mentor error. Please retry."),
+          [key]: toTutorErrorMessage(err, "Mentor error. Please retry."),
         }));
       } finally {
-        if (!controller.signal.aborted) {
-          setLoadingKey(null);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
         }
+        setLoadingKey((prev) => (prev === key ? null : prev));
       }
     },
     [
@@ -444,15 +552,12 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     const body = buildPayload(tab, undefined, prompt, true, undefined, targetLevel);
 
     try {
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
-
+      const { res, data } = await fetchMentorPayload(body);
       const structured = getResponseStructured(data);
+      const rateLimitedWithFallback = res.status === 429 && Boolean(structured);
+      if (!res.ok && !rateLimitedWithFallback) {
+        throw new Error(getResponseError(data, "Mentor request failed."));
+      }
       if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
       const meta = extractDiagramMeta(structured);
@@ -484,8 +589,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
 
   const sendDoubt = useCallback(
     async (prompt: string) => {
-      if (!prompt.trim() || doubtLoading || !nodeId) return;
+      const promptTrimmed = String(prompt || "").trim();
+      if (!promptTrimmed || doubtLoading || !nodeId) return;
       setDoubtError(null);
+      setShowLessonPack(false);
+      setChatTurns((prev) => [...prev, { role: "user", text: promptTrimmed }]);
       setDoubtLoading(true);
 
       const last = currentResponse || {};
@@ -505,24 +613,40 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       };
 
       try {
-        const body = buildPayload(tab, doubtContext, prompt, false, undefined);
-        const res = await fetch(MENTOR_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(getResponseError(data, "Mentor request failed."));
-
+        const mentorPrompt = promptTrimmed;
+        const body = buildPayload(tab, doubtContext, mentorPrompt, false, undefined);
+        const { res, data } = await fetchMentorPayload(body);
         const structured = getResponseStructured(data);
+        const rateLimitedWithFallback = res.status === 429 && Boolean(structured);
+        if (!res.ok && !rateLimitedWithFallback) {
+          throw new Error(getResponseError(data, "Mentor request failed."));
+        }
+        if (structured && currentKey) {
+          const meta = extractDiagramMeta(structured);
+          setResponses((prev) => ({
+            ...prev,
+            [currentKey]: {
+              ...(prev[currentKey] || {}),
+              structured,
+              diagramType: meta.diagramType,
+              diagramLabels: meta.diagramLabels as Record<string, string> | string[] | null,
+              diagramSpec: meta.diagramSpec as MentorDiagramSpec | null,
+              responseId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              summary: JSON.stringify(structured).slice(0, 280),
+            },
+          }));
+        }
         const formatted = structured ? formatDoubtStructured(structured) : String(getResponseText(data) || "");
-        setDoubtAnswer(formatted || "Mentor reply received.");
+        const finalAnswer = String(formatted || "").trim()
+          ? String(formatted).trim()
+          : "I could not generate a clear reply yet. Try: Explain AA similarity with one solved example.";
+        setChatTurns((prev) => [...prev, { role: "assistant", text: finalAnswer }]);
         setDoubtInput("");
       } catch (err) {
-        setDoubtError(getErrorMessage(err, "Mentor error. Please retry."));
-      } finally {
-        setDoubtLoading(false);
-      }
+        setDoubtError(toTutorErrorMessage(err, "Mentor error. Please retry."));
+    } finally {
+      setDoubtLoading(false);
+    }
     },
     [
       doubtLoading,
@@ -533,6 +657,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       tab,
       nodeIndex,
       buildPayload,
+      currentKey,
     ]
   );
 
@@ -540,8 +665,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     if (!open) {
       cancelInFlight();
       setDoubtInput("");
-      setDoubtAnswer(null);
       setDoubtError(null);
+      setChatTurns([]);
       return;
     }
     if (!nodeId) return;
@@ -552,10 +677,12 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   }, [open, nodeId, tab, currentResponse, currentError, isLoading, requestTutor, cancelInFlight]);
 
   useEffect(() => {
-    setDoubtAnswer(null);
     setDoubtError(null);
     setDoubtInput("");
+    setChatTurns([]);
+    setShowLessonPack(true);
     setShowSoftGateWarning(false);
+    setShowFeedbackPanel(false);
     setFeedbackChoice(null);
     setFeedbackText("");
     setFeedbackStatus("idle");
@@ -576,6 +703,16 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     setCoachHintLoading(false);
     setCoachHintFallback(false);
   }, [currentKey, currentResponse]);
+
+  useEffect(() => {
+    if (!open || tab !== "teach") return;
+    const el = contentScrollRef.current;
+    if (!el) return;
+    const id = window.setTimeout(() => {
+      el.scrollTop = el.scrollHeight;
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [open, tab, nodeId, chatTurns, doubtLoading, showLessonPack]);
 
   if (!open) return null;
 
@@ -756,17 +893,253 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     };
   };
 
+  const normalizeWorkedSteps = (
+    raw: unknown,
+    fallbackFromBoard: Array<{ text: string; marks?: number }>
+  ): Array<{ text: string; marks?: number }> => {
+    const fromRaw = Array.isArray(raw)
+      ? raw
+          .map((step) => {
+            if (typeof step === "string") {
+              const text = step.trim();
+              return text ? { text } : null;
+            }
+            if (!isRecord(step)) return null;
+            const text = String(step.text || step.line || step.statement || "").trim();
+            if (!text) return null;
+            const marksNum = Number(step.marks ?? step.mark ?? step.points);
+            return Number.isFinite(marksNum) ? { text, marks: marksNum } : { text };
+          })
+          .filter((s): s is { text: string; marks?: number } => Boolean(s))
+      : [];
+    if (fromRaw.length) return fromRaw;
+    if (fallbackFromBoard.length) return fallbackFromBoard;
+    return [
+      { text: `State the key theorem/criterion for ${nodeTitle}.`, marks: 1 },
+      { text: "Write one correct relation with correspondence and conclude.", marks: 1 },
+    ];
+  };
+
+  const normalizeTeachView = (obj: MentorStructured) => {
+    const teach = isRecord(obj.teach) ? obj.teach : {};
+    const tutorObj = getTutorObject(obj);
+    const board = isRecord(tutorObj?.board_steps_ms) ? tutorObj.board_steps_ms : null;
+    const next = isRecord(tutorObj?.next) ? tutorObj.next : null;
+    const socratic = isRecord(tutorObj?.socratic) ? tutorObj.socratic : null;
+    const diagnosis = isRecord(tutorObj?.diagnosis) ? tutorObj.diagnosis : null;
+    const checkpoint =
+      isRecord(obj.checkpoint) ? obj.checkpoint : isRecord(teach.checkpoint) ? teach.checkpoint : {};
+    const boardSteps = Array.isArray(board?.steps)
+      ? board.steps
+          .map((step) => {
+            if (!isRecord(step)) return null;
+            const text = String(step.line || step.text || "").trim();
+            if (!text) return null;
+            const marksNum = Number(step.marks);
+            return Number.isFinite(marksNum) ? { text, marks: marksNum } : { text };
+          })
+          .filter((s): s is { text: string; marks?: number } => Boolean(s))
+      : [];
+
+    const keyIdeasRaw = [
+      ...(Array.isArray(obj.conceptBullets) ? obj.conceptBullets : []),
+      ...(Array.isArray(teach.conceptBullets) ? teach.conceptBullets : []),
+      ...(Array.isArray(teach.keyIdeas) ? teach.keyIdeas : []),
+      ...(Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : []),
+    ].map((x) => String(x || "").trim()).filter(Boolean);
+    const keyIdeas = keyIdeasRaw.length
+      ? keyIdeasRaw
+      : [
+          `Definition first: identify what ${nodeTitle} means in this question.`,
+          "Write the exact criterion/theorem name before using it.",
+          "Maintain correspondence order when writing ratios or equal angles.",
+        ];
+
+    const examLinesRaw = [
+      ...(Array.isArray(obj.examLines) ? obj.examLines : []),
+      ...(Array.isArray(teach.examLines) ? teach.examLines : []),
+      ...(Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : []),
+      ...boardSteps.map((s) => s.text),
+    ].map((x) => String(x || "").trim()).filter(Boolean);
+    const examLines = examLinesRaw.length
+      ? examLinesRaw
+      : [
+          "CBSE examiner line: state theorem/criterion and correspondence explicitly.",
+          "Final line must clearly conclude the required result.",
+        ];
+
+    const workedSingle =
+      isRecord(obj.workedExample)
+        ? obj.workedExample
+        : Array.isArray(obj.workedExamples) && isRecord(obj.workedExamples[0])
+          ? obj.workedExamples[0]
+          : {};
+    const workedQuestion =
+      String(workedSingle.question || "").trim() ||
+      String(next?.micro_drill || "").trim() ||
+      `Micro-drill: write two board-style steps for ${nodeTitle}.`;
+    const workedSteps = normalizeWorkedSteps(workedSingle.steps, boardSteps);
+    const workedFinal =
+      String(workedSingle.finalAnswer || "").trim() ||
+      String(next?.revision_hook || "").trim() ||
+      `Therefore, ${nodeTitle} is established with correct reasoning.`;
+
+    type NormalizedWorkedExample = {
+      question: string;
+      steps: Array<{ text: string; marks?: number }>;
+      totalMarks?: number;
+      finalAnswer: string;
+    };
+    const rawWorkedExamples = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
+    const workedExamples: NormalizedWorkedExample[] = [];
+    if (rawWorkedExamples.length > 0) {
+      rawWorkedExamples.forEach((entry) => {
+        if (!isRecord(entry)) return;
+        const steps = normalizeWorkedSteps(entry.steps, boardSteps);
+        const totalMarks = Number(entry.totalMarks);
+        const sumMarks = steps.reduce((acc, s) => acc + (Number.isFinite(Number(s.marks)) ? Number(s.marks) : 0), 0);
+        workedExamples.push({
+          question: String(entry.question || workedQuestion),
+          steps,
+          totalMarks: Number.isFinite(totalMarks) ? totalMarks : sumMarks > 0 ? sumMarks : undefined,
+          finalAnswer: String(entry.finalAnswer || workedFinal),
+        });
+      });
+    }
+    if (workedExamples.length === 0) {
+      workedExamples.push({
+        question: workedQuestion,
+        steps: workedSteps,
+        totalMarks:
+          workedSteps.reduce(
+            (acc, s) => acc + (Number.isFinite(Number(s.marks)) ? Number(s.marks) : 0),
+            0
+          ) || undefined,
+        finalAnswer: workedFinal,
+      });
+    }
+
+    const goalLine =
+      String(teach.goal || teach.headline || teach.oneLiner || obj.goalLine || "").trim() ||
+      `Learn ${nodeTitle} in exam-writing format.`;
+    const checkpointQuestion =
+      String(checkpoint.question || obj.checkQuestion || socratic?.question || "").trim() ||
+      `Quick check: which criterion/theorem applies for ${nodeTitle}?`;
+    const checkpointAnswer =
+      String(checkpoint.answer || "").trim() ||
+      "Expected answer: state the theorem/criterion and the correspondence clearly.";
+    const commonMistake =
+      String(
+        obj.commonMistake ||
+          teach.commonMistake ||
+          obj.commonError ||
+          diagnosis?.misconception_summary ||
+          (Array.isArray(obj.commonMistakes) ? obj.commonMistakes[0] : "")
+      ).trim() || "Common mistake: skipping theorem name or correspondence order.";
+    const commonFix =
+      String(obj.commonFix || next?.micro_drill || next?.revision_hook || "").trim() ||
+      "Fix: write theorem name, correspondence, and final conclusion line.";
+
+    const boardQuestion =
+      workedExamples.length > 1
+        ? String(workedExamples[1].question || "").trim()
+        : checkpointQuestion;
+
+    return {
+      goalLine,
+      keyIdeas,
+      examLines,
+      workedQuestion,
+      workedSteps,
+      workedFinal,
+      workedExamples,
+      checkpointQuestion,
+      checkpointAnswer,
+      commonMistake,
+      commonFix,
+      boardQuestion,
+    };
+  };
+
 
   const renderTeach = () => {
     const response = currentResponse;
     if (!response || !response.structured) return null;
     const obj = response.structured;
-    const tutorText = getTutorText(obj);
     const coachProps = buildCoachViewProps(obj);
-    const bullets = Array.isArray(obj.conceptBullets) ? obj.conceptBullets : [];
-    const examLines = Array.isArray(obj.examLines) ? obj.examLines : [];
-    const worked = isRecord(obj.workedExample) ? obj.workedExample : {};
-    const steps = Array.isArray(worked.steps) ? worked.steps : [];
+    const view = normalizeTeachView(obj);
+    const tutorText = getTutorText(obj);
+    const workedStepText = view.workedSteps
+      .map((step, idx) => {
+        const marks = Number.isFinite(Number(step.marks)) ? ` (${Number(step.marks)}M)` : "";
+        return `${idx + 1}. ${String(step.text)}${marks}`;
+      })
+      .join("\n");
+    const lessonMessages: Array<{ id: string; role: "assistant"; title: string; text: string; tone?: "neutral" | "warn" }> = [
+      {
+        id: "lesson",
+        role: "assistant",
+        title: "Lesson",
+        text: [view.goalLine, ...view.keyIdeas.map((line) => `- ${line}`)].join("\n"),
+      },
+      {
+        id: "intuition",
+        role: "assistant",
+        title: "Why This Works",
+        text: view.examLines.map((line) => `- ${line}`).join("\n"),
+      },
+      {
+        id: "worked",
+        role: "assistant",
+        title: "Worked Example",
+        text: `${view.workedQuestion}\n\n${workedStepText}\n\nFinal: ${view.workedFinal}`,
+      },
+      {
+        id: "board-q",
+        role: "assistant",
+        title: "Board-Style Question",
+        text: `${view.boardQuestion}\n\nTry it in the input box below. I will hint before giving full steps.`,
+      },
+      {
+        id: "checkpoint",
+        role: "assistant",
+        title: "Checkpoint",
+        text: `${view.checkpointQuestion}\n\nExpected answer style: ${view.checkpointAnswer}`,
+      },
+      {
+        id: "mistake",
+        role: "assistant",
+        title: "Common Trap",
+        text: `${view.commonMistake}\n\nFix: ${view.commonFix}`,
+        tone: "warn",
+      },
+    ];
+    const chatMessages = chatTurns.map((turn, idx) => ({
+      id: `chat-${idx}`,
+      role: turn.role,
+      title: turn.role === "assistant" ? "Tutor" : "You",
+      text: turn.text,
+      tone: "neutral" as const,
+    }));
+    const allMessages = [
+      ...(showLessonPack ? lessonMessages : []),
+      ...chatMessages,
+      ...(doubtLoading
+        ? [{ id: "pending", role: "assistant" as const, title: "Tutor", text: "Thinking...", tone: "neutral" as const }]
+        : []),
+    ];
+    const bubbleStyle = (role: "assistant" | "user", tone?: "neutral" | "warn") => ({
+      maxWidth: "82%",
+      borderRadius: 14,
+      padding: "10px 12px",
+      border: role === "assistant" ? "1px solid rgba(0,0,0,0.10)" : "1px solid rgba(59,130,246,0.35)",
+      background:
+        role === "assistant"
+          ? tone === "warn"
+            ? "rgba(245,158,11,0.10)"
+            : "rgba(255,255,255,0.92)"
+          : "rgba(59,130,246,0.12)",
+    });
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
@@ -776,56 +1149,61 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           note="CBSE diagram block"
         />
         {tutorText ? (
-          <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
+          <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.9)", border: "1px solid rgba(0,0,0,0.08)" }}>
             {String(tutorText)}
           </div>
         ) : null}
-        {coachProps ? <HumanGradeCoachView {...coachProps} /> : null}
+        {coachProps ? <HumanGradeCoachView {...coachProps} compact /> : null}
         {renderAttemptFeedback(obj)}
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Concept bullets</div>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {bullets.map((b, idx: number) => (
-              <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam lines</div>
-          {examLines.map((l, idx: number) => (
-            <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
-              {String(l)}
+        {chatTurns.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="pill"
+              style={{ padding: "6px 10px", fontSize: 12 }}
+              onClick={() => setShowLessonPack((prev) => !prev)}
+            >
+              {showLessonPack ? "Hide lesson pack" : "Show lesson pack"}
+            </button>
+            {!showLessonPack ? (
+              <span style={{ fontSize: 12, opacity: 0.7 }}>Focus mode: chat and guidance only.</span>
+            ) : null}
+          </div>
+        ) : null}
+        <div style={{ display: "grid", gap: 10 }}>
+          {allMessages.map((msg) => (
+            <div
+              key={msg.id}
+              style={{
+                display: "flex",
+                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+              }}
+            >
+              <div style={bubbleStyle(msg.role, msg.tone)}>
+                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
+                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{msg.text}</div>
+              </div>
             </div>
           ))}
         </div>
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Mini worked example</div>
-          {worked.question ? (
-            <div style={{ marginBottom: 8, opacity: 0.9 }}>{String(worked.question)}</div>
-          ) : null}
-          {steps.length ? (
-            <ol style={{ margin: 0, paddingLeft: 18 }}>
-              {steps.map((s, idx: number) => (
-                <li key={idx} style={{ marginBottom: 6 }}>{String(s)}</li>
-              ))}
-            </ol>
-          ) : null}
-          {worked.finalAnswer ? (
-            <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(worked.finalAnswer)}</div>
-          ) : null}
-        </div>
-        <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(255,180,0,0.08)" }}>
-          <div style={{ fontWeight: 800 }}>Common error + fix</div>
-          <div style={{ marginTop: 6 }}>{String(obj.commonError || "")}</div>
-          <div style={{ marginTop: 6, fontWeight: 700 }}>Fix: {String(obj.commonFix || "")}</div>
-        </div>
-        <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Quick check</div>
-          <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
-            {String(obj.checkQuestion || "")}
-          </div>
-        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
+          >
+            Need hint
+          </button>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => {
+              setDoubtInput("Checkpoint attempt: ");
+              doubtInputRef.current?.focus();
+            }}
+          >
+            Try checkpoint
+          </button>
           <button
             type="button"
             className="pill"
@@ -870,11 +1248,10 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     const obj = response.structured;
     const tutorText = getTutorText(obj);
     const coachProps = buildCoachViewProps(obj);
-    const teach = isRecord(obj.teach) ? obj.teach : {};
-    const simple = Array.isArray(teach.simpleExplanation) ? teach.simpleExplanation : [];
-    const exam = Array.isArray(teach.cbseExamSentence) ? teach.cbseExamSentence : [];
-    const worked = Array.isArray(obj.workedExamples) ? obj.workedExamples : [];
-    const mistakes = Array.isArray(obj.commonMistakes) ? obj.commonMistakes : [];
+    const view = normalizeTeachView(obj);
+    const mistakes = Array.isArray(obj.commonMistakes)
+      ? obj.commonMistakes.map((m) => String(m || "").trim()).filter(Boolean)
+      : [view.commonMistake];
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
@@ -893,37 +1270,38 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Teach bullets</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {simple.map((b, idx: number) => (
+            {view.keyIdeas.map((b, idx: number) => (
               <li key={idx} style={{ marginBottom: 6 }}>{String(b)}</li>
             ))}
           </ul>
         </div>
         <div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Exam line</div>
-          {exam.map((l, idx: number) => (
+          {view.examLines.map((l, idx: number) => (
             <div key={idx} style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
               {String(l)}
             </div>
           ))}
         </div>
         <div>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked examples (2)</div>
-          {worked.map((ex, exIdx: number) => {
-            const exRecord = isRecord(ex) ? ex : {};
-            const steps = Array.isArray(exRecord.steps) ? exRecord.steps : [];
-            const sumMarks = steps.reduce((acc: number, s) => acc + (isRecord(s) ? Number(s.marks) || 0 : 0), 0);
-            const total = Number(exRecord.totalMarks);
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked examples</div>
+          {view.workedExamples.map((ex, exIdx: number) => {
+            const sumMarks = ex.steps.reduce(
+              (acc: number, s) => acc + (Number.isFinite(Number(s.marks)) ? Number(s.marks) : 0),
+              0
+            );
+            const total = Number(ex.totalMarks);
             return (
               <div key={exIdx} style={{ borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(0,0,0,0.08)", marginBottom: 10 }}>
                 <div style={{ fontWeight: 800 }}>
                   {exIdx === 0 ? "Example 1: Basic" : "Example 2: Board-style"}
                 </div>
-                {exRecord.question ? <div style={{ marginTop: 6 }}>{String(exRecord.question)}</div> : null}
-                {steps.length ? (
+                {ex.question ? <div style={{ marginTop: 6 }}>{String(ex.question)}</div> : null}
+                {ex.steps.length ? (
                   <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                    {steps.map((s, idx: number) => (
+                    {ex.steps.map((s, idx: number) => (
                       <li key={idx} style={{ marginBottom: 6 }}>
-                        <b>[{isRecord(s) ? Number(s.marks) || 0 : 0}]</b> {isRecord(s) ? String(s.text || "") : ""}
+                        {Number.isFinite(Number(s.marks)) ? <b>[{Number(s.marks)}]</b> : null} {String(s.text || "")}
                       </li>
                     ))}
                   </ol>
@@ -936,8 +1314,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                     Marking check: step marks sum to {sumMarks}, expected {total}.
                   </div>
                 ) : null}
-                {exRecord.finalAnswer ? (
-                  <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(exRecord.finalAnswer)}</div>
+                {ex.finalAnswer ? (
+                  <div style={{ marginTop: 6, fontWeight: 700 }}>Final: {String(ex.finalAnswer)}</div>
                 ) : null}
               </div>
             );
@@ -953,11 +1331,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </ul>
           </div>
         ) : null}
-        {obj.checkQuestion ? (
+        {view.checkpointQuestion ? (
           <div>
             <div style={{ fontWeight: 800, marginBottom: 6 }}>Check question</div>
             <div style={{ padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
-              {String(obj.checkQuestion)}
+              {view.checkpointQuestion}
             </div>
           </div>
         ) : null}
@@ -1001,6 +1379,21 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const inputPlaceholder =
     tab === "teach" ? "Answer checkpoint or ask a doubt..." : "Ask a doubt about this step...";
   const sendButtonLabel = tab === "teach" ? "Submit" : "Send";
+  const checkpointHint =
+    tab === "teach"
+      ? "Checkpoint = answer the quick check above in your own words."
+      : "Ask any doubt about this step.";
+  const quickPrompts =
+    tab === "teach"
+      ? [
+          "Explain this in simple Class 10 language.",
+          "Give one board-style solved example for this step.",
+          "Check my checkpoint answer and tell me one mistake.",
+        ]
+      : [
+          "Show one more board example for this node.",
+          "What is the most common exam mistake here?",
+        ];
 
   return (
     <div
@@ -1017,15 +1410,20 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       <div
         style={{
           position: "absolute",
-          top: 0,
-          right: 0,
-          height: "100%",
-          width: "min(440px, 94vw)",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "min(1360px, 98vw)",
+          height: "min(96vh, 980px)",
+          maxHeight: "96vh",
+          minHeight: "620px",
           background: drawerBg,
+          borderRadius: 18,
+          border: "1px solid rgba(0,0,0,0.12)",
           boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
           display: "flex",
           flexDirection: "column",
-          padding: 16,
+          padding: 18,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1163,6 +1561,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         </div>
 
         <div
+          ref={contentScrollRef}
           style={{
             marginTop: 12,
             flex: 1,
@@ -1171,39 +1570,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             borderRadius: 14,
             border: "1px solid rgba(0,0,0,0.10)",
             background: "rgba(255,255,255,0.6)",
+            minHeight: 280,
           }}
         >
           {drawerContent()}
         </div>
-
-        {doubtAnswer ? (
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
-            <div style={{ whiteSpace: "pre-wrap" }}>{doubtAnswer}</div>
-            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="pill" onClick={() => setDoubtAnswer(null)}>
-                Resume
-              </button>
-              <button
-                type="button"
-                className="pill"
-                onClick={() => sendDoubt("Explain this in simpler words, shorter and clearer.")}
-                disabled={doubtLoading}
-              >
-                Explain simpler
-              </button>
-              <button
-                type="button"
-                className="pill"
-                onClick={() => {
-                  setDoubtAnswer(null);
-                  handleTabChange("examples");
-                }}
-              >
-                Show board example
-              </button>
-            </div>
-          </div>
-        ) : null}
 
         {doubtError ? (
           <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(255,0,0,0.06)" }}>
@@ -1211,14 +1582,18 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.78 }}>{checkpointHint}</div>
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
           <input
             ref={doubtInputRef}
             value={doubtInput}
             onChange={(e) => setDoubtInput(e.target.value)}
             placeholder={inputPlaceholder}
             onKeyDown={(e) => {
-              if (e.key === "Enter") sendDoubt(doubtInput);
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void sendDoubt(doubtInput);
+              }
             }}
             style={{
               flex: 1,
@@ -1237,92 +1612,120 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             onClick={() => sendDoubt(doubtInput)}
             disabled={doubtLoading || !doubtInput.trim()}
           >
-            {sendButtonLabel}
+            {doubtLoading ? "Thinking..." : sendButtonLabel}
           </button>
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {quickPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="pill"
+              style={{ padding: "6px 10px", fontSize: 12 }}
+              onClick={() => {
+                setDoubtInput(prompt);
+                doubtInputRef.current?.focus();
+              }}
+              disabled={doubtLoading}
+            >
+              {prompt}
+            </button>
+          ))}
         </div>
 
         <div style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Was this helpful?</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="pill"
-              onClick={() => setFeedbackChoice("yes")}
-              style={{ background: feedbackChoice === "yes" ? "rgba(34,197,94,0.15)" : "white" }}
-            >
-              Yes
-            </button>
-            <button
-              type="button"
-              className="pill"
-              onClick={() => setFeedbackChoice("no")}
-              style={{ background: feedbackChoice === "no" ? "rgba(239,68,68,0.15)" : "white" }}
-            >
-              No
-            </button>
-          </div>
-          <textarea
-            value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
-            placeholder="Optional feedback (what helped / what was missing)"
-            rows={3}
-            style={{
-              marginTop: 8,
-              width: "100%",
-              borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.12)",
-              padding: "8px 10px",
-              fontSize: 13,
-              resize: "vertical",
-              background: "white",
-            }}
-          />
-          <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="pill"
-              disabled={!feedbackChoice || feedbackStatus === "sending"}
-              onClick={async () => {
-                if (!feedbackChoice) return;
-                setFeedbackStatus("sending");
-                setFeedbackMessage(null);
-                try {
-                  const payload = {
-                    helpful: feedbackChoice === "yes",
-                    comment: feedbackText,
-                    topicKey,
-                    nodeId,
-                    responseId: currentResponse?.responseId || null,
-                    tab,
-                    mode,
-                    grade,
-                    subject: subjectTitle,
-                    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-                    clientTs: new Date().toISOString(),
-                  };
-                  const res = await fetch("/api/tutor-feedback", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(getResponseError(data, "Feedback failed."));
-                  setFeedbackStatus("success");
-                  setFeedbackMessage("Thanks! Your feedback was saved.");
-                } catch (err) {
-                  setFeedbackStatus("error");
-                  setFeedbackMessage(getErrorMessage(err, "Could not save feedback."));
-                }
-              }}
-            >
-              {feedbackStatus === "sending" ? "Submitting..." : "Submit"}
-            </button>
-            {feedbackMessage ? (
-              <div style={{ fontSize: 12, color: feedbackStatus === "error" ? "#b91c1c" : "#166534" }}>
-                {feedbackMessage}
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setShowFeedbackPanel((prev) => !prev)}
+            style={{ padding: "6px 10px", fontSize: 13, background: "white" }}
+          >
+            {showFeedbackPanel ? "Hide feedback" : "Was this helpful? Add feedback (optional)"}
+          </button>
+          {showFeedbackPanel ? (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => setFeedbackChoice("yes")}
+                  style={{ background: feedbackChoice === "yes" ? "rgba(34,197,94,0.15)" : "white" }}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => setFeedbackChoice("no")}
+                  style={{ background: feedbackChoice === "no" ? "rgba(239,68,68,0.15)" : "white" }}
+                >
+                  No
+                </button>
               </div>
-            ) : null}
-          </div>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Optional feedback (what helped / what was missing)"
+                rows={3}
+                style={{
+                  marginTop: 8,
+                  width: "100%",
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  padding: "8px 10px",
+                  fontSize: 13,
+                  resize: "vertical",
+                  background: "white",
+                }}
+              />
+              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="pill"
+                  disabled={!feedbackChoice || feedbackStatus === "sending"}
+                  onClick={async () => {
+                    if (!feedbackChoice) return;
+                    setFeedbackStatus("sending");
+                    setFeedbackMessage(null);
+                    try {
+                      const payload = {
+                        helpful: feedbackChoice === "yes",
+                        comment: feedbackText,
+                        topicKey,
+                        nodeId,
+                        responseId: currentResponse?.responseId || null,
+                        tab,
+                        mode,
+                        grade,
+                        subject: subjectTitle,
+                        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+                        clientTs: new Date().toISOString(),
+                      };
+                      const res = await fetch("/api/tutor-feedback", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                      });
+                      const data = await parseResponsePayload(res);
+                      if (!res.ok) throw new Error(getResponseError(data, "Feedback failed."));
+                      setFeedbackStatus("success");
+                      setFeedbackMessage("Thanks! Your feedback was saved.");
+                    } catch (err) {
+                      setFeedbackStatus("error");
+                      setFeedbackMessage(toTutorErrorMessage(err, "Could not save feedback."));
+                    }
+                  }}
+                >
+                  {feedbackStatus === "sending" ? "Submitting..." : "Submit"}
+                </button>
+                {feedbackMessage ? (
+                  <div style={{ fontSize: 12, color: feedbackStatus === "error" ? "#b91c1c" : "#166534" }}>
+                    {feedbackMessage}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

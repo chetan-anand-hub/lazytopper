@@ -123,6 +123,7 @@ const STUB_MODE = !AI_PROVIDER || !API_KEY || AI_PROVIDER_NORMALIZED !== 'gemini
 const ACTIVE_PROVIDER = STUB_MODE ? 'stub' : AI_PROVIDER_NORMALIZED;
 const GEMINI_API_KEY = AI_PROVIDER_NORMALIZED === 'gemini' ? API_KEY : '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_TIMEOUT_MS = Math.max(5000, Number(process.env.GEMINI_TIMEOUT_MS || 20000) || 20000);
 const IS_DEV = String(process.env.NODE_ENV || '').toLowerCase() !== 'production';
 const GEMINI_MODEL_ZOMBIE = process.env.GEMINI_MODEL_ZOMBIE || '';
 const GEMINI_MODEL_BEAST = process.env.GEMINI_MODEL_BEAST || '';
@@ -1452,13 +1453,28 @@ function getLastUserMessage(messages) {
 
 function isTrianglesEvaluationRequest(payload, messages) {
   if (!isTrianglesTopic(payload)) return false;
+  // Keep Learn/Teach interactions in tutor mode; evaluation is opt-in.
+  if (isTeachTabPayload(payload)) return false;
+  const section = String(payload?.section || '').toLowerCase();
+  const subSection = String(payload?.subSection || '').toLowerCase();
+  const selectedTab = String(payload?.selectedTab || payload?.tab || '').toLowerCase();
+  if (
+    section === 'learn' &&
+    (selectedTab === 'teach' || subSection.includes('teach') || subSection.includes('board'))
+  ) {
+    return false;
+  }
   const explicitAttempt = String(payload?.studentAttempt || payload?.studentAnswer || '').trim();
   if (explicitAttempt) return true;
   const last = getLastUserMessage(messages);
   if (!last) return false;
-  const hasEvalKeyword = /(check|evaluate|mark|grade|score|feedback)\b/i.test(last);
-  const hasAttemptKeyword = /(answer|attempt|solution|proof)\b/i.test(last);
-  return hasEvalKeyword && hasAttemptKeyword;
+  const normalized = last.trim();
+  const hasExplicitEvalIntent =
+    /^(please\s+)?(check|evaluate|mark|grade|score|feedback|assess)\b/i.test(normalized) ||
+    /\b(check|evaluate|mark|grade|score|feedback|assess)\s+(my|this)\b/i.test(normalized);
+  if (!hasExplicitEvalIntent) return false;
+  const hasAttemptKeyword = /(answer|attempt|solution|proof)\b/i.test(normalized);
+  return hasAttemptKeyword;
 }
 
 function extractStudentAttempt(payload, messages) {
@@ -1466,7 +1482,10 @@ function extractStudentAttempt(payload, messages) {
   if (explicit) return explicit;
   const last = getLastUserMessage(messages);
   if (!last) return '';
-  return String(last || '').replace(/^(check|evaluate|mark|grade|score|feedback)\s*[:\-]?\s*/i, '').trim();
+  return String(last || '')
+    .replace(/^(please\s+)?(check|evaluate|mark|grade|score|feedback|assess)\s*[:\-]?\s*/i, '')
+    .replace(/^student\s+checkpoint\s+attempt\s+or\s+doubt\s*[:\-]?\s*/i, '')
+    .trim();
 }
 
 function classifyAttemptStatus(attempt) {
@@ -1915,6 +1934,91 @@ function ensureMinArray(list, min, makeItem) {
   return out;
 }
 
+function toSingleLine(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function enforceTeacherGoal(goal, nodeTitle) {
+  const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  let out = toSingleLine(goal);
+  if (!out) out = `Teacher goal: Learn ${topic} in CBSE board-writing format.`;
+  if (!/^teacher goal:/i.test(out)) out = `Teacher goal: ${out.replace(/^goal:\s*/i, '')}`;
+  if (!/\bCBSE\b|\bboard\b/i.test(out)) out = `${out} (CBSE board-writing format).`;
+  return out;
+}
+
+function normalizeTeachKeyIdeas(lines, nodeTitle) {
+  const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  const defaults = [
+    `Definition: state what ${topic} means in this question.`,
+    'Criterion: write the exact theorem/criterion name before using it.',
+    'Correspondence: keep matching vertices/sides in the same order.',
+    'Conclusion: end with Therefore/Hence and the required statement.',
+  ];
+  const prefixes = ['Definition', 'Criterion', 'Correspondence', 'Conclusion'];
+  const merged = ensureMinArray(toStringArray(lines), 4, (i) => defaults[i] || `Step ${i + 1}: ${topic}.`).slice(0, 4);
+  return merged.map((line, idx) => {
+    const cleaned = toSingleLine(String(line || '').replace(/^(definition|criterion|correspondence|conclusion)\s*[:\-]?\s*/i, ''));
+    const fallback = defaults[idx].replace(/^(Definition|Criterion|Correspondence|Conclusion)\s*:\s*/i, '');
+    return `${prefixes[idx]}: ${cleaned || fallback}`;
+  });
+}
+
+function enforceCheckpointQuestion(question, nodeTitle) {
+  const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  let out = toSingleLine(question);
+  if (!out) {
+    out = `Board checkpoint: In 2-4 lines, write Given, To Prove, the criterion/theorem for ${topic}, and one Therefore/Hence line.`;
+  }
+  if (!/\bboard\b|\bCBSE\b/i.test(out)) out = `Board checkpoint: ${out}`;
+  if (!/\bcriterion\b|\btheorem\b/i.test(out)) out = `${out} Include the criterion/theorem name.`;
+  if (!/\bGiven\b/i.test(out) || !/\bTo Prove\b/i.test(out) || !/\bTherefore\b|\bHence\b/i.test(out)) {
+    out = `${out} Use Given, To Prove, and Therefore/Hence format.`;
+  }
+  return out;
+}
+
+function enforceCheckpointAnswer(answer, nodeTitle) {
+  const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  let out = String(answer || '').trim();
+  const boardTemplate = [
+    `Given: [state the given data for ${topic}].`,
+    'To Prove: [write the required result].',
+    'Criterion/Theorem: [write exact name such as AA/SAS/SSS if applicable].',
+    'Therefore/Hence: [write the final conclusion line].',
+  ].join(' ');
+  if (!out) out = boardTemplate;
+  out = toSingleLine(out);
+  const hasGiven = /\bgiven\b\s*:/i.test(out);
+  const hasToProve = /\bto prove\b\s*:/i.test(out);
+  const hasCriterion = /\bcriterion\b|\btheorem\b/i.test(out);
+  const hasConclusion = /\btherefore\b|\bhence\b/i.test(out);
+  if (!hasGiven || !hasToProve || !hasCriterion || !hasConclusion) {
+    if (!out.includes('Given: [state the given data')) {
+      out = `${out} ${boardTemplate}`.trim();
+    }
+  }
+  const doubledTemplate = `${boardTemplate} ${boardTemplate}`;
+  if (out.includes(doubledTemplate)) {
+    out = out.replace(doubledTemplate, boardTemplate);
+  }
+  if (!/^expected answer:/i.test(out)) out = `Expected answer: ${out}`;
+  return out;
+}
+
+function enforceCommonMistake(commonMistake, nodeTitle) {
+  const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  let out = toSingleLine(commonMistake);
+  if (!out) {
+    out = `Common mistake: skipping criterion/correspondence while writing ${topic}.`;
+  }
+  if (!/^common mistake:/i.test(out)) out = `Common mistake: ${out}`;
+  if (!/\bmark\b|\bdeduct\b|\blose marks\b|\bstep marks\b/i.test(out)) {
+    out = `${out} This can lose marks in CBSE board checking.`;
+  }
+  return out;
+}
+
 function buildDiagramFields(payload, raw = {}) {
   const diagramRequired = typeof raw.diagramRequired === 'boolean' ? raw.diagramRequired : shouldRequireDiagram(payload);
   const diagramType = diagramRequired
@@ -2007,30 +2111,35 @@ function ensureTeachContractShape(raw, payload) {
     payload?.itemTitle ||
     topic;
   const teach = raw.teach && typeof raw.teach === 'object' ? { ...raw.teach } : {};
-  const goal =
-    String(teach.goal || raw.goalLine || teach.headline || teach.oneLiner || '').trim() ||
-    `Goal: Understand ${nodeTitle}.`;
+  const goal = enforceTeacherGoal(
+    String(teach.goal || raw.goalLine || teach.headline || teach.oneLiner || '').trim(),
+    nodeTitle
+  );
   let keyIdeas = toStringArray(teach.keyIdeas);
   if (!keyIdeas.length) keyIdeas = toStringArray(raw.keyIdeaBullets);
   if (!keyIdeas.length) keyIdeas = toStringArray(teach.conceptBullets);
   if (!keyIdeas.length) keyIdeas = toStringArray(teach.simpleExplanation);
-  keyIdeas = ensureMinArray(keyIdeas, 2, (i) => `Key idea ${i + 1}: ${nodeTitle}.`);
+  keyIdeas = normalizeTeachKeyIdeas(keyIdeas, nodeTitle);
   const diagram = buildTeachDiagramObject(payload, teach.diagram || raw.diagram || {}, raw);
   const checkpointRaw = raw.checkpoint || teach.checkpoint || {};
-  const checkpointQuestion =
-    String(checkpointRaw.question || raw.checkpointQ || raw.checkQuestion || '').trim() ||
-    `Quick check: What must you state before applying ${nodeTitle}?`;
-  const checkpointAnswer =
-    String(checkpointRaw.answer || raw.checkpointA || '').trim() ||
-    `Expected answer: State the criterion and correspondence clearly for ${nodeTitle}.`;
-  const commonMistake =
+  const checkpointQuestion = enforceCheckpointQuestion(
+    String(checkpointRaw.question || raw.checkpointQ || raw.checkQuestion || '').trim(),
+    nodeTitle
+  );
+  const checkpointAnswer = enforceCheckpointAnswer(
+    String(checkpointRaw.answer || raw.checkpointA || '').trim(),
+    nodeTitle
+  );
+  const commonMistake = enforceCommonMistake(
     String(
       raw.commonMistake ||
         teach.commonMistake ||
         raw.commonMistakeWarning ||
         raw.commonError ||
         (Array.isArray(raw.commonMistakes) ? raw.commonMistakes[0] : '')
-    ).trim() || 'Common mistake: skipping the criterion or correspondence.';
+    ).trim(),
+    nodeTitle
+  );
 
   const nextTeach = {
     ...teach,
@@ -2067,7 +2176,15 @@ function validateLearnTeachContract(obj, payload) {
   const goal = String(teach.goal || '').trim();
   const keyIdeas = toStringArray(teach.keyIdeas);
   if (!goal) issues.push('teach.goal missing.');
-  if (keyIdeas.length < 2) issues.push('teach.keyIdeas needs >= 2 items.');
+  if (keyIdeas.length < 4) issues.push('teach.keyIdeas needs >= 4 items.');
+  if (!/^Teacher goal:/i.test(goal)) issues.push('teach.goal must start with "Teacher goal:".');
+  const ideaPrefixes = ['Definition:', 'Criterion:', 'Correspondence:', 'Conclusion:'];
+  ideaPrefixes.forEach((prefix, idx) => {
+    const line = String(keyIdeas[idx] || '');
+    if (!line.startsWith(prefix)) {
+      issues.push(`teach.keyIdeas[${idx}] must start with "${prefix}".`);
+    }
+  });
 
   const diagram = teach.diagram || {};
   if (!diagram || typeof diagram !== 'object') {
@@ -2083,11 +2200,37 @@ function validateLearnTeachContract(obj, payload) {
   }
 
   const checkpoint = obj.checkpoint || teach.checkpoint || {};
-  if (!String(checkpoint.question || '').trim()) issues.push('checkpoint.question missing.');
-  if (!String(checkpoint.answer || '').trim()) issues.push('checkpoint.answer missing.');
+  const checkpointQuestion = String(checkpoint.question || '').trim();
+  const checkpointAnswer = String(checkpoint.answer || '').trim();
+  if (!checkpointQuestion) issues.push('checkpoint.question missing.');
+  if (!checkpointAnswer) issues.push('checkpoint.answer missing.');
+  if (checkpointQuestion) {
+    if (!/\bboard\b|\bCBSE\b/i.test(checkpointQuestion)) {
+      issues.push('checkpoint.question must be board/CBSE aligned.');
+    }
+    if (!/\bgiven\b/i.test(checkpointQuestion) || !/\bto prove\b/i.test(checkpointQuestion)) {
+      issues.push('checkpoint.question must reference Given and To Prove format.');
+    }
+  }
+  if (checkpointAnswer) {
+    if (!/^Expected answer:/i.test(checkpointAnswer)) {
+      issues.push('checkpoint.answer must start with "Expected answer:".');
+    }
+    if (!/\bgiven\b\s*:/i.test(checkpointAnswer)) issues.push('checkpoint.answer missing "Given:".');
+    if (!/\bto prove\b\s*:/i.test(checkpointAnswer)) issues.push('checkpoint.answer missing "To Prove:".');
+    if (!/\bcriterion\b|\btheorem\b/i.test(checkpointAnswer)) {
+      issues.push('checkpoint.answer missing criterion/theorem line.');
+    }
+    if (!/\btherefore\b|\bhence\b/i.test(checkpointAnswer)) {
+      issues.push('checkpoint.answer missing Therefore/Hence line.');
+    }
+  }
 
   const commonMistake = String(obj.commonMistake || teach.commonMistake || '').trim();
   if (!commonMistake) issues.push('commonMistake missing.');
+  if (!/\bmark\b|\bdeduct\b|\blose marks\b|\bstep marks\b/i.test(commonMistake)) {
+    issues.push('commonMistake must mention a marks/deduction risk.');
+  }
 
   const blob = JSON.stringify(obj || {});
   if (containsPlaceholderLanguage(blob)) issues.push('Placeholder language detected.');
@@ -2384,11 +2527,12 @@ function buildLearnTeachContractPrompt(payload) {
   const example = {
     kind: 'learn_teach',
     teach: {
-      goal: 'Goal: Conclude similarity and state one correct proportionality.',
+      goal: 'Teacher goal: Conclude similarity and state one correct proportionality in CBSE board-writing format.',
       keyIdeas: [
-        'State the angle equalities and the order of correspondence.',
-        'Use AA to conclude similarity.',
-        'Apply CPST to write the ratio of corresponding sides.',
+        'Definition: State the angle equalities used in this question.',
+        'Criterion: Use AA similarity with the criterion name written explicitly.',
+        'Correspondence: Write vertex order before ratio/equality statements.',
+        'Conclusion: Therefore/Hence conclude the required proportionality.',
       ],
       diagram: {
         required: diagram.required,
@@ -2399,10 +2543,11 @@ function buildLearnTeachContractPrompt(payload) {
       },
     },
     checkpoint: {
-      question: 'Which criterion proves similarity when two angles are equal?',
-      answer: 'AA similarity (state the correspondence order first).',
+      question: 'Board checkpoint: Write Given, To Prove, and the criterion when two angles are equal.',
+      answer:
+        'Expected answer: Given: two corresponding angles are equal. To Prove: triangles are similar. Criterion/Theorem: AA similarity. Therefore/Hence: triangles are similar in correct correspondence order.',
     },
-    commonMistake: 'Mixing the correspondence order of vertices before CPST.',
+    commonMistake: 'Common mistake: mixing correspondence order of vertices before CPST. This can lose marks in CBSE board checking.',
   };
   return [
     `You are a strict CBSE Class ${grade} ${subject} teacher for the Teach tab.`,
@@ -2415,10 +2560,20 @@ function buildLearnTeachContractPrompt(payload) {
     getLearnTeachContractSchemaText(payload),
     '',
     'RULES:',
-    '- teach.keyIdeas must have >= 2 items.',
+    '- Deterministic teacher voice: teach.goal must start with "Teacher goal:".',
+    '- teach.keyIdeas must have exactly 4 micro-steps in order.',
+    '- teach.keyIdeas line 1 starts "Definition:", line 2 "Criterion:", line 3 "Correspondence:", line 4 "Conclusion:".',
+    '- Keep NCERT/CBSE wording; avoid coaching shortcuts unless explicitly marked as shortcut.',
+    '- The lesson flow must mirror: Concept -> Intuition -> Worked Step -> Board-style question.',
+    '- Include at least one board-writing phrase in key ideas (Given, To Prove, Therefore, Hence).',
     '- teach.diagram must be present with required/type/labels/spec/altText.',
     '- checkpoint.question and checkpoint.answer must be non-empty.',
+    '- checkpoint.question must be board-style and answerable in 2-4 lines.',
+    '- checkpoint.question must explicitly ask for Given and To Prove format.',
+    '- checkpoint.answer must start with "Expected answer:" and include Given:, To Prove:, Criterion/Theorem:, and Therefore/Hence:.',
+    '- checkpoint.answer should guide expected method, not dump full solution.',
     '- commonMistake must be non-empty.',
+    '- commonMistake should mention a likely marking deduction risk.',
     '',
     'EXAMPLE (compact, valid):',
     JSON.stringify(example),
@@ -3523,16 +3678,30 @@ async function callGemini(model, finalContents, config) {
   };
 
   const doRequest = async (includeMimeType) => {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': GEMINI_API_KEY,
-      },
-      body: JSON.stringify(buildBody(includeMimeType)),
-    });
-    const rawText = await response.text();
-    return { response, rawText };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY,
+        },
+        body: JSON.stringify(buildBody(includeMimeType)),
+        signal: controller.signal,
+      });
+      const rawText = await response.text();
+      return { response, rawText };
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        const timeoutErr = new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS}ms`);
+        timeoutErr.status = 504;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   };
 
   let { response, rawText } = await doRequest(true);
@@ -4397,10 +4566,34 @@ ${userPrompt}` }] },
     } catch (err) {
       if (err && err.status === 429) {
         const retryAfterSec = 20;
-        const fallback = attachTutorDiagramIntent(
-          { tutor: { text: 'Mentor is rate-limited. Please wait 20 seconds and retry.' } },
-          payload
-        );
+        let fallbackStructured = null;
+        if (isTeachContract) {
+          fallbackStructured = buildLearnTeachFallback(payload);
+        } else if (isStructuredMode(normalisedMode)) {
+          fallbackStructured = buildTutorFallback(normalisedMode, payload);
+        }
+        if (fallbackStructured && typeof fallbackStructured === 'object') {
+          fallbackStructured = orchestrateTutorResponse({
+            mode: normalisedMode,
+            payload,
+            messages: reqJson?.messages,
+            structuredDraft: fallbackStructured,
+          });
+        }
+        const fallbackAttemptText = extractStudentAttempt(payload, reqJson?.messages);
+        if (
+          fallbackStructured &&
+          typeof fallbackStructured === 'object' &&
+          fallbackAttemptText &&
+          isTrianglesTopic(payload)
+        ) {
+          fallbackStructured.attempt_loop = buildAttemptLoopHeuristic(payload, fallbackAttemptText);
+        }
+        const fallbackBase =
+          fallbackStructured && typeof fallbackStructured === 'object'
+            ? fallbackStructured
+            : { tutor: { text: 'Mentor is rate-limited. Please wait 20 seconds and retry.' } };
+        const fallback = attachTutorDiagramIntent(fallbackBase, payload);
         return sendJsonWithHeaders(
           res,
           429,

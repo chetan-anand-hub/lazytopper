@@ -1340,20 +1340,32 @@ const showInZombie = (sectionId: string) => {
               <div>
                 <div style={{ fontWeight: 900, fontSize: 16 }}>Let me teach you</div>
                 <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  Start from basics and move step-by-step with the guided mindmap.
+                  Start from basics and move step-by-step with the guided learning path.
                 </div>
                 <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>
                   Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
                   {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoint passed
                 </div>
               </div>
-              <button
-                type="button"
-                className="pill"
-                onClick={() => openTutorDrawer({ tab: "teach" })}
-              >
-                Let me teach you
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => openTutorDrawer({ tab: "teach" })}
+                >
+                  Let me teach you
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => {
+                    setActiveTab("grind");
+                    openGrindDrawer();
+                  }}
+                >
+                  Practice via Grind
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -1378,9 +1390,21 @@ const showInZombie = (sectionId: string) => {
                   Marks-roadmap practice: rubrics, board skeletons, traps, and micro-drills.
                 </div>
               </div>
-              <button type="button" className="pill" onClick={() => openGrindDrawer({ nodeId: defaultGrindNodeId })}>
-                Start grind
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className="pill" onClick={() => openGrindDrawer({ nodeId: defaultGrindNodeId })}>
+                  Start grind
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  onClick={() => {
+                    setActiveTab("learn");
+                    openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
+                  }}
+                >
+                  Resume weakest in Learn
+                </button>
+              </div>
             </div>
           ) : null}
 {isLearn && showInZombie("summary") && overview.length > 0 && (
@@ -1462,7 +1486,7 @@ Use CBSE exam language and include a labelled diagram.`,
           )}
 
             {isLearn && guidedMindmap ? (
-              <AccordionCard id="guided-mindmap" title="Guided mindmap (Triangles)" defaultOpen={false}>
+              <AccordionCard id="guided-learning-path" title="Guided learning path (Triangles)" defaultOpen={false}>
                 <GuidedMindmapPanel
                   data={guidedMindmap}
                   onAskMentor={(node) => {
@@ -2036,9 +2060,21 @@ Use CBSE exam language and include a labelled diagram.`,
 
               <AccordionCard id="resources" title="Resources" defaultOpen>
                 <p style={{ marginTop: 0, lineHeight: 1.65, opacity: 0.95 }}>
-                  Quick revision kit for <b>{title}</b> - mindmap, formula sheet, and top videos.
+                  Quick revision kit for <b>{title}</b> - concept map, formula sheet, and top videos.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  {isTrianglesTopic ? (
+                    <button
+                      type="button"
+                      className="pill"
+                      onClick={() => {
+                        setActiveTab("learn");
+                        openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
+                      }}
+                    >
+                      Resume weakest concept
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="pill"
@@ -2055,10 +2091,10 @@ Use CBSE exam language and include a labelled diagram.`,
                 </div>
               </AccordionCard>
 
-              <AccordionCard id="mindmap" title="Mindmap" defaultOpen>
+              <AccordionCard id="concept-map" title="Concept map" defaultOpen>
                 {!mindMap ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
-                    Mindmap coming soon for this topic. (We'll auto-fill as the bank grows.)
+                    Concept map coming soon for this topic. (We'll auto-fill as the bank grows.)
                   </div>
                 ) : (
                   <MindMapCanvas

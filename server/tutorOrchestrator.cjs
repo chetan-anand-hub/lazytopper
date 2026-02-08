@@ -294,6 +294,7 @@ function buildNextBlock(tutorObj, structuredDraft, payload, attemptLoop, attempt
 function orchestrateTutorResponse({ mode, payload, messages, structuredDraft }) {
   if (!structuredDraft || typeof structuredDraft !== 'object') return structuredDraft;
   const base = {
+    ...structuredDraft,
     kind: structuredDraft.kind ?? 'tutor',
     finalAnswer: structuredDraft.finalAnswer ?? '',
   };
