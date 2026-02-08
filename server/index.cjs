@@ -3936,6 +3936,10 @@ async function handleRequest(req, res) {
           messages: reqJson?.messages,
           structuredDraft: structured,
         });
+        const stubAttemptText = extractStudentAttempt(payload, reqJson?.messages);
+        if (stubAttemptText && isTrianglesTopic(payload)) {
+          structured.attempt_loop = buildAttemptLoopHeuristic(payload, stubAttemptText);
+        }
         structured = attachTutorDiagramIntent(structured, payload);
       }
       const text = structured ? JSON.stringify(structured) : buildStubText();
