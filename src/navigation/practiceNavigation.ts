@@ -2,18 +2,21 @@
 import type { NavigateFunction } from "react-router-dom";
 
 export type PracticeDifficultyPreset = "All" | "Easy" | "Medium" | "Hard";
+export type PracticeSectionFilter = "A" | "B" | "C" | "D" | "E";
 
 export interface PracticeNavRequest {
-  grade: string;                    // e.g. "10"
+  grade: string; // e.g. "10"
   subject: "Maths" | "Science";
-  topicKey?: string;                // canonical topic key, usually the Trends/HPQ topic key
-  topicName?: string;               // pretty display name for header
-  backPath?: string;                // where “Back to …” should return
-  backLabel?: string;               // label for back button
-  subtopicHint?: string;            // e.g. bucket.topic, concept tag
-  focusBankIds?: string[];          // HPQ / predictive engine IDs to bias sampling from
-  recommendedCount?: number;        // suggested number of questions (UI can override)
+  topicKey?: string; // canonical topic key, usually the Trends/HPQ topic key
+  topicName?: string; // pretty display name for header
+  backPath?: string; // where "Back to ..." should return
+  backLabel?: string; // label for back button
+  subtopicHint?: string; // e.g. bucket.topic, concept tag
+  sectionFilter?: PracticeSectionFilter; // CBSE board section/pattern filter
+  focusBankIds?: string[]; // HPQ / predictive engine IDs to bias sampling from
+  recommendedCount?: number; // suggested number of questions (UI can override)
   difficultyPreset?: PracticeDifficultyPreset;
+  source?: string;
 }
 
 /**
@@ -21,7 +24,7 @@ export interface PracticeNavRequest {
  * It ALWAYS goes to `/practice/:grade/:subject` and passes all filters
  * via query string + location.state.
  *
- * This is the only place that should “know” the exact URL shape.
+ * This is the only place that should "know" the exact URL shape.
  */
 export function navigateToPractice(
   navigate: NavigateFunction,
@@ -35,14 +38,16 @@ export function navigateToPractice(
     backPath,
     backLabel,
     subtopicHint,
+    sectionFilter,
     focusBankIds,
     recommendedCount,
     difficultyPreset = "All",
+    source = "hpq",
   } = request;
 
   const search = new URLSearchParams();
 
-  // Topic key drives which topic’s practice engine to use
+  // Topic key drives which topic's practice engine to use
   if (topicKey) {
     search.set("topic", topicKey);
   }
@@ -51,18 +56,21 @@ export function navigateToPractice(
   if (subtopicHint) {
     search.set("subtopicHint", subtopicHint);
   }
+  if (sectionFilter) {
+    search.set("section", sectionFilter);
+  }
 
   // HPQ / predictive IDs to bias sampling from
   if (focusBankIds && focusBankIds.length > 0) {
     search.set("focusBankIds", focusBankIds.join(","));
   }
 
-  // Recommended question count – UI slider on Practice can override
+  // Recommended question count - UI slider on Practice can override
   if (typeof recommendedCount === "number" && recommendedCount > 0) {
     search.set("count", String(recommendedCount));
   }
 
-  // Difficulty preset – “All” means no extra filter
+  // Difficulty preset - "All" means no extra filter
   if (difficultyPreset && difficultyPreset !== "All") {
     search.set("difficulty", difficultyPreset);
   }
@@ -77,7 +85,8 @@ export function navigateToPractice(
       back: backPath,
       backLabel: backLabel ?? "Back",
       topicName: topicName ?? topicKey,
-      source: "hpq", // so PracticePage knows this came from HPQ
+      source, // so PracticePage knows where this came from
+      ...(sectionFilter ? { sectionFilter } : {}),
     },
   });
 }

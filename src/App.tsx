@@ -9,6 +9,7 @@ import MockPaper from "./pages/MockPaper";
 import HighlyProbableQuestions from "./pages/HighlyProbableQuestions";
 import PredictivePapersPage from "./pages/PredictivePapers";
 import TopicHub from "./pages/TopicHub";
+import TopicHubHome from "./pages/TopicHubHome";
 import MockBuilder from "./pages/MockBuilder";
 import AiMentorPage from "./pages/AiMentorPage";
 import StudyPlanPage from "./pages/StudyPlanPage";
@@ -150,7 +151,7 @@ export default function App() {
         navigate('/mock-builder/10/Maths');
         break;
       case 'navigateToTopicHub':
-        navigate('/topic-hub/10/Maths');
+        navigate('/topic-hub');
         break;
       case 'navigateToMentor':
         navigate('/mentor/10/Maths');
@@ -220,8 +221,8 @@ export default function App() {
           <Route path="/topic-hub/:grade/:subject" element={<TopicHub />} />
           <Route path="/topic-hub/:grade/:subject/:topicKey" element={<TopicHub />} />
 
-          {/* Generic Topic Hub entry via query params (for backwards compatibility) */}
-          <Route path="/topic-hub" element={<TopicHub />} />
+          {/* TopicHub launcher page */}
+          <Route path="/topic-hub" element={<TopicHubHome />} />
 
       
 

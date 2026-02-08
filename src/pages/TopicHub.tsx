@@ -25,7 +25,10 @@ import SharedTutorDrawerV2, {
 import { MENTOR_ENDPOINT } from "../ai/aiClient";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
-import { navigateToPractice } from "../navigation/practiceNavigation";
+import {
+  navigateToPractice,
+  type PracticeSectionFilter,
+} from "../navigation/practiceNavigation";
 import {
   ensureTopicMasterySnapshot,
   getMasteryCounts,
@@ -667,6 +670,8 @@ const masteryBadgeMeta: Record<
   },
 };
 
+const TOPICHUB_LAST_ROUTE_KEY = "lazytopper.topicHub.lastRoute.v1";
+
 function mapGrindNodeToGuidedNodeId(grindNodeId: string): string {
   const id = String(grindNodeId || "").toUpperCase();
   if (id.startsWith("B")) return "gBPT";
@@ -718,6 +723,23 @@ export default function TopicHub() {
 
   // Derived display title for this TopicHub page (must be declared before hooks that depend on it).
   const title = String(v2?.topicName || topicKey || '').trim() || 'Topic';
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload = {
+      grade: String(grade),
+      subject: subjectTitle,
+      topicKey: String(topicKey),
+      topicName: title,
+      path: `/topic-hub/${grade}/${subjectTitle}/${topicKey}`,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      window.localStorage.setItem(TOPICHUB_LAST_ROUTE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore localStorage failures to avoid affecting learning flow.
+    }
+  }, [grade, subjectTitle, title, topicKey]);
 
   // Use the global vibe mode (Beast/Zombie) as the single source of truth.
   // This avoids duplicate toggles inside TopicHub and keeps behavior consistent across the app.
@@ -1631,11 +1653,90 @@ const showInZombie = (sectionId: string) => {
   const isGrind = activeTab === 'grind';
   const isResources = activeTab === 'resources';
 
+  const toSectionFilter = useCallback((value: unknown): PracticeSectionFilter | undefined => {
+    const raw = String(value ?? "").trim().toUpperCase();
+    if (raw === "A" || raw === "B" || raw === "C" || raw === "D" || raw === "E") {
+      return raw;
+    }
+    return undefined;
+  }, []);
+
+  const inferSectionFromMarks = useCallback((marks: unknown): PracticeSectionFilter | undefined => {
+    const m = typeof marks === "number" ? marks : Number(marks);
+    if (!Number.isFinite(m)) return undefined;
+    if (m === 1) return "A";
+    if (m === 2) return "B";
+    if (m === 3) return "C";
+    if (m === 4) return "E"; // case-based
+    if (m === 5) return "D";
+    return undefined;
+  }, []);
+
+  const inferSectionFromQuestionTypes = useCallback(
+    (questionTypes: unknown): PracticeSectionFilter | undefined => {
+      if (!Array.isArray(questionTypes)) return undefined;
+      const values = questionTypes.map((item) => String(item || "").toUpperCase());
+      if (values.some((item) => item.includes("CASE") || item.includes("SOURCE"))) return "E";
+      if (values.some((item) => item.includes("ASSERTION") || item.includes("MCQ"))) return "A";
+      if (values.some((item) => item.includes("SHORT") || item.includes("VSA"))) return "B";
+      if (values.some((item) => item.includes("LONG"))) return "D";
+      if (values.some((item) => item.includes("PROOF") || item.includes("NUMERICAL") || item.includes("BOARD"))) return "C";
+      return undefined;
+    },
+    []
+  );
+
+  const inferSectionFromSubtopicHint = useCallback(
+    (subtopicHint?: string): PracticeSectionFilter | undefined => {
+      const hint = String(subtopicHint || "").trim();
+      if (!hint) return undefined;
+      const direct = toSectionFilter(hint);
+      if (direct) return direct;
+      const match = hint.match(/\bpattern\s*:\s*([A-E])\b/i);
+      return match ? toSectionFilter(match[1]) : undefined;
+    },
+    [toSectionFilter]
+  );
+
+  const inferSectionFromGrindNode = useCallback(
+    (grindNodeId: string): PracticeSectionFilter | undefined => {
+      const id = String(grindNodeId || "").trim();
+      if (!id) return undefined;
+      const nodesById: Record<string, any> = grindMindmap?.nodesById || {};
+      const node = nodesById[id];
+      if (!node) return undefined;
+      const direct = toSectionFilter(node.section);
+      if (direct) return direct;
+      const byMarks = inferSectionFromMarks(
+        node?.rubric?.totalMarksTypical ??
+          node?.rubric?.total_marks ??
+          node?.marks ??
+          node?.examWeight
+      );
+      if (byMarks) return byMarks;
+      return inferSectionFromQuestionTypes(node?.questionTypes);
+    },
+    [grindMindmap, inferSectionFromMarks, inferSectionFromQuestionTypes, toSectionFilter]
+  );
+
   const openPracticeFromTopicHub = useCallback(
-    (opts: { nodeId?: string; tab?: TopicTabKey; subtopicHint?: string }) => {
+    (opts: {
+      nodeId?: string;
+      grindNodeId?: string;
+      tab?: TopicTabKey;
+      subtopicHint?: string;
+      sectionFilter?: PracticeSectionFilter;
+    }) => {
       const nodeId = String(opts.nodeId || "").trim();
       const nodeTitle = nodeId ? guidedNodeTitleById[nodeId] || nodeId : "";
       const fallbackHint = nodeId && nodeTitle ? `${nodeId}:${nodeTitle}` : nodeId || undefined;
+      const grindNodeId =
+        String(opts.grindNodeId || "").trim() ||
+        (nodeId ? guidedToGrindNodeId[nodeId] || "" : "");
+      const sectionFilter =
+        opts.sectionFilter ||
+        inferSectionFromSubtopicHint(opts.subtopicHint) ||
+        inferSectionFromGrindNode(grindNodeId);
       const backTab = opts.tab || activeTab;
       navigateToPractice(navigate, {
         grade,
@@ -1645,9 +1746,23 @@ const showInZombie = (sectionId: string) => {
         backPath: `/topic-hub/${grade}/${subject}/${topicKey}?tab=${backTab}`,
         backLabel: "Back to TopicHub",
         subtopicHint: opts.subtopicHint || fallbackHint,
+        sectionFilter,
+        source: "topic_hub",
       });
     },
-    [activeTab, grade, guidedNodeTitleById, navigate, subject, subjectTitle, title, topicKey]
+    [
+      activeTab,
+      grade,
+      guidedNodeTitleById,
+      guidedToGrindNodeId,
+      inferSectionFromGrindNode,
+      inferSectionFromSubtopicHint,
+      navigate,
+      subject,
+      subjectTitle,
+      title,
+      topicKey,
+    ]
   );
 
   const onTutorNodeProgress = useCallback(
@@ -2188,6 +2303,7 @@ const showInZombie = (sectionId: string) => {
                   openPracticeFromTopicHub({
                     tab: "learn",
                     subtopicHint: `pattern:${String(exampleSection)}`,
+                    sectionFilter: exampleSection,
                   })
                 }
                 title="Go to Practice page filtered to this Board pattern"
@@ -2883,6 +2999,7 @@ const showInZombie = (sectionId: string) => {
         onPracticeNode={(grindId) =>
           openPracticeFromTopicHub({
             nodeId: mapGrindNodeToGuidedNodeId(grindId),
+            grindNodeId: String(grindId),
             tab: "grind",
             subtopicHint: `grind:${String(grindId)}`,
           })
