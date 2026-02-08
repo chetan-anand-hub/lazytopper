@@ -158,6 +158,7 @@ async function run() {
   const cases = [
     { id: "triangles", subject: "Maths", topicKey: "triangles", expectedTypeContains: "triangle" },
     { id: "trigonometry", subject: "Maths", topicKey: "trigonometry", expectedTypeContains: "trigonometric_triangle" },
+    { id: "heights_distances", subject: "Maths", topicKey: "maths-applications-trigonometry", expectedTypeContains: "trigonometric_triangle" },
     { id: "coordinate_geometry", subject: "Maths", topicKey: "coordinate-geometry", expectedTypeContains: "coordinate_plane" },
     { id: "electricity", subject: "Science", topicKey: "electricity", expectedTypeContains: "circuit" },
     { id: "light", subject: "Science", topicKey: "light-reflection-refraction", expectedTypeContains: "ray_diagram" },

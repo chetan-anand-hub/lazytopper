@@ -145,6 +145,14 @@ async function run() {
       expectedTypeContains: "trigonometric_triangle",
     },
     {
+      id: "heights_distances",
+      subject: "Maths",
+      topicKey: "maths-applications-trigonometry",
+      chapter: "maths-applications-trigonometry",
+      questionText: "Solve heights and distances using angle of elevation and a labelled diagram.",
+      expectedTypeContains: "trigonometric_triangle",
+    },
+    {
       id: "coordinate_geometry",
       subject: "Maths",
       topicKey: "coordinate-geometry",
