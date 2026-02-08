@@ -37,6 +37,25 @@ function resolveTargets(files) {
     .filter((file) => fs.existsSync(path.resolve(file)));
 }
 
+function runMojibakeGuard() {
+  const checkScript = path.resolve("scripts", "check-mojibake.cjs");
+  if (!fs.existsSync(checkScript)) return;
+  const result = spawnSync(process.execPath, [checkScript], {
+    stdio: "inherit",
+  });
+  if (result.error) {
+    console.error("lint:ci - mojibake guard failed to run");
+    console.error(result.error.message || result.error);
+    process.exit(1);
+  }
+  if ((result.status ?? 1) !== 0) {
+    console.error("lint:ci - mojibake guard detected encoding issues.");
+    process.exit(result.status ?? 1);
+  }
+}
+
+runMojibakeGuard();
+
 let baseRef;
 try {
   baseRef = getMergeBase();
