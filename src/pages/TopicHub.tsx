@@ -998,6 +998,48 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     });
     return ordered.filter((x) => (x.rec?.state || "unseen") !== "mastered").slice(0, 3);
   }, [guidedOrder, guidedNodeTitleById, trianglesMastery]);
+  const revisionCockpitNodes = useMemo(() => {
+    const fallback = guidedOrder.slice(0, 3).map((id) => ({
+      id,
+      title: guidedNodeTitleById[id] || id,
+      state: getNodeMasteryState(trianglesMastery, id),
+    }));
+    const fromWeakest = weakestResourceNodes.map((item) => ({
+      id: item.id,
+      title: item.title,
+      state: (item.rec?.state || "unseen") as TopicHubNodeMasteryState,
+    }));
+    const merged = [...fromWeakest, ...fallback];
+    const seen = new Set<string>();
+    const unique = merged.filter((item) => {
+      if (!item.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+    return unique.slice(0, 3);
+  }, [guidedOrder, guidedNodeTitleById, trianglesMastery, weakestResourceNodes]);
+  const weakestProgressionHints = useMemo(() => {
+    if (!revisionCockpitNodes.length) {
+      return [
+        "You are fully mastered. Do one timed board-style practice set to retain speed.",
+      ];
+    }
+    const first = revisionCockpitNodes[0];
+    const second = revisionCockpitNodes[1];
+    const hints: string[] = [];
+    hints.push(
+      `Start with ${first.title}: open Teach first, then answer its checkpoint in your own words.`
+    );
+    if (second) {
+      hints.push(
+        `Next do ${second.title}: use Grind rubric and micro-drills to convert understanding into marks.`
+      );
+    }
+    hints.push(
+      `Current mastery: ${masteryCounts.mastered}/${masteryCounts.total} mastered, ${masteryCounts.checkpointPassed}/${masteryCounts.total} checkpoint passed.`
+    );
+    return hints;
+  }, [masteryCounts, revisionCockpitNodes]);
 
   const defaultGrindNodeId = useMemo(() => {
     const hw = grindMindmap?.highways || [];
@@ -2076,6 +2118,171 @@ Use CBSE exam language and include a labelled diagram.`,
                       Great work. All guided nodes are mastered.
                     </div>
                   )}
+                </AccordionCard>
+              ) : null}
+
+              {isTrianglesTopic ? (
+                <AccordionCard id="resources-revision-cockpit" title="10-minute revision cockpit" defaultOpen>
+                  <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
+                    Human-tutor loop: Teach {"->"} Grind {"->"} Checkpoint {"->"} Practice.
+                  </div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {[
+                      { label: "Minute 0-3 • Teach", node: revisionCockpitNodes[0] || null, action: "teach" as const },
+                      { label: "Minute 3-7 • Grind", node: revisionCockpitNodes[1] || revisionCockpitNodes[0] || null, action: "grind" as const },
+                      { label: "Minute 7-10 • Checkpoint + Practice", node: revisionCockpitNodes[2] || revisionCockpitNodes[0] || null, action: "practice" as const },
+                    ].map((slot, idx) => {
+                      const nodeId = String(slot.node?.id || "");
+                      const nodeTitle = String(slot.node?.title || `Step ${idx + 1}`);
+                      const state = (slot.node?.state || "unseen") as TopicHubNodeMasteryState;
+                      const badge = masteryBadgeMeta[state];
+                      const grindId = nodeId ? guidedToGrindNodeId[nodeId] || defaultGrindNodeId : defaultGrindNodeId;
+                      return (
+                        <div
+                          key={slot.label}
+                          style={{
+                            borderRadius: 14,
+                            padding: "12px 12px",
+                            border: "1px solid rgba(0,0,0,0.08)",
+                            background: "rgba(0,0,0,0.02)",
+                          }}
+                        >
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            <div style={{ fontWeight: 900 }}>{slot.label}</div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                background: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                          </div>
+                          <div style={{ marginTop: 6, opacity: 0.9 }}>{nodeTitle}</div>
+                          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="pill"
+                              style={{ padding: "7px 10px", fontSize: 13 }}
+                              onClick={() => openTutorDrawer({ tab: "teach", nodeId })}
+                            >
+                              Teach now
+                            </button>
+                            {slot.action !== "teach" ? (
+                              <button
+                                type="button"
+                                className="pill"
+                                style={{ padding: "7px 10px", fontSize: 13 }}
+                                onClick={() => {
+                                  setActiveTab("grind");
+                                  openGrindDrawer({ nodeId: grindId });
+                                }}
+                              >
+                                Open Grind
+                              </button>
+                            ) : null}
+                            {slot.action === "practice" ? (
+                              <button
+                                type="button"
+                                className="pill"
+                                style={{ padding: "7px 10px", fontSize: 13 }}
+                                onClick={() =>
+                                  openPracticeFromTopicHub({
+                                    nodeId,
+                                    tab: "resources",
+                                  })
+                                }
+                              >
+                                Practice now
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </AccordionCard>
+              ) : null}
+
+              {isTrianglesTopic ? (
+                <AccordionCard id="resources-exam-day-pack" title="Exam-day pack (Triangles)" defaultOpen={false}>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        background: "rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>2-minute formula + theorem sweep</div>
+                      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}>
+                        AA / SAS / SSS similarity + BPT + area-ratio logic + CPST usage.
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        background: "rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>5-minute board-writing drill</div>
+                      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}>
+                        For one weak node: write Given, To Prove, Criterion/Theorem, Therefore/Hence in order.
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        borderRadius: 14,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        background: "rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>3-minute trap check</div>
+                      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.88 }}>
+                        Recheck correspondence order, theorem name, and final conclusion sentence.
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="pill"
+                        onClick={() => openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId })}
+                      >
+                        Human tutor quick drill
+                      </button>
+                      <button
+                        type="button"
+                        className="pill"
+                        onClick={() => {
+                          setActiveTab("grind");
+                          openGrindDrawer({ nodeId: defaultGrindNodeId });
+                        }}
+                      >
+                        Open exam grind
+                      </button>
+                    </div>
+                  </div>
+                </AccordionCard>
+              ) : null}
+
+              {isTrianglesTopic ? (
+                <AccordionCard id="resources-progression-hints" title="Weakest-node progression hints" defaultOpen={false}>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {weakestProgressionHints.map((hint, idx) => (
+                      <li key={idx} style={{ marginBottom: 8, lineHeight: 1.5 }}>
+                        {hint}
+                      </li>
+                    ))}
+                  </ul>
                 </AccordionCard>
               ) : null}
 
