@@ -46,6 +46,7 @@
     "lint:full": "eslint .",
     "bom:guard": "node scripts/bomGuard.mjs",
     "test:triangles:human-tutor": "node scripts/ops/triangles_human_tutor_acceptance.mjs",
+    "test:topic-grind-contracts": "node scripts/ops/topic_grind_contracts_acceptance.mjs",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"
