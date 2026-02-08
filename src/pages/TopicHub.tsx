@@ -466,6 +466,171 @@ function toNullableString(x: unknown): string | null {
   return typeof x === "string" ? x : null;
 }
 
+function hasMindMapContent(mindMap: any): boolean {
+  return safeArray<any>(mindMap?.nodes || mindMap?.concepts || mindMap?.items).length > 0;
+}
+
+function buildFallbackFormulae(args: {
+  topicKey: string;
+  title: string;
+  subjectTitle: string;
+}): Array<{ title: string; formula: string; whenToUse: string }> {
+  const key = String(args.topicKey || "").toLowerCase();
+  const title = String(args.title || "Topic");
+  const subject = String(args.subjectTitle || "").toLowerCase();
+
+  if (key.includes("triangle")) {
+    return [
+      { title: "AA Similarity", formula: "If two angles are equal, triangles are similar.", whenToUse: "When two corresponding angles are given equal." },
+      { title: "BPT", formula: "If DE || BC in triangle ABC, then AD/DB = AE/EC.", whenToUse: "When a line parallel to one side cuts the other two sides." },
+      { title: "Area Ratio", formula: "For similar triangles, area1/area2 = (corresponding side ratio)^2.", whenToUse: "After proving similarity and asked area ratio." },
+      { title: "Pythagoras", formula: "In right triangle: hypotenuse^2 = base^2 + perpendicular^2.", whenToUse: "Only when right angle is given/proved." },
+    ];
+  }
+  if (key.includes("trigon")) {
+    return [
+      { title: "Trig Ratios", formula: "sin(theta)=opp/hyp, cos(theta)=adj/hyp, tan(theta)=opp/adj.", whenToUse: "For right-triangle side/angle finding." },
+      { title: "Core Identity", formula: "sin^2(theta) + cos^2(theta) = 1.", whenToUse: "When simplifying trigonometric expressions." },
+      { title: "Heights & Distances Setup", formula: "Model right triangle, map theta, then apply tan/sin/cos.", whenToUse: "Word problems with angles of elevation/depression." },
+    ];
+  }
+  if (key.includes("coordinate")) {
+    return [
+      { title: "Distance Formula", formula: "d = sqrt((x2-x1)^2 + (y2-y1)^2)", whenToUse: "Distance between two points." },
+      { title: "Section Formula", formula: "P((mx2+nx1)/(m+n), (my2+ny1)/(m+n))", whenToUse: "Point dividing line segment internally in ratio m:n." },
+      { title: "Area of Triangle", formula: "Area = 1/2 |x1(y2-y3)+x2(y3-y1)+x3(y1-y2)|", whenToUse: "Coordinate-geometry area questions." },
+    ];
+  }
+  if (key.includes("surface-areas") || key.includes("volume") || key.includes("mensuration")) {
+    return [
+      { title: "CSA/TSA Cylinder", formula: "CSA=2pi rh, TSA=2pi r(r+h)", whenToUse: "Cylinder curved/total surface area." },
+      { title: "Cone", formula: "CSA=pi rl, TSA=pi r(r+l), Volume=(1/3)pi r^2 h", whenToUse: "Cone area/volume problems." },
+      { title: "Sphere/Hemisphere", formula: "Sphere SA=4pi r^2, Volume=(4/3)pi r^3", whenToUse: "Spherical solids and conversions." },
+    ];
+  }
+  if (key.includes("quadratic")) {
+    return [
+      { title: "Quadratic Formula", formula: "x = (-b ± sqrt(b^2-4ac)) / 2a", whenToUse: "When factorization is not straightforward." },
+      { title: "Discriminant", formula: "D = b^2 - 4ac", whenToUse: "To determine nature of roots." },
+      { title: "Root Relations", formula: "alpha + beta = -b/a, alpha*beta = c/a", whenToUse: "When roots are used without solving fully." },
+    ];
+  }
+  if (key.includes("pair-of-linear")) {
+    return [
+      { title: "Standard Form", formula: "a1x + b1y + c1 = 0 and a2x + b2y + c2 = 0", whenToUse: "Before elimination/substitution/graphing." },
+      { title: "Consistency", formula: "a1/a2 != b1/b2 -> unique, a1/a2 = b1/b2 != c1/c2 -> no solution, a1/a2 = b1/b2 = c1/c2 -> infinite", whenToUse: "To classify number of solutions." },
+      { title: "Board Skeleton", formula: "Given -> equation setup -> elimination/substitution -> final ordered pair", whenToUse: "Word/application problems." },
+    ];
+  }
+  if (key.includes("statistics")) {
+    return [
+      { title: "Mean (Step Deviation)", formula: "mean = a + (sum(f_i*u_i)/sum(f_i))*h", whenToUse: "Grouped frequency table mean." },
+      { title: "Median (Grouped)", formula: "Median = l + [(N/2 - cf)/f]*h", whenToUse: "Median from cumulative frequency." },
+      { title: "Mode (Grouped)", formula: "Mode = l + [(f1-f0)/(2f1-f0-f2)]*h", whenToUse: "Mode from grouped data." },
+    ];
+  }
+  if (key.includes("probability")) {
+    return [
+      { title: "Classical Probability", formula: "P(E) = favourable outcomes / total outcomes", whenToUse: "Equally likely finite outcomes." },
+      { title: "Complement", formula: "P(not E) = 1 - P(E)", whenToUse: "When direct count is hard." },
+      { title: "Range", formula: "0 <= P(E) <= 1", whenToUse: "Quick sanity check." },
+    ];
+  }
+  if (key.includes("electricity")) {
+    return [
+      { title: "Ohm's Law", formula: "V = IR", whenToUse: "Find current/voltage/resistance in circuit numericals." },
+      { title: "Power", formula: "P = VI = I^2R = V^2/R", whenToUse: "Electrical power/consumption questions." },
+      { title: "Energy", formula: "E = Pt", whenToUse: "Energy consumed in given time interval." },
+    ];
+  }
+  if (key.includes("light") || key.includes("reflection") || key.includes("refraction") || key.includes("lens")) {
+    return [
+      { title: "Mirror/Lens Formula", formula: "1/f = 1/v + 1/u", whenToUse: "Image position and focal-length numericals." },
+      { title: "Magnification", formula: "m = h_i/h_o = -v/u", whenToUse: "Image size/sign determination." },
+      { title: "Ray Rules", formula: "Use principal rays with sign convention before substitution.", whenToUse: "Ray diagram + numerical combo questions." },
+    ];
+  }
+  if (key.includes("magnetic") || key.includes("magnet")) {
+    return [
+      { title: "Direction Rule", formula: "Right-hand thumb rule gives magnetic field direction around conductor.", whenToUse: "Field direction questions." },
+      { title: "Motor Rule", formula: "Fleming's left-hand rule: Force direction in motor setup.", whenToUse: "Motor working and direction." },
+      { title: "Generator Rule", formula: "Fleming's right-hand rule: Induced current direction.", whenToUse: "Electromagnetic induction problems." },
+    ];
+  }
+  if (
+    key.includes("life-process") ||
+    key.includes("control") ||
+    key.includes("reproduction") ||
+    key.includes("heredity") ||
+    key.includes("environment")
+  ) {
+    return [
+      { title: "Biology Flow Formula", formula: "Stimulus -> receptor -> control center -> effector -> response", whenToUse: "Control/coordination sequence answers." },
+      { title: "Life Process Chain", formula: "Ingestion -> digestion -> absorption -> assimilation -> egestion", whenToUse: "Nutrition process questions." },
+      { title: "Exam Keywords", formula: "Definition + labelled diagram + sequence + function + conclusion", whenToUse: "3-5 mark biology board answers." },
+    ];
+  }
+  if (subject.includes("science")) {
+    return [
+      { title: "Science Answer Template", formula: "Definition -> Diagram -> Principle/Law -> Application -> Conclusion", whenToUse: "Structured CBSE science answers." },
+      { title: "Units and Terms", formula: "Use SI units and textbook terms consistently.", whenToUse: "Numerical and explanation questions." },
+      { title: "Reasoning Line", formula: "Because <principle>, therefore <result>.", whenToUse: "Assertion-reason and concept justification." },
+    ];
+  }
+  return [
+    { title: `${title} Core Rule`, formula: "State given data, apply one correct rule/theorem, and conclude clearly.", whenToUse: `Any exam-format ${title} answer.` },
+    { title: "Board Writing Template", formula: "Given -> To Find/To Prove -> Working -> Therefore/Hence", whenToUse: "Short and long answers." },
+    { title: "Quick Trap Check", formula: "Check correspondence, units, sign, and final statement.", whenToUse: "Before final submission." },
+  ];
+}
+
+function buildFallbackVideos(args: {
+  topicKey: string;
+  title: string;
+  subjectTitle: string;
+}): Array<{ title: string; url: string }> {
+  const topic = String(args.title || args.topicKey || "Topic");
+  const subject = String(args.subjectTitle || "Maths/Science");
+  const base = `CBSE Class 10 ${subject} ${topic}`;
+  const khanQuery = `${base} fundamentals`;
+  const ytConcept = `${base} NCERT explanation`;
+  const ytExam = `${base} board exam questions`;
+  return [
+    {
+      title: `Khan Academy • ${topic} fundamentals`,
+      url: `https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(khanQuery)}`,
+    },
+    {
+      title: `YouTube • ${topic} concept walkthrough`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytConcept)}`,
+    },
+    {
+      title: `YouTube • ${topic} exam-focused problems`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(ytExam)}`,
+    },
+  ];
+}
+
+function mergeResourceVideos(
+  primary: Array<{ title?: string; name?: string; url?: string; link?: string; youtubeUrl?: string }>,
+  fallback: Array<{ title: string; url: string }>
+): Array<{ title: string; url: string }> {
+  const out: Array<{ title: string; url: string }> = [];
+  const seen = new Set<string>();
+  const push = (title: string, url: string) => {
+    const cleanUrl = String(url || "").trim();
+    if (!cleanUrl || seen.has(cleanUrl)) return;
+    seen.add(cleanUrl);
+    out.push({ title: String(title || "Video").trim() || "Video", url: cleanUrl });
+  };
+
+  primary.forEach((v, idx) => {
+    push(String(v?.title || v?.name || `Video ${idx + 1}`), String(v?.url || v?.link || v?.youtubeUrl || ""));
+  });
+  fallback.forEach((v) => push(v.title, v.url));
+  return out.slice(0, 12);
+}
+
 const masteryBadgeMeta: Record<
   TopicHubNodeMasteryState,
   { label: string; bg: string; color: string; border: string }
@@ -932,9 +1097,9 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const caseStudies = safeArray<CaseStudy>((v2Data as any).caseStudies);
 
     // --- Resources (optional fields) ---
-  const mindMap = (v2Data as any).mindMap || (v2Data as any).mindmap || null;
-  const formulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
-  const videos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
+  const rawMindMap = (v2Data as any).mindMap || (v2Data as any).mindmap || null;
+  const rawFormulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
+  const rawVideos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
   const guidedMindmap = isTrianglesTopic ? trianglesGuidedMindmap : null;
   const fallbackGuidedNodes = useMemo(() => {
     const out: Array<{
@@ -1176,6 +1341,54 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
       coreIdByNodeId,
     };
   }, [guidedCoreByNodeId, guidedCoreIdByNodeId, guidedNodeTitleById, guidedNodes, guidedOrder]);
+  const fallbackResourceMindMap = useMemo(() => {
+    if (!guidedOrder.length) return null;
+    const ordered = guidedOrder.slice(0, Math.min(12, guidedOrder.length));
+    const nodes = ordered.map((id) => {
+      const node = guidedNodeById.get(id);
+      return {
+        id,
+        label: guidedNodeTitleById[id] || id,
+        description: String(node?.text || ""),
+      };
+    });
+    const edgeSet = new Set<string>();
+    const edges: Array<{ from: string; to: string; label?: string }> = [];
+    ordered.forEach((id, idx) => {
+      const prev = idx > 0 ? ordered[idx - 1] : "";
+      if (prev) {
+        const key = `${prev}->${id}`;
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          edges.push({ from: prev, to: id, label: "next" });
+        }
+      }
+      const links = safeArray<any>((guidedNodeById.get(id) as any)?.links);
+      links.forEach((link) => {
+        const to = String(link || "");
+        if (!ordered.includes(to)) return;
+        const key = `${id}->${to}`;
+        if (edgeSet.has(key)) return;
+        edgeSet.add(key);
+        edges.push({ from: id, to, label: "related" });
+      });
+    });
+    return { nodes, edges };
+  }, [guidedNodeById, guidedNodeTitleById, guidedOrder]);
+  const resourceMindMap = hasMindMapContent(rawMindMap) ? rawMindMap : fallbackResourceMindMap;
+  const fallbackFormulae = useMemo(
+    () => buildFallbackFormulae({ topicKey, title, subjectTitle }),
+    [topicKey, title, subjectTitle]
+  );
+  const resourceFormulae = rawFormulae.length ? rawFormulae : fallbackFormulae;
+  const fallbackVideos = useMemo(
+    () => buildFallbackVideos({ topicKey, title, subjectTitle }),
+    [topicKey, title, subjectTitle]
+  );
+  const resourceVideos = useMemo(
+    () => mergeResourceVideos(rawVideos, fallbackVideos),
+    [fallbackVideos, rawVideos]
+  );
   const currentTutorNodeId = guidedOrder[tutorNodeIndex] || guidedOrder[0];
   const currentTutorNode = currentTutorNodeId ? guidedNodeById.get(currentTutorNodeId) : null;
   const currentTutorCore = currentTutorNodeId ? guidedCoreByNodeId[currentTutorNodeId] : null;
@@ -2506,13 +2719,13 @@ const showInZombie = (sectionId: string) => {
               </AccordionCard>
 
               <AccordionCard id="concept-map" title="Concept map" defaultOpen>
-                {!mindMap ? (
+                {!resourceMindMap ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
                     Concept map coming soon for this topic. (We'll auto-fill as the bank grows.)
                   </div>
                 ) : (
                   <MindMapCanvas
-                    mindMap={mindMap}
+                    mindMap={resourceMindMap}
                     onAskMentor={(seedTitle, seedQuestion) =>
                       openMentorDrawer({
                         title: seedTitle,
@@ -2525,13 +2738,13 @@ const showInZombie = (sectionId: string) => {
               </AccordionCard>
 
               <AccordionCard id="formulae" title="Formula sheet" defaultOpen={false}>
-                {safeArray<any>(formulae).length === 0 ? (
+                {safeArray<any>(resourceFormulae).length === 0 ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>
                     No formula sheet added yet for this topic.
                   </div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-                    {safeArray<any>(formulae).slice(0, 20).map((f, idx) => {
+                    {safeArray<any>(resourceFormulae).slice(0, 20).map((f, idx) => {
                       const label = String(f?.title || f?.name || `Formula ${idx + 1}`);
                       const text = String(f?.formula || f?.text || f?.statement || "");
                       const whenToUse = String(
@@ -2600,11 +2813,11 @@ const showInZombie = (sectionId: string) => {
               </AccordionCard>
 
               <AccordionCard id="videos" title="Top videos" defaultOpen={false}>
-                {safeArray<any>(videos).length === 0 ? (
+                {safeArray<any>(resourceVideos).length === 0 ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>No videos added yet for this topic.</div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-                    {safeArray<any>(videos).slice(0, 12).map((v, idx) => {
+                    {safeArray<any>(resourceVideos).slice(0, 12).map((v, idx) => {
                       const titleTxt = String(v?.title || v?.name || `Video ${idx + 1}`);
                       const url = String(v?.url || v?.link || v?.youtubeUrl || "");
                       return (

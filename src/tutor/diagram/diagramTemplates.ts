@@ -312,6 +312,29 @@ const GENERIC_MENSURATION_SOLID: DiagramSpec = {
   ],
 };
 
+const GENERIC_BIOLOGY_PROCESS: DiagramSpec = {
+  kind: "tutor_diagram_v1",
+  width: 460,
+  height: 240,
+  title: "Biology Process Flow",
+  caption: "Use labelled flow sequence and arrows in CBSE biology answers.",
+  points: [
+    { id: "A", x: 70, y: 120, label: "Input" },
+    { id: "B", x: 170, y: 120, label: "Stage 1" },
+    { id: "C", x: 270, y: 120, label: "Stage 2" },
+    { id: "D", x: 370, y: 120, label: "Output" },
+    { id: "E", x: 170, y: 70, label: "Control" },
+    { id: "F", x: 270, y: 170, label: "Effect" },
+  ],
+  edges: [
+    { from: "A", to: "B", highlight: true },
+    { from: "B", to: "C", highlight: true },
+    { from: "C", to: "D", highlight: true },
+    { from: "E", to: "B", dashed: true },
+    { from: "C", to: "F", dashed: true },
+  ],
+};
+
 function pickAaVariant(seed: string): DiagramSpec {
   const idx = hashSeed(seed) % AA_SIMILARITY_VARIANTS.length;
   return cloneSpec(AA_SIMILARITY_VARIANTS[idx]);
@@ -340,7 +363,7 @@ export function getDiagramTemplate(
   const seed = normalizeSeed({ topicKey, nodeId, stepSlugOrTitle, diagramType });
   const lower = seed.toLowerCase();
   const typeHint = String(diagramType || "").toLowerCase();
-  const hint = `${typeHint} ${lower}`;
+  const hint = `${typeHint} ${lower}`.replace(/[_-]+/g, " ");
   const hasTrigWord = /\b(trigonometry|trigonometric|sin|cos|tan|sine|cosine|tangent|theta)\b/.test(hint);
   const isTriangles = lower.includes("triangle");
   if (
@@ -361,6 +384,26 @@ export function getDiagramTemplate(
     hint.includes("light")
   ) {
     return cloneSpec(GENERIC_RAY_DIAGRAM);
+  }
+  if (
+    hint.includes("biology_process") ||
+    hint.includes("life process") ||
+    hint.includes("nutrition") ||
+    hint.includes("respiration") ||
+    hint.includes("excretion") ||
+    hint.includes("stomata") ||
+    hint.includes("nephron") ||
+    hint.includes("heart") ||
+    hint.includes("control and coordination") ||
+    hint.includes("neuron") ||
+    hint.includes("reflex") ||
+    hint.includes("reproduction") ||
+    hint.includes("heredity") ||
+    hint.includes("evolution") ||
+    hint.includes("food chain") ||
+    hint.includes("trophic")
+  ) {
+    return cloneSpec(GENERIC_BIOLOGY_PROCESS);
   }
   if (
     hint.includes("circuit") ||

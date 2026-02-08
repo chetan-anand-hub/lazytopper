@@ -1447,7 +1447,7 @@ function getDiagramTopicText(payload) {
     payload?.contextText,
   ]
     .flat()
-    .map((v) => String(v || '').toLowerCase())
+    .map((v) => String(v || '').toLowerCase().replace(/[_-]+/g, ' '))
     .join(' ');
 }
 
@@ -1508,6 +1508,25 @@ function isNonNegotiableDiagramTopic(payload) {
     'magnetic',
     'magnet',
     'field',
+    'life process',
+    'life processes',
+    'nutrition',
+    'respiration',
+    'excretion',
+    'transportation',
+    'nephron',
+    'heart',
+    'stomata',
+    'control and coordination',
+    'control',
+    'coordination',
+    'neuron',
+    'reflex',
+    'reproduction',
+    'heredity',
+    'evolution',
+    'food chain',
+    'trophic',
   ];
   const hasMath = maths.some((k) => text.includes(k));
   const hasScience = science.some((k) => text.includes(k));
@@ -1540,7 +1559,7 @@ function inferDiagramType(payload) {
     payload?.chapter,
   ]
     .flat()
-    .map((v) => String(v || '').toLowerCase())
+    .map((v) => String(v || '').toLowerCase().replace(/[_-]+/g, ' '))
     .join(' ');
   const hasTrigWord = /\b(trigonometry|trigonometric|sin|cos|tan|sine|cosine|tangent|theta)\b/.test(hint);
   if (hint.includes('trigon') || hasTrigWord || hint.includes('height') || hint.includes('distance')) {
@@ -1553,6 +1572,25 @@ function inferDiagramType(payload) {
   }
   if (hint.includes('ray') || hint.includes('reflection') || hint.includes('refraction') || hint.includes('lens') || hint.includes('mirror') || hint.includes('optics')) {
     return 'ray_diagram';
+  }
+  if (
+    hint.includes('life process') ||
+    hint.includes('nutrition') ||
+    hint.includes('respiration') ||
+    hint.includes('excretion') ||
+    hint.includes('stomata') ||
+    hint.includes('nephron') ||
+    hint.includes('heart') ||
+    hint.includes('control and coordination') ||
+    hint.includes('neuron') ||
+    hint.includes('reflex') ||
+    hint.includes('reproduction') ||
+    hint.includes('heredity') ||
+    hint.includes('evolution') ||
+    hint.includes('food chain') ||
+    hint.includes('trophic')
+  ) {
+    return 'biology_process';
   }
   if (hint.includes('magnetic') || hint.includes('magnet') || hint.includes('solenoid') || hint.includes('field')) {
     return 'magnetic_field';
@@ -1577,6 +1615,7 @@ function diagramLabelsForType(diagramType) {
   if (t === 'coordinate_plane') return { O: 'O', X: 'x', Y: 'y', P: 'P' };
   if (t === 'mensuration_solid') return { H: 'h', R: 'r' };
   if (t === 'ray_diagram') return { O: 'O', F: 'F', F2: '2F' };
+  if (t === 'biology_process') return { A: 'Input', B: 'Process', C: 'Output' };
   if (t === 'magnetic_field') return { P: 'Conductor', B1: 'B1', B2: 'B2' };
   if (t === 'circuit') return { A: 'A', B: 'B', V: 'V' };
   return { A: 'A', B: 'B', C: 'C' };
