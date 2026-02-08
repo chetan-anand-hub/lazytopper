@@ -530,6 +530,246 @@ function buildGrindTrianglesUserPrompt(payload) {
   return contextLines.join('\n\n');
 }
 
+const PRIORITY_GRIND_TOPIC_PROFILES = {
+  'pair-of-linear-equations': {
+    label: 'Pair of Linear Equations in Two Variables',
+    marks: 3,
+    given: [
+      'Identify both equations in standard form.',
+      'Note whether the target is intersection point, consistency, or value of variables.',
+    ],
+    toProve: ['Solve x and y with clear elimination/substitution steps.'],
+    figureHints: ['Write equations one below another and align variable coefficients.'],
+    steps: [
+      'Choose elimination/substitution method and justify the choice briefly.',
+      'Show one clean elimination/substitution step.',
+      'Write x and y values, then verify in one original equation.',
+    ],
+    checkpoints: [
+      'Method selected correctly for the pair of equations.',
+      'Algebraic manipulation without sign errors.',
+      'Final values written and verified.',
+    ],
+    traps: [
+      { trap: 'Sign mistake during elimination.', fix: 'Write each transformed equation line-by-line before subtraction.' },
+      { trap: 'Stopping after finding one variable.', fix: 'Back-substitute and report both x and y.' },
+    ],
+    drills: [
+      { prompt: 'Solve one pair using elimination in 3 lines.', answerKey: 'Eliminate one variable, solve the other, back-substitute.' },
+      { prompt: 'State condition for infinitely many solutions.', answerKey: 'a1/a2 = b1/b2 = c1/c2' },
+    ],
+    nextNodeId: 'quadratic-equations',
+    nextReason: 'Quadratic solving is the next high-yield algebra progression.',
+  },
+  'quadratic-equations': {
+    label: 'Quadratic Equations',
+    marks: 4,
+    given: [
+      'Rewrite equation in ax^2 + bx + c = 0 form.',
+      'Identify method: factorization / completing square / quadratic formula.',
+    ],
+    toProve: ['Find roots with valid method and check by substitution.'],
+    figureHints: ['Keep discriminant and root calculations in separate lines.'],
+    steps: [
+      'State chosen method and why it fits this equation.',
+      'Compute roots with one justified transformation chain.',
+      'Write both roots and validate one root quickly.',
+    ],
+    checkpoints: [
+      'Correct standard form setup.',
+      'Correct discriminant/factor decomposition.',
+      'Both roots written with correct sign.',
+    ],
+    traps: [
+      { trap: 'Missing second root.', fix: 'Always write x1 and x2 explicitly.' },
+      { trap: 'Incorrect sign in formula.', fix: 'Bracket numerator: (-b ± √D) / 2a before simplifying.' },
+    ],
+    drills: [
+      { prompt: 'Compute discriminant and predict nature of roots.', answerKey: 'Use D = b^2 - 4ac and classify from D.' },
+      { prompt: 'Solve one factorable quadratic in board format.', answerKey: 'Factor, set each factor to zero, list both roots.' },
+    ],
+    nextNodeId: 'pair-of-linear-equations',
+    nextReason: 'Switch to linear systems to strengthen algebra fluency.',
+  },
+  trigonometry: {
+    label: 'Trigonometry',
+    marks: 3,
+    given: [
+      'Identify right triangle and known angle/side.',
+      'Select ratio (sin, cos, tan) matching required side.',
+    ],
+    toProve: ['Compute unknown side/angle with correct ratio and units.'],
+    figureHints: ['Mark opposite, adjacent, and hypotenuse relative to the given angle.'],
+    steps: [
+      'Write target ratio formula with substituted values.',
+      'Rearrange cleanly and compute final value.',
+      'Add unit and practical rounding if needed.',
+    ],
+    checkpoints: [
+      'Correct ratio selected from context.',
+      'Correct side mapping (opp/adj/hyp).',
+      'Final answer with units.',
+    ],
+    traps: [
+      { trap: 'Mixing opposite and adjacent sides.', fix: 'Anchor sides with respect to theta before formula.' },
+      { trap: 'Using Pythagoras when not needed.', fix: 'Use direct trigonometric ratio first if one angle is given.' },
+    ],
+    drills: [
+      { prompt: 'Pick correct ratio for each mini scenario.', answerKey: 'Match target side relation to sin/cos/tan.' },
+      { prompt: 'One board-style height-distance calculation.', answerKey: 'Ratio equation + substitution + unit.' },
+    ],
+    nextNodeId: 'maths_applications_trigonometry',
+    nextReason: 'Applications build exam-oriented word-problem fluency.',
+  },
+  electricity: {
+    label: 'Electricity',
+    marks: 3,
+    given: [
+      'List known values with units (V, I, R, P).',
+      'Identify required quantity and relevant law/formula.',
+    ],
+    toProve: ['Compute unknown quantity with unit-consistent steps.'],
+    figureHints: ['Draw a simple circuit label (source, resistor, current direction).'],
+    steps: [
+      'Write governing formula (Ohm’s law / power relation).',
+      'Substitute values with SI units only.',
+      'Compute and state final quantity with unit.',
+    ],
+    checkpoints: [
+      'Correct formula chosen for target variable.',
+      'Units handled correctly before substitution.',
+      'Numerical result and unit both correct.',
+    ],
+    traps: [
+      { trap: 'Using mA without conversion.', fix: 'Convert to A before formula substitution.' },
+      { trap: 'Confusing power and energy formulas.', fix: 'Use P = VI and E = Pt with explicit unit checks.' },
+    ],
+    drills: [
+      { prompt: 'Find resistance using V and I.', answerKey: 'R = V/I with SI units.' },
+      { prompt: 'Compute energy for given power and time.', answerKey: 'E = Pt; convert time to seconds when needed.' },
+    ],
+    nextNodeId: 'magnetic-effects-of-electric-current',
+    nextReason: 'Magnetic effects is the natural continuation of electricity concepts.',
+  },
+  'life-processes': {
+    label: 'Life Processes',
+    marks: 3,
+    given: [
+      'Identify process focus (nutrition, respiration, transport, excretion).',
+      'List key biological terms used in the question.',
+    ],
+    toProve: ['Write mechanism in correct sequence with one function line.'],
+    figureHints: ['Use simple labelled flow chart (organ -> role -> outcome).'],
+    steps: [
+      'State the biological process definition.',
+      'Write sequence of steps/events in order.',
+      'End with exam-ready function/result statement.',
+    ],
+    checkpoints: [
+      'Correct process identified from question cue.',
+      'Sequence of steps is biologically accurate.',
+      'Conclusion links process to organism survival.',
+    ],
+    traps: [
+      { trap: 'Mixing respiration and breathing.', fix: 'Differentiate process location and purpose in one line.' },
+      { trap: 'Missing keyword terms in answers.', fix: 'Include textbook terms: tissue/organ/enzyme/gas exchange as relevant.' },
+    ],
+    drills: [
+      { prompt: 'Write a 3-line process flow for one life process.', answerKey: 'Definition -> key steps -> function.' },
+      { prompt: 'One difference question with 2 points.', answerKey: 'Point-wise contrast with textbook keywords.' },
+    ],
+    nextNodeId: 'science_control_coordination',
+    nextReason: 'Control and coordination builds on foundational biology process understanding.',
+  },
+};
+
+const PRIORITY_GRIND_TOPIC_ALIASES = {
+  'maths_introduction_trigonometry': 'trigonometry',
+  'maths_applications_trigonometry': 'trigonometry',
+  'science_light_reflection_refraction': 'trigonometry',
+  'chemical-reactions-equations': 'life-processes',
+  'carbon-and-its-compounds': 'life-processes',
+  'magnetic-effects-of-electric-current': 'electricity',
+};
+
+function normalizeTopicKeyInput(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+function resolvePriorityGrindTopicKey(topicKey) {
+  const normalized = normalizeTopicKeyInput(topicKey);
+  if (!normalized) return '';
+  if (Object.prototype.hasOwnProperty.call(PRIORITY_GRIND_TOPIC_PROFILES, normalized)) {
+    return normalized;
+  }
+  if (Object.prototype.hasOwnProperty.call(PRIORITY_GRIND_TOPIC_ALIASES, normalized)) {
+    return String(PRIORITY_GRIND_TOPIC_ALIASES[normalized] || '');
+  }
+  return '';
+}
+
+function buildGrindTopicContractFallback(payload) {
+  const rawTopicKey = payload?.topicKey || payload?.chapter || payload?.topic || '';
+  const resolvedTopicKey = resolvePriorityGrindTopicKey(rawTopicKey);
+  if (!resolvedTopicKey) return null;
+  const profile = PRIORITY_GRIND_TOPIC_PROFILES[resolvedTopicKey];
+  if (!profile) return null;
+
+  const nodeId = String(payload?.mindmapNodeId || payload?.cardId || 'node_1').trim() || 'node_1';
+  const nodeTitle =
+    String(payload?.mindmapNodeTitle || payload?.cardTitle || profile.label || 'Grind node').trim() ||
+    profile.label;
+  const marksRaw = Number(payload?.marks ?? payload?.totalMarks ?? payload?.total_marks);
+  const marks = Number.isFinite(marksRaw) && marksRaw > 0 ? marksRaw : profile.marks;
+  const nextNodeId = String(profile.nextNodeId || '').trim() || nodeId;
+
+  return {
+    type: 'grind_topic_v1',
+    topicKey: resolvedTopicKey,
+    node: { id: nodeId, title: nodeTitle },
+    board: {
+      given: profile.given,
+      toProve: profile.toProve,
+      figureHints: profile.figureHints,
+      steps: profile.steps,
+    },
+    rubric: {
+      marks,
+      checkpoints: profile.checkpoints,
+    },
+    commonTraps: profile.traps,
+    microDrills: profile.drills,
+    next: {
+      recommendedNodeId: nextNodeId,
+      reason: profile.nextReason,
+    },
+  };
+}
+
+function buildGrindTopicUserPrompt(payload) {
+  const rawTopicKey = payload?.topicKey || payload?.chapter || payload?.topic || '';
+  const resolvedTopicKey = resolvePriorityGrindTopicKey(rawTopicKey);
+  const profile = resolvedTopicKey ? PRIORITY_GRIND_TOPIC_PROFILES[resolvedTopicKey] : null;
+  const nodeTitle = String(payload?.mindmapNodeTitle || payload?.cardTitle || '').trim() || 'selected node';
+  const subject = String(payload?.subject || 'Maths/Science').trim();
+  const grade = String(payload?.grade || '10').trim();
+  return [
+    `Create a ${subject} Class ${grade} grind contract for "${nodeTitle}".`,
+    profile ? `Priority topic profile: ${profile.label}.` : '',
+    payload?.mindmapNodeText ? `Node notes: ${String(payload.mindmapNodeText).trim()}` : '',
+    payload?.doubtContext ? `Doubt context: ${String(payload.doubtContext).trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function isPriorityGrindTopicPayload(payload) {
+  const rawTopicKey = payload?.topicKey || payload?.chapter || payload?.topic || '';
+  return Boolean(resolvePriorityGrindTopicKey(rawTopicKey));
+}
+
 function isLearnMisconceptionPayload(payload) {
   if (!payload || typeof payload !== 'object') return false;
   const section = String(payload.section || '').toLowerCase();
@@ -602,6 +842,8 @@ const MODE_ALIASES = {
   learn_teach: 'learn_teach',
   learn_proof: 'learn_proof',
   learn_mindmap: 'learn_mindmap',
+  grind_triangles_v1: 'grind_triangles_v1',
+  grind_topic_v1: 'grind_topic_v1',
   explain: 'explain',
   coach: 'coach',
   plan: 'plan',
@@ -3909,6 +4151,32 @@ async function handleRequest(req, res) {
 
     let handlerUsed = persona && typeof persona === 'object' ? 'persona_prompt' : `prompt_builder:${normalisedMode}`;
     if (isTrianglesEvaluation) handlerUsed = 'triangles_evaluation';
+    if (normalisedMode === 'grind_topic_v1') {
+      if (!isPriorityGrindTopicPayload(payload)) {
+        return sendJson(res, 422, {
+          error: 'grind_topic_v1 is enabled only for priority non-triangles topics.',
+        });
+      }
+      const contract = buildGrindTopicContractFallback(payload);
+      if (!contract) {
+        return sendJson(res, 500, { error: 'Failed to prepare topic grind contract.' });
+      }
+      const trace = {
+        normalized_mode: normalisedMode,
+        handler_used: 'topic_grind_contract',
+        schema_used: 'schema_grind_topic_v1',
+        repair_used: false,
+        deterministic: true,
+      };
+      return sendJson(res, 200, {
+        ok: true,
+        data: {
+          text: JSON.stringify(contract),
+          structured: contract,
+          trace,
+        },
+      });
+    }
 
     if (stubMode) {
       const isTeachContract = isTeachContractRequest(payload, normalisedMode);

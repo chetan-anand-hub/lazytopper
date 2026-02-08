@@ -510,7 +510,27 @@ function mapGrindNodeToGuidedNodeId(grindNodeId: string): string {
   if (id === "S3" || id === "S4") return "gCPST";
   if (id.startsWith("S")) return "gQ1";
   if (id.startsWith("P")) return "gEnd";
-  return "gQ1";
+  return String(grindNodeId || "").trim();
+}
+
+const PRIORITY_TOPIC_GRIND_KEYS = new Set([
+  "pair-of-linear-equations",
+  "quadratic-equations",
+  "trigonometry",
+  "electricity",
+  "life-processes",
+  "chemical-reactions-equations",
+  "carbon-and-its-compounds",
+  "magnetic-effects-of-electric-current",
+  "maths_introduction_trigonometry",
+  "maths_applications_trigonometry",
+  "science_light_reflection_refraction",
+]);
+
+function isPriorityTopicForGrind(topicKey: string): boolean {
+  const key = String(topicKey || "").trim().toLowerCase();
+  if (!key) return false;
+  return PRIORITY_TOPIC_GRIND_KEYS.has(key);
 }
 
 function toTutorMasteryState(state: TopicHubNodeMasteryState): TutorMasteryState {
@@ -936,7 +956,10 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const formulae = safeArray<any>((v2Data as any).formulae || (v2Data as any).formulas || (v2Data as any).formulaSheet);
   const videos = safeArray<any>((v2Data as any).videos || (v2Data as any).videoLinks || (v2Data as any).youtube);
   const guidedMindmap = isTrianglesTopic ? trianglesGuidedMindmap : null;
-  const grindMindmap = isTrianglesTopic ? trianglesGrindMindmap : null;
+  const isPriorityNonTrianglesTopic = useMemo(
+    () => !isTrianglesTopic && isPriorityTopicForGrind(topicKey),
+    [isTrianglesTopic, topicKey]
+  );
   const fallbackGuidedNodes = useMemo(() => {
     const out: Array<{
       id: string;
@@ -1066,6 +1089,77 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   }, [fallbackGuidedNodes]);
   const guidedCoreByNodeId: Record<string, unknown> = guidedMindmap?.coreByNodeId || fallbackCoreByNodeId;
   const guidedCoreIdByNodeId: Record<string, unknown> = guidedMindmap?.coreIdByNodeId || fallbackCoreIdByNodeId;
+  const fallbackGrindMindmap = useMemo(() => {
+    if (!isPriorityNonTrianglesTopic || !guidedOrder.length) return null;
+    const order = guidedOrder.slice(0, Math.min(6, guidedOrder.length));
+    const nodesById: Record<string, any> = {};
+    order.forEach((id, idx) => {
+      const guidedTitle = guidedNodeTitleById[id] || id;
+      const guidedNode = guidedNodeById.get(id);
+      nodesById[id] = {
+        nodeId: id,
+        title: guidedTitle,
+        description: String(guidedNode?.text || `Practice ${guidedTitle} in exam format.`),
+        text: String(guidedNode?.text || ""),
+        examWeight: idx < 2 ? "high" : "medium",
+        difficulty: idx < 2 ? "medium" : "easy",
+        questionTypes: ["short-answer", "board-style"],
+        rubric: {
+          totalMarksTypical: 3,
+          checkpoints: [
+            { id: `${id}-r1`, label: "Set up given data and target clearly.", marks: 1 },
+            { id: `${id}-r2`, label: "Apply correct rule/theorem or relation.", marks: 1 },
+            { id: `${id}-r3`, label: "Conclude with exam-ready final line.", marks: 1 },
+          ],
+        },
+        solutionSkeleton: [
+          { id: `${id}-s1`, heading: "Given / Target", expectedForm: "State known data and what to find/prove." },
+          { id: `${id}-s2`, heading: "Core step", expectedForm: "Use correct formula/theorem with one reason." },
+          { id: `${id}-s3`, heading: "Conclusion", expectedForm: "Write final answer in one clean line." },
+        ],
+        commonMistakes: [
+          {
+            tag: `${id}-m1`,
+            studentFriendly: "Skipping the reason/theorem line.",
+            fixTip: "Always name the rule before writing the key step.",
+          },
+          {
+            tag: `${id}-m2`,
+            studentFriendly: "Jumping to final answer too early.",
+            fixTip: "Show at least one intermediate justified step.",
+          },
+        ],
+        microDrills: [
+          {
+            id: `${id}-d1`,
+            prompt: `Write one 2-3 line board answer for ${guidedTitle}.`,
+            expectedAnswerHints: ["given", "rule/theorem", "therefore/hence"],
+          },
+          {
+            id: `${id}-d2`,
+            prompt: `List one common trap in ${guidedTitle} and the fix.`,
+            expectedAnswerHints: ["trap", "fix"],
+          },
+        ],
+      };
+    });
+    return {
+      highways: [
+        {
+          id: "core-highway",
+          title: `${title} grind highway`,
+          intent: "Convert concept understanding into board marks with quick checks.",
+          recommendedNodeOrder: order,
+        },
+      ],
+      nodesById,
+    };
+  }, [guidedNodeById, guidedNodeTitleById, guidedOrder, isPriorityNonTrianglesTopic, title]);
+  const grindMindmap = useMemo(
+    () => (isTrianglesTopic ? trianglesGrindMindmap : fallbackGrindMindmap),
+    [fallbackGrindMindmap, isTrianglesTopic]
+  );
+  const hasGrindContractFlow = Boolean(grindMindmap);
   const guidedPanelData = useMemo(() => {
     const nodes = guidedNodes.map((node) => ({
       id: String(node.id),
@@ -1571,7 +1665,7 @@ const showInZombie = (sectionId: string) => {
                   className="pill"
                   onClick={() => {
                     setActiveTab("grind");
-                    if (isTrianglesTopic) openGrindDrawer();
+                    if (hasGrindContractFlow) openGrindDrawer();
                   }}
                 >
                   Practice via Grind
@@ -1610,14 +1704,14 @@ const showInZombie = (sectionId: string) => {
                   type="button"
                   className="pill"
                   onClick={() => {
-                    if (isTrianglesTopic) {
+                    if (hasGrindContractFlow) {
                       openGrindDrawer({ nodeId: defaultGrindNodeId });
                       return;
                     }
                     openPracticeFromTopicHub({ tab: "grind" });
                   }}
                 >
-                  {isTrianglesTopic ? "Start grind" : "Open practice"}
+                  {hasGrindContractFlow ? "Start grind" : "Open practice"}
                 </button>
                 <button
                   type="button"
@@ -2188,10 +2282,15 @@ const showInZombie = (sectionId: string) => {
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
                                   setActiveTab("grind");
-                                  if (isTrianglesTopic) {
+                                  if (hasGrindContractFlow) {
                                     const grindId = guidedToGrindNodeId[item.id] || defaultGrindNodeId;
                                     openGrindDrawer({ nodeId: grindId });
+                                    return;
                                   }
+                                  openPracticeFromTopicHub({
+                                    nodeId: item.id,
+                                    tab: "grind",
+                                  });
                                 }}
                               >
                                 Grind this
@@ -2279,9 +2378,14 @@ const showInZombie = (sectionId: string) => {
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
                                   setActiveTab("grind");
-                                  if (isTrianglesTopic) {
+                                  if (hasGrindContractFlow) {
                                     openGrindDrawer({ nodeId: grindId });
+                                    return;
                                   }
+                                  openPracticeFromTopicHub({
+                                    nodeId,
+                                    tab: "grind",
+                                  });
                                 }}
                               >
                                 Open Grind
@@ -2371,7 +2475,11 @@ const showInZombie = (sectionId: string) => {
                         className="pill"
                         onClick={() => {
                           setActiveTab("grind");
-                          if (isTrianglesTopic) openGrindDrawer({ nodeId: defaultGrindNodeId });
+                          if (hasGrindContractFlow) {
+                            openGrindDrawer({ nodeId: defaultGrindNodeId });
+                            return;
+                          }
+                          openPracticeFromTopicHub({ tab: "grind" });
                         }}
                       >
                         Open exam grind
@@ -2571,7 +2679,7 @@ const showInZombie = (sectionId: string) => {
         </div>
       </div>
       <GrindDrawerV1
-        open={grindDrawerOpen && isTrianglesTopic}
+        open={grindDrawerOpen && hasGrindContractFlow}
         onClose={closeGrindDrawer}
         mindmap={grindMindmap}
         nodeId={grindNodeId || defaultGrindNodeId}
@@ -5409,7 +5517,7 @@ function GrindDrawerV1(props: {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const nodeTitle = String(activeNode?.title || 'Triangles');
+    const nodeTitle = String(activeNode?.title || String(topicKey || "Topic"));
     const context = [
       `Topic: ${topicKey} (Class ${grade} ${subjectTitle})`,
       `Grind node: ${nodeTitle} (${String(activeNode?.nodeId || nodeId)})`,
@@ -5438,7 +5546,7 @@ function GrindDrawerV1(props: {
 
     try {
       const body = {
-        mode: 'grind_triangles_v1',
+        mode: /triangles/i.test(String(topicKey || "")) ? 'grind_triangles_v1' : 'grind_topic_v1',
         payload: {
           subject: subjectTitle,
           grade: Number(grade),
@@ -5491,20 +5599,25 @@ function GrindDrawerV1(props: {
     }
   };
 
-  const trianglesContract = useMemo(() => {
+  const grindContract = useMemo(() => {
     if (typeof doubtAnswer !== "string") return null;
     try {
       const parsed = JSON.parse(doubtAnswer);
-      if (parsed && parsed.type === "grind_triangles_v1") return parsed;
+      if (
+        parsed &&
+        (parsed.type === "grind_triangles_v1" || parsed.type === "grind_topic_v1")
+      ) {
+        return parsed;
+      }
     } catch {
       return null;
     }
     return null;
   }, [doubtAnswer]);
-  const boardForContract = trianglesContract?.board || null;
-  const contractRubric = trianglesContract?.rubric || null;
-  const contractCommonTraps = safeArray(trianglesContract?.commonTraps);
-  const contractMicroDrills = safeArray(trianglesContract?.microDrills);
+  const boardForContract = grindContract?.board || null;
+  const contractRubric = grindContract?.rubric || null;
+  const contractCommonTraps = safeArray(grindContract?.commonTraps);
+  const contractMicroDrills = safeArray(grindContract?.microDrills);
   const contractSectionStyle = {
     borderRadius: 14,
     padding: "12px",
@@ -5571,7 +5684,9 @@ function GrindDrawerV1(props: {
         >
           <div>
             <div style={{ fontWeight: 950, fontSize: 16 }}>Grind</div>
-            <div style={{ fontSize: 12, opacity: 0.72 }}>Triangles • Marks roadmap • Rubrics + board skeletons</div>
+            <div style={{ fontSize: 12, opacity: 0.72 }}>
+              {String(topicKey || "Topic")} • Marks roadmap • Rubrics + board skeletons
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
@@ -5831,7 +5946,7 @@ function GrindDrawerV1(props: {
                       <div style={{ marginTop: 10, color: 'rgba(146,64,14,0.95)', fontSize: 13 }}>{doubtWarning}</div>
                     ) : null}
                     {doubtAnswer ? (
-                      trianglesContract ? (
+                      grindContract ? (
                         <div
                           style={{
                             marginTop: 10,
@@ -5846,10 +5961,10 @@ function GrindDrawerV1(props: {
                         >
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
                             <div style={{ fontWeight: 950, fontSize: 15 }}>
-                              {String(trianglesContract.node?.title || 'Grind node summary')}
+                              {String(grindContract.node?.title || 'Grind node summary')}
                             </div>
-                            {trianglesContract.node?.id ? (
-                              <div style={{ fontSize: 12, opacity: 0.7 }}>ID: {trianglesContract.node.id}</div>
+                            {grindContract.node?.id ? (
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>ID: {grindContract.node.id}</div>
                             ) : null}
                           </div>
                           <div style={{ display: 'grid', gap: 12 }}>
@@ -5933,23 +6048,23 @@ function GrindDrawerV1(props: {
                                 </div>
                               </div>
                             ) : null}
-                            {trianglesContract.next ? (
+                            {grindContract.next ? (
                               <div style={contractSectionStyle}>
                                 <div style={{ fontWeight: 900 }}>Next</div>
                                 <div style={{ marginTop: 8, fontSize: 13 }}>
                                   {(() => {
                                     const recommendedNodeId = String(
-                                      trianglesContract.next.recommendedNodeId || ""
+                                      grindContract.next.recommendedNodeId || ""
                                     ).trim();
                                     const hasRecommendedNode =
                                       Boolean(recommendedNodeId) && Boolean(nodesById[recommendedNodeId]);
                                     return (
                                       <>
                                   <div>
-                                    Recommended node: {String(trianglesContract.next.recommendedNodeId || 'Unknown')}
+                                    Recommended node: {String(grindContract.next.recommendedNodeId || 'Unknown')}
                                   </div>
                                   <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-                                    Reason: {String(trianglesContract.next.reason || 'No reason provided')}
+                                    Reason: {String(grindContract.next.reason || 'No reason provided')}
                                   </div>
                                         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                                           <button
