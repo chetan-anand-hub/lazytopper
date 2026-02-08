@@ -70,6 +70,100 @@ function isNonEmptyArray(v) {
   return Array.isArray(v) && v.length > 0;
 }
 
+function normalizeTopicKey(raw) {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (!s) return "";
+  return s
+    .replace(/&/g, " and ")
+    .replace(/[\/\\]/g, " ")
+    .replace(/[_\s]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function extractObjectBody(source, marker) {
+  const markerIdx = source.indexOf(marker);
+  if (markerIdx < 0) return "";
+  const openIdx = source.indexOf("{", markerIdx);
+  if (openIdx < 0) return "";
+  let depth = 0;
+  let inString = false;
+  let quote = "";
+  let escaped = false;
+  for (let i = openIdx; i < source.length; i += 1) {
+    const ch = source[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === quote) {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      inString = true;
+      quote = ch;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+      continue;
+    }
+    if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(openIdx + 1, i);
+      }
+    }
+  }
+  return "";
+}
+
+function extractMathTrendTopicNames(source) {
+  const block = extractObjectBody(source, "topics:");
+  if (!block) return [];
+  const out = [];
+  const re = /^\s*"([^"]+)"\s*:\s*\{/gm;
+  let match;
+  while ((match = re.exec(block)) !== null) {
+    out.push(String(match[1] || "").trim());
+  }
+  return out;
+}
+
+function extractScienceTrendTopicNames(source) {
+  const out = [];
+  const re = /topicName:\s*"([^"]+)"/g;
+  let match;
+  while ((match = re.exec(source)) !== null) {
+    out.push(String(match[1] || "").trim());
+  }
+  return out;
+}
+
+function buildTrendTopicEntries(mathText, scienceText) {
+  const entries = [];
+  const seen = new Set();
+  const pushEntry = (subject, topicName) => {
+    const topicKey = normalizeTopicKey(topicName);
+    if (!topicKey) return;
+    const dedupeKey = `${subject}:${topicKey}`;
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    entries.push({ subject, topicName, topicKey });
+  };
+  extractMathTrendTopicNames(mathText).forEach((topicName) => pushEntry("Maths", topicName));
+  extractScienceTrendTopicNames(scienceText).forEach((topicName) => pushEntry("Science", topicName));
+  return entries;
+}
+
 async function run() {
   const checks = [];
   const apiSnapshots = {};
@@ -78,6 +172,9 @@ async function run() {
 
   const topicHubText = await readText("src/pages/TopicHub.tsx");
   const serverText = await readText("server/index.cjs");
+  const mathTrendsText = await readText("src/data/class10MathTopicTrends.ts");
+  const scienceTrendsText = await readText("src/data/class10ScienceTopicTrends.ts");
+  const trendTopicEntries = buildTrendTopicEntries(mathTrendsText, scienceTrendsText);
 
   addCheck(
     checks,
@@ -87,9 +184,9 @@ async function run() {
   );
   addCheck(
     checks,
-    "topic_hub_priority_grind_keys_present",
-    topicHubText.includes("PRIORITY_TOPIC_GRIND_KEYS"),
-    "TopicHub should declare priority topic set for non-triangles grind."
+    "topic_hub_priority_grind_keys_removed",
+    !topicHubText.includes("PRIORITY_TOPIC_GRIND_KEYS"),
+    "TopicHub should not gate grind contracts to a hard-coded priority list."
   );
   addCheck(
     checks,
@@ -97,6 +194,18 @@ async function run() {
     serverText.includes("buildGrindTopicContractFallback") &&
       serverText.includes("grind_topic_v1"),
     "Server should expose deterministic grind_topic_v1 contract handler."
+  );
+  addCheck(
+    checks,
+    "server_priority_rejection_removed",
+    !serverText.includes("enabled only for priority non-triangles topics"),
+    "Server should not reject non-priority topics for grind_topic_v1."
+  );
+  addCheck(
+    checks,
+    "trends_topic_inventory_parsed",
+    trendTopicEntries.length >= 20,
+    `parsed=${trendTopicEntries.length}`
   );
 
   const serverProc = spawn(process.execPath, ["server/index.cjs"], {
@@ -123,85 +232,54 @@ async function run() {
       grade: 10,
       section: "grind",
       subSection: "inline-doubt",
-      mindmapNodeId: "n1",
+      mindmapNodeId: "core_node",
       mindmapNodeTitle: "Core grind node",
       mindmapNodeText: "Board-writing focused grind node",
       questionText: "Give a board-style skeleton answer.",
       doubtContext: "Student needs exam-format drilling.",
     };
 
-    const pairsReq = await postMentor(baseUrl, {
-      mode: "grind_topic_v1",
-      payload: {
-        ...basePayload,
-        topicKey: "pair-of-linear-equations",
-        chapter: "pair-of-linear-equations",
-      },
-      messages: [{ role: "user", content: "Give me grind contract for pair of linear equations." }],
-    });
-    apiSnapshots.pair_of_linear_equations = pairsReq;
-    const pairsContract = parseContract(pairsReq);
-    addCheck(checks, "pair_eq_status_ok", pairsReq.status === 200, `status=${pairsReq.status}`);
-    addCheck(
-      checks,
-      "pair_eq_contract_shape",
-      Boolean(
-        pairsContract &&
-          pairsContract.type === "grind_topic_v1" &&
-          String(pairsContract.topicKey || "") === "pair-of-linear-equations" &&
-          isNonEmptyArray(pairsContract.board?.steps) &&
-          Number.isFinite(Number(pairsContract.rubric?.marks)) &&
-          isNonEmptyArray(pairsContract.rubric?.checkpoints) &&
-          isNonEmptyArray(pairsContract.commonTraps) &&
-          isNonEmptyArray(pairsContract.microDrills)
-      ),
-      JSON.stringify(pairsContract)
-    );
-
-    const electricityReq = await postMentor(baseUrl, {
-      mode: "grind_topic_v1",
-      payload: {
-        ...basePayload,
-        subject: "Science",
-        topicKey: "electricity",
-        chapter: "electricity",
-      },
-      messages: [{ role: "user", content: "Give me grind contract for electricity." }],
-    });
-    apiSnapshots.electricity = electricityReq;
-    const electricityContract = parseContract(electricityReq);
-    addCheck(checks, "electricity_status_ok", electricityReq.status === 200, `status=${electricityReq.status}`);
-    addCheck(
-      checks,
-      "electricity_contract_shape",
-      Boolean(
-        electricityContract &&
-          electricityContract.type === "grind_topic_v1" &&
-          String(electricityContract.topicKey || "") === "electricity" &&
-          isNonEmptyArray(electricityContract.board?.given) &&
-          isNonEmptyArray(electricityContract.board?.steps) &&
-          isNonEmptyArray(electricityContract.commonTraps) &&
-          isNonEmptyArray(electricityContract.microDrills)
-      ),
-      JSON.stringify(electricityContract)
-    );
-
-    const unsupportedReq = await postMentor(baseUrl, {
-      mode: "grind_topic_v1",
-      payload: {
-        ...basePayload,
-        topicKey: "statistics",
-        chapter: "statistics",
-      },
-      messages: [{ role: "user", content: "Give me grind contract for statistics." }],
-    });
-    apiSnapshots.unsupported = unsupportedReq;
-    addCheck(
-      checks,
-      "unsupported_topic_rejected",
-      unsupportedReq.status === 422,
-      `status=${unsupportedReq.status} body=${JSON.stringify(unsupportedReq.json)}`
-    );
+    for (const entry of trendTopicEntries) {
+      const req = await postMentor(baseUrl, {
+        mode: "grind_topic_v1",
+        payload: {
+          ...basePayload,
+          subject: entry.subject,
+          topicKey: entry.topicKey,
+          chapter: entry.topicKey,
+          topic: entry.topicName,
+          mindmapNodeTitle: `${entry.topicName} core node`,
+        },
+        messages: [{ role: "user", content: `Give me grind contract for ${entry.topicName}.` }],
+      });
+      const snapshotKey = `${entry.subject.toLowerCase()}_${entry.topicKey}`.replace(/[^a-z0-9_]+/g, "_");
+      apiSnapshots[snapshotKey] = req;
+      const contract = parseContract(req);
+      addCheck(
+        checks,
+        `${snapshotKey}_status_ok`,
+        req.status === 200,
+        `status=${req.status}`
+      );
+      addCheck(
+        checks,
+        `${snapshotKey}_contract_shape`,
+        Boolean(
+          contract &&
+            contract.type === "grind_topic_v1" &&
+            String(contract.topicKey || "").length > 0 &&
+            String(contract.node?.id || "").length > 0 &&
+            String(contract.node?.title || "").length > 0 &&
+            isNonEmptyArray(contract.board?.given) &&
+            isNonEmptyArray(contract.board?.steps) &&
+            Number.isFinite(Number(contract.rubric?.marks)) &&
+            isNonEmptyArray(contract.rubric?.checkpoints) &&
+            isNonEmptyArray(contract.commonTraps) &&
+            isNonEmptyArray(contract.microDrills)
+        ),
+        JSON.stringify(contract)
+      );
+    }
   } finally {
     if (!serverProc.killed) {
       serverProc.kill("SIGTERM");
@@ -250,4 +328,3 @@ run().catch(async (err) => {
   console.error(`Report: ${path.relative(repoRoot, outPath)}`);
   process.exitCode = 1;
 });
-
