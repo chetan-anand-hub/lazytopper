@@ -11,7 +11,7 @@
 // the look and feel can be controlled via your existing theme without
 // hardcoded colours.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { QuickAction } from '../../services/commandPaletteConfig';
 import { defaultQuickActions } from '../../services/commandPaletteConfig';
 import { vibeCommandBadgeCopy } from '../microcopy/vibeCommandBadgeCopy';
@@ -24,38 +24,37 @@ export interface CommandPaletteProps {
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onSelect }) => {
   const [query, setQuery] = useState('');
-  const [filtered, setFiltered] = useState<QuickAction[]>(defaultQuickActions);
   const inputRef = useRef<HTMLInputElement>(null);
   const copy = vibeCommandBadgeCopy.commandPalette;
 
-  // Filter actions when the query changes
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const lower = query.toLowerCase();
-    setFiltered(
-      defaultQuickActions.filter(
-        (a) =>
-          a.label.toLowerCase().includes(lower) ||
-          (a.description || '').toLowerCase().includes(lower) ||
-          a.id.toLowerCase().includes(lower),
-      ),
+    return defaultQuickActions.filter(
+      (a) =>
+        a.label.toLowerCase().includes(lower) ||
+        (a.description || '').toLowerCase().includes(lower) ||
+        a.id.toLowerCase().includes(lower),
     );
   }, [query]);
 
-  // Reset and focus input when palette opens
+  // Focus input when palette opens
   useEffect(() => {
     if (isOpen) {
-      setQuery('');
-      setFiltered(defaultQuickActions);
       setTimeout(() => {
         inputRef.current?.focus();
       }, 0);
     }
   }, [isOpen]);
 
+  const handleClose = () => {
+    setQuery('');
+    onClose();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
-      onClose();
+      handleClose();
       return;
     }
     if (e.key === "Enter") {
@@ -68,7 +67,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   return (
-    <div className="command-palette-backdrop" onClick={onClose}>
+    <div className="command-palette-backdrop" onClick={handleClose}>
       <div
         className="command-palette"
         onClick={(e) => e.stopPropagation()}
