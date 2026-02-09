@@ -84,7 +84,7 @@ export function buildMockPaperFromBank(
     );
 
   // 1️⃣ Topic weightage → target marks per topic
-  const topicWeightMap: Record<Class10TopicKey, number> = {} as any;
+  const topicWeightMap: Partial<Record<Class10TopicKey, number>> = {};
   let totalWeight = 0;
 
   class10TopicTrendList.forEach((entry) => {
@@ -92,7 +92,7 @@ export function buildMockPaperFromBank(
     totalWeight += entry.weightagePercent;
   });
 
-  const remainingMarksByTopic: Record<Class10TopicKey, number> = {} as any;
+  const remainingMarksByTopic: Partial<Record<Class10TopicKey, number>> = {};
   (Object.keys(topicWeightMap) as Class10TopicKey[]).forEach((topicKey) => {
     const weight = topicWeightMap[topicKey] ?? 0;
     remainingMarksByTopic[topicKey] = (weight / totalWeight) * totalMarksTarget;
@@ -100,7 +100,7 @@ export function buildMockPaperFromBank(
 
   // 2️⃣ Selection loop – section by section
   const usedIds = new Set<string>();
-  const sectionsResult: Record<SectionKey, MockPaperSectionResult> = {} as any;
+  const sectionsResult: Partial<Record<SectionKey, MockPaperSectionResult>> = {};
 
   sectionsBlueprint.forEach((bp) => {
     // Candidate pool for this section, excluding already used questions
@@ -172,16 +172,16 @@ export function buildMockPaperFromBank(
   );
 
   // 4️⃣ Topic-wise marks summary
-  const byTopicMarks: Record<Class10TopicKey, number> = {} as any;
+  const byTopicMarks: Partial<Record<Class10TopicKey, number>> = {};
   orderedQuestions.forEach((q) => {
     const t = q.topicKey as Class10TopicKey;
     byTopicMarks[t] = (byTopicMarks[t] ?? 0) + (q.marks ?? 0);
   });
 
   return {
-    sections: sectionsResult,
+    sections: sectionsResult as Record<SectionKey, MockPaperSectionResult>,
     orderedQuestions,
     totalMarks,
-    byTopicMarks,
+    byTopicMarks: byTopicMarks as Record<Class10TopicKey, number>,
   };
 }
