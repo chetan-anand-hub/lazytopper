@@ -1270,4 +1270,35 @@ export const predictedQuestionsAdditions: PredictedQuestion[] = [
     strategyHint:
       "Break the track into simple geometric shapes: a rectangle and a circle.",
   },
+  {
+    id: "2026-TRIG-LA-13",
+    topicKey: "Trigonometry",
+    subtopic: "Application/Heights & Distances",
+    kind: "Short",
+    section: "D",
+    marks: 5,
+    difficulty: "Hard",
+    bloomSkill: "Applying",
+    questionText:
+      "From the top of a tower, the angle of depression of two objects on the same straight line with the foot of the tower are 45° and 30°. If the two objects are 40 m apart, find the height of the tower and the distance of the nearer object from the foot of the tower.",
+    answer:
+      "Let nearer distance = x m, farther distance = x + 40 m. tan45° = h/x gives h = x. tan30° = h/(x+40) gives h = (x+40)/√3. Equating: x = (x+40)/√3 ⇒ x(√3−1)=40 ⇒ x = 20(√3+1). Height h = 20(√3+1) m.",
+    finalAnswer:
+      "Height of tower = 20(√3+1) m and distance of nearer object from foot = 20(√3+1) m.",
+    explanation:
+      "Board-style 5-mark application that combines two depression angles with a shared-height setup.",
+    solutionSteps: [
+      "Draw a labelled diagram with tower AB and points C (nearer) and D (farther) on horizontal line through B.",
+      "Use angle of depression = angle of elevation to write ∠ACB = 45° and ∠ADB = 30°.",
+      "Assume BC = x, so BD = x + 40 and AB = h.",
+      "From triangle ABC: tan45° = h/x ⇒ h = x.",
+      "From triangle ABD: tan30° = h/(x+40) ⇒ h = (x+40)/√3.",
+      "Equate both values of h and solve for x.",
+      "State h and BC clearly with units.",
+    ],
+    strategyHint:
+      "For two observations on one line, create two tan equations using the same height variable.",
+    policyTag: "Trigonometry 5-mark competency application",
+    pastBoardYear: "2024",
+  },
 ];

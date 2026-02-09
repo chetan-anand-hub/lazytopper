@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/engine/paperEngine.ts
 
 import {
@@ -21,6 +22,8 @@ import {
   predictedQuestions,
   type PredictedQuestion,
 } from "../data/predictedQuestions";
+import { predictedQuestionsScience } from "../data/predictedQuestionsScience";
+import { buildConstrainedPaper } from "../prediction/constrainedPaperConstructor";
 
 // Common difficulty labels across Maths & Science
 export type DifficultyKey = "Easy" | "Medium" | "Hard";
@@ -195,6 +198,89 @@ export function generatePaper(paperId: string): GeneratedPaper {
     difficultyUsedMarks,
   };
 
+  // 6a. Constrained constructor path (integer-constraint style):
+  // satisfies section marks exactly and enforces competency-focused quotas.
+  const constrained = buildConstrainedPaper({
+    candidates: subjectQuestions.map((q) => ({
+      id: q.id,
+      subject: subject as "Maths" | "Science",
+      topicKey: String((q as any).topicKey),
+      subtopic: String((q as any).subtopic ?? "general"),
+      section: q.section as any,
+      marks: Number((q as any).marks ?? 0),
+      format: String((q as any).kind ?? "Short"),
+      competencyType:
+        String((q as any).kind ?? "").toLowerCase().includes("case") ||
+        String((q as any).kind ?? "").toLowerCase().includes("assertion")
+          ? String((q as any).kind)
+          : String((q as any).bloomSkill ?? "procedural"),
+      score: scoreQuestion(
+        q,
+        pickMostUnderfilledDifficulty(
+          scoreContext.difficultyTargetMarks,
+          scoreContext.difficultyUsedMarks
+        ),
+        scoreContext
+      ),
+    })),
+    blueprint: {
+      sectionMarks: paperMeta.sectionMarks as any,
+      competencyFocusedMinShare: 0.5,
+      caseBasedMinCount: 3,
+    },
+  });
+
+  const constrainedRows = constrained.selected;
+  if (constrainedRows.length > 0) {
+    const sectionsFromConstrained: Record<SectionKey, GeneratedQuestionSlot[]> = {
+      A: [],
+      B: [],
+      C: [],
+      D: [],
+      E: [],
+    };
+    constrainedRows.forEach((row) => {
+      const sec = row.section as SectionKey;
+      if (!sectionsFromConstrained[sec]) return;
+      sectionsFromConstrained[sec].push({
+        questionId: row.id,
+        section: sec,
+        marks: row.marks,
+        difficulty: inferDifficultyFromQuestionId(row.id, subjectQuestions),
+        topicKey: row.topicKey,
+      });
+    });
+
+    const topicMarks: Record<string, number> = {};
+    Object.keys(trendsBundle.topicWeights).forEach((t) => {
+      topicMarks[t] = 0;
+    });
+    const finalDifficultyMarks: Record<DifficultyKey, number> = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0,
+    };
+
+    (Object.keys(sectionsFromConstrained) as SectionKey[]).forEach((sectionKey) => {
+      sectionsFromConstrained[sectionKey].forEach((slot) => {
+        if (!(slot.topicKey in topicMarks)) {
+          topicMarks[slot.topicKey] = 0;
+        }
+        topicMarks[slot.topicKey] += slot.marks;
+        finalDifficultyMarks[slot.difficulty] += slot.marks;
+      });
+    });
+
+    return {
+      paperId,
+      subject,
+      totalMarks,
+      sections: sectionsFromConstrained,
+      topicMarks,
+      difficultyMarks: finalDifficultyMarks,
+    };
+  }
+
   for (const sectionTarget of sectionTargets) {
     fillSectionGreedy({
       sectionTarget,
@@ -235,6 +321,16 @@ export function generatePaper(paperId: string): GeneratedPaper {
     topicMarks,
     difficultyMarks: finalDifficultyMarks,
   };
+}
+
+function inferDifficultyFromQuestionId(
+  questionId: string,
+  subjectQuestions: PredictedQuestion[]
+): DifficultyKey {
+  const found = subjectQuestions.find((q) => q.id === questionId);
+  const d = String((found as any)?.difficulty ?? "Medium");
+  if (d === "Easy" || d === "Medium" || d === "Hard") return d;
+  return "Medium";
 }
 
 /**
@@ -377,8 +473,8 @@ function filterQuestionsBySubject(subject: SubjectKey): PredictedQuestion[] {
     );
   }
 
-  // Science
-  return predictedQuestions.filter((q) => (q as any).subject === "Science");
+  // Science: use the dedicated science predictive bank.
+  return predictedQuestionsScience as unknown as PredictedQuestion[];
 }
 
 /**

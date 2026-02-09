@@ -2,6 +2,8 @@
 import type { PredictedQuestionId } from "./predictedQuestions";
 import { hpqAdditions } from "./hpqAdditionsAndDailyMixSeeds";
 import { mergeBucketsByTopic } from "../utils/mergeBucketsByTopic.ts";
+import { class10ScienceTopicTrends } from "./class10ScienceTopicTrends";
+import { deriveHPQConfidence } from "../prediction/hpqConfidence";
 
 // ---------------- Shared types for the HPQ engine ----------------
 
@@ -69,6 +71,9 @@ export interface HPQQuestion {
     | "Evaluating";
   pastBoardYear?: string;
   policyTag?: string;
+  confidenceScore?: number;
+  confidenceBand?: "low" | "medium" | "high";
+  confidenceRationale?: string;
 }
 
 export interface HPQTopicBucket {
@@ -1980,6 +1985,20 @@ export const highlyProbableQuestions: HPQTopicBucket[] = [
   ...mergeBucketsByTopic("Science", _rawHpqBuckets),
 ];
 
+function normalizeTopicLabel(raw: string): string {
+  return String(raw || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const allowedScienceTopicLabels = new Set(
+  Object.values(class10ScienceTopicTrends.topics).map((topic) =>
+    normalizeTopicLabel(topic.topicName)
+  )
+);
+
 // ----------------------- Safe, typed helpers (UI-neutral) -----------------------
 
 /**
@@ -1994,12 +2013,28 @@ export function getHighlyProbableQuestions(
   const filtered = highlyProbableQuestions.filter((b) => {
     const bSubject: HPQSubject = (b.subject as HPQSubject) ?? "Maths";
     if (bSubject !== subj) return false;
+    if (
+      subj === "Science" &&
+      !allowedScienceTopicLabels.has(normalizeTopicLabel(b.topic))
+    ) {
+      return false;
+    }
     if (subj === "Science" && stream) {
       return (b.stream as HPQStream | undefined) === stream;
     }
     return true;
   });
-  return filtered;
+  return filtered.map((bucket) => ({
+    ...bucket,
+    questions: bucket.questions.map((question) => ({
+      ...question,
+      ...deriveHPQConfidence({
+        subject: subj,
+        topic: bucket.topic,
+        question,
+      }),
+    })),
+  }));
 }
 
 /**

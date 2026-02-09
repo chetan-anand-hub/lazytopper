@@ -2160,6 +2160,34 @@ Food chains usually have 3–4 levels because a lot of energy is lost (about 90%
       "Connects textbook discussion on waste management with real-life civic problems and solutions.",
     policyTag: "Our environment – solid waste management and pollution",
   },
+  {
+    id: "2026-ELEC-LA-12",
+    topicKey: "Electricity",
+    subtopic: "Ohm's law and resistance combinations",
+    kind: "Short",
+    section: "D",
+    marks: 5,
+    difficulty: "Hard",
+    bloomSkill: "Applying",
+    questionText:
+      "A 12 V battery is connected to a resistor network where R1 = 4 Ω is in series with a parallel combination of R2 = 6 Ω and R3 = 3 Ω. (a) Find the equivalent resistance of the circuit. (b) Find the total current from the battery. (c) Find current through R2 and R3 separately. Draw a neat circuit diagram.",
+    answer:
+      "(a) Parallel part: 1/Rp = 1/6 + 1/3 = 1/2 ⇒ Rp = 2 Ω. Equivalent: Req = 4 + 2 = 6 Ω. (b) Total current I = V/Req = 12/6 = 2 A. (c) Voltage across parallel branch = I×Rp = 2×2 = 4 V. Hence I2 = 4/6 = 2/3 A and I3 = 4/3 A.",
+    explanation:
+      "Combines series-parallel reduction with current division and explicit diagram-based presentation, matching 5-mark board style.",
+    solutionSteps: [
+      "Draw the circuit: R1 in series with a branch containing R2 and R3 in parallel.",
+      "Calculate equivalent of parallel branch using reciprocal formula.",
+      "Add R1 to get total equivalent resistance.",
+      "Use Ohm's law to get total current from source.",
+      "Find branch voltage and then branch currents using I = V/R.",
+      "State final values with correct SI units.",
+    ],
+    strategyHint:
+      "Always reduce the parallel block first, then solve series current, then branch currents.",
+    policyTag: "Electricity 5-mark competency numerical with diagram",
+    pastBoardYear: "2025",
+  },
 ];
 export type PredictedQuestionScience = SciencePredictedQuestion;
 // Back-compat alias expected by older mock builders

@@ -29,13 +29,11 @@ export interface PracticeGenerationRequest {
 export function generatePracticeQuestions(
   req: PracticeGenerationRequest
 ): PracticeQuestion[] {
-  // Extract only the fields we use. Rename subject to _subject to avoid unused-variable warnings.
-  const { subject: _subject, topicKey, count, difficulty, subtopicHint, focusBankIds } = req;
+  const { subject, topicKey, count, difficulty, subtopicHint, focusBankIds } = req;
 
-  // Fetch all canonical questions for the topic.  Subject filtering can be
-  // applied later if needed.  For now we ignore subject to keep the
-  // placeholder simple.
+  // Fetch all canonical questions for the topic and keep subject-boundary strict.
   let pool = PredictionCore.getLikelyQuestionsForConcept(topicKey);
+  pool = pool.filter((q: PracticeQuestion) => q.subject === subject);
 
   // Apply difficulty filter if provided (and not "All").
   const effectiveDifficulty: DifficultyLevel | undefined =
@@ -65,9 +63,8 @@ export function generatePracticeQuestions(
     }
   }
 
-  // Ensure we have enough questions.  If not, repeat the pool until
-  // sufficient.  Duplicates are allowed for now; later we can implement
-  // smarter backfilling.
+  // Ensure we have enough questions. If sparse, repeat the pool in a bounded
+  // way so high-demand drills still return the requested count.
   const result: PracticeQuestion[] = [];
   let safety = 0;
   while (result.length < count && safety < 5) {

@@ -92,19 +92,19 @@ export const class10SciencePredictiveEngine: SciencePredictiveEngineSpec = {
     {
       section: "B",
       questionTypes: ["Short"],
-      numQuestions: 6,
+      numQuestions: 5,
       marksEach: 2,
     },
     {
       section: "C",
       questionTypes: ["Short", "Diagram"],
-      numQuestions: 7,
+      numQuestions: 6,
       marksEach: 3,
     },
     {
       section: "D",
       questionTypes: ["Long"],
-      numQuestions: 3,
+      numQuestions: 4,
       marksEach: 5,
     },
     {

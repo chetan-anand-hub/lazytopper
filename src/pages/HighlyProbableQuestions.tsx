@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/pages/HighlyProbableQuestions.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -36,6 +37,7 @@ import {
 
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterId, ChapterMeta } from "../engine/smartLearningTypes";
+import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 
 // Import AI helpers to generate HPQ variants.  MoreLikeThisVariant is the
 // return type for each AI-generated question variant.  We also pull in
@@ -630,7 +632,6 @@ const HighlyProbableQuestions: React.FC = () => {
       // (Optional micro-feedback in future: small toast / chip)
     } catch (err) {
       // Fail silently for now – Smart Learning is a bonus layer, not critical path.
-      // eslint-disable-next-line no-console
       console.error("Failed to record HPQ attempt", err);
     }
   };
@@ -1615,7 +1616,6 @@ const HighlyProbableQuestions: React.FC = () => {
                             */}
                             {q.kind === "assertion-reason" ||
                             // Support both legacy and new schema
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             (q as any).type === "AssertionReason" ? (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                 <div style={{ fontWeight: 600 }}>
@@ -1632,10 +1632,8 @@ const HighlyProbableQuestions: React.FC = () => {
                                   </div>
                                 )}
                                 {/* Render AR options if present */}
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                 {(q as any).aROptions?.length ? (
                                   <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                     {(q as any).aROptions.map((opt: any) => (
                                       <div key={opt.label} style={{ fontSize: "0.8rem", color: "#334155" }}>
                                         <strong>{opt.label}.</strong> {opt.text}
@@ -1648,6 +1646,38 @@ const HighlyProbableQuestions: React.FC = () => {
                               <>{q.question}</>
                             )}
                           </div>
+                          <QuestionVisualAid
+                            subject={bucket.subject ?? subjectKey}
+                            topicKey={bucket.topic}
+                            questionText={q.question}
+                            kind={q.type}
+                            marks={q.marks}
+                          />
+                          {(q.confidenceBand || q.confidenceRationale) && (
+                            <div
+                              style={{
+                                marginTop: 6,
+                                marginBottom: 6,
+                                padding: "6px 8px",
+                                borderRadius: 8,
+                                border: "1px solid rgba(148,163,184,0.5)",
+                                background: "rgba(248,250,252,0.9)",
+                                fontSize: "0.75rem",
+                                color: "#334155",
+                              }}
+                              title={q.confidenceRationale || ""}
+                            >
+                              <strong style={{ textTransform: "capitalize" }}>
+                                Confidence: {q.confidenceBand || "medium"}
+                              </strong>
+                              {q.confidenceScore != null && (
+                                <span> ({Math.round(q.confidenceScore * 100)}%)</span>
+                              )}
+                              {q.confidenceRationale ? (
+                                <div style={{ marginTop: 2 }}>{q.confidenceRationale}</div>
+                              ) : null}
+                            </div>
+                          )}
 
                           {q.answer && (
                             <div

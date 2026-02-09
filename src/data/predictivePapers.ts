@@ -1,6 +1,6 @@
-// src/data/predictivePapers.ts
+﻿// src/data/predictivePapers.ts
 
-// NOTE: we no longer need PredictedQuestion here – the hub + MockPaper
+// NOTE: we no longer need PredictedQuestion here â€“ the hub + MockPaper
 // only use the predictive paper metadata + list of questionIds.
 // import type { PredictedQuestion } from "./predictedQuestions";
 
@@ -14,7 +14,7 @@ export interface PredictivePaper {
   vibe: string;
   tagline: string;
   markTotal: number;
-  subject: SubjectKey; // 👈 NEW
+  subject: SubjectKey; // ðŸ‘ˆ NEW
   // Total marks per section (now includes E)
   sectionMarks: Record<SectionKey, number>;
   // List of PredictedQuestion.id values that belong to this paper.
@@ -22,9 +22,9 @@ export interface PredictivePaper {
   questionIds?: string[];
 }
 
-// NOTE: For now questionIds are left empty – MockPaper falls back
+// NOTE: For now questionIds are left empty â€“ MockPaper falls back
 // to the full prediction bank if a paper has no ids yet.
-// Later, we’ll populate these to get a true 80-mark curated paper.
+// Later, we'll populate these to get a true 80-mark curated paper.
 
 export const predictivePapers: PredictivePaper[] = [
   {
@@ -35,7 +35,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Good first mock: near-board difficulty and coverage.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -46,7 +46,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Great if you want to stress-test equations + polynomials.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -57,7 +57,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Perfect for a geometry-focused revision mock.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -68,7 +68,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Use this when polishing last-unit topics.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -79,7 +79,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Ideal for a fast Sunday sprint mock.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -90,7 +90,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Closest to a generic board paper pattern.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -98,10 +98,10 @@ export const predictivePapers: PredictivePaper[] = [
     title: "Predictive Paper 7",
     slug: "paper-7-tricky-concepts",
     vibe: "Includes more concept-twister questions.",
-    tagline: "Attempt when you’re comfortable with basics.",
+    tagline: "Attempt when you're comfortable with basics.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -109,10 +109,10 @@ export const predictivePapers: PredictivePaper[] = [
     title: "Predictive Paper 8",
     slug: "paper-8-algebra-geometry-stats",
     vibe: "Algebra + geometry + a dash of stats.",
-    tagline: "Good mid-journey mock once syllabus is 70–80% done.",
+    tagline: "Good mid-journey mock once syllabus is 70â€“80% done.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -123,7 +123,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Use this as a dress rehearsal before school prelims.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
   {
@@ -134,7 +134,7 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Best attempted close to the boards as a final stress test.",
     markTotal: 80,
     subject: "Maths",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [],
   },
 
@@ -147,7 +147,8 @@ export const predictivePapers: PredictivePaper[] = [
     tagline: "Good first full-length Science mock with NCERT-heavy flavour.",
     markTotal: 80,
     subject: "Science",
-    sectionMarks: { A: 20, B: 12, C: 24, D: 16, E: 8 },
+    sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },
     questionIds: [], // will reuse the Science bank via engine for now
   },
 ];
+

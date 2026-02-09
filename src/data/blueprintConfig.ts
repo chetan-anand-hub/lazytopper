@@ -25,7 +25,7 @@ export interface SubjectBlueprintConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Maths blueprint (v1 guess, adjust to official pattern as needed)
+// Maths blueprint aligned to current Class X board-style pattern (80 marks).
 // ---------------------------------------------------------------------------
 
 export const mathsBlueprintV1: SubjectBlueprintConfig = {
@@ -69,7 +69,7 @@ export const mathsBlueprintV1: SubjectBlueprintConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Science blueprint (v1 guess, adjust to official pattern as needed)
+// Science blueprint uses the same A-E board-style section marks in product.
 // ---------------------------------------------------------------------------
 
 export const scienceBlueprintV1: SubjectBlueprintConfig = {
@@ -83,25 +83,25 @@ export const scienceBlueprintV1: SubjectBlueprintConfig = {
     },
     {
       section: "B",
-      totalQuestions: 6,
+      totalQuestions: 5,
       marksPerQuestion: 2,
       allowedFormats: ["Short"],
     },
     {
       section: "C",
-      totalQuestions: 7,
+      totalQuestions: 6,
       marksPerQuestion: 3,
       allowedFormats: ["Short", "Long"],
     },
     {
       section: "D",
-      totalQuestions: 3,
+      totalQuestions: 4,
       marksPerQuestion: 5,
       allowedFormats: ["Long"],
     },
     {
       section: "E",
-      totalQuestions: 2,
+      totalQuestions: 3,
       marksPerQuestion: 4,
       allowedFormats: ["Case-Based"],
     },

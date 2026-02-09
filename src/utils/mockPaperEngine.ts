@@ -42,19 +42,19 @@ export interface MockPaperResult {
 // 🔢 CBSE-ish blueprint tuned to 80 marks total:
 //
 // A: 20 × 1 = 20
-// B:  6 × 2 = 12
-// C:  8 × 3 = 24
-// D:  4 × 4 = 16
-// E:  2 × 4 =  8
+// B:  5 × 2 = 10
+// C:  6 × 3 = 18
+// D:  4 × 5 = 20
+// E:  3 × 4 = 12
 // ----------------
 // Total          80
 //
 export const DEFAULT_SECTION_BLUEPRINT: SectionBlueprint[] = [
   { section: "A", targetQuestions: 20, marksPerQuestion: 1 },
-  { section: "B", targetQuestions: 6, marksPerQuestion: 2 },
-  { section: "C", targetQuestions: 8, marksPerQuestion: 3 },
-  { section: "D", targetQuestions: 4, marksPerQuestion: 4 },
-  { section: "E", targetQuestions: 2, marksPerQuestion: 4 },
+  { section: "B", targetQuestions: 5, marksPerQuestion: 2 },
+  { section: "C", targetQuestions: 6, marksPerQuestion: 3 },
+  { section: "D", targetQuestions: 4, marksPerQuestion: 5 },
+  { section: "E", targetQuestions: 3, marksPerQuestion: 4 },
 ];
 
 // Tiny helper to nudge the engine towards slightly tougher questions

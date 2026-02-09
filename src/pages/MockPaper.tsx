@@ -14,15 +14,27 @@ import {
   type PredictedQuestionScience,
 } from "../data/predictedQuestionsScience";
 import { buildMockPaperFromBank } from "../utils/mockPaperEngine";
+import { buildScienceMockPaperFromBank } from "../utils/mockPaperEngineScience";
 import {
   predictivePapers,
   type SubjectKey,
 } from "../data/predictivePapers";
+import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 import "../print.css"; // print styles
 
 type AnyPredictedQuestion = PredictedQuestion | PredictedQuestionScience;
 
 const sectionOrder: SectionKey[] = ["A", "B", "C", "D", "E"];
+
+function toMathSectionBlueprint(sectionMarks: Record<SectionKey, number>) {
+  return [
+    { section: "A" as const, targetQuestions: Math.max(0, Math.floor((sectionMarks.A ?? 0) / 1)), marksPerQuestion: 1 },
+    { section: "B" as const, targetQuestions: Math.max(0, Math.floor((sectionMarks.B ?? 0) / 2)), marksPerQuestion: 2 },
+    { section: "C" as const, targetQuestions: Math.max(0, Math.floor((sectionMarks.C ?? 0) / 3)), marksPerQuestion: 3 },
+    { section: "D" as const, targetQuestions: Math.max(0, Math.floor((sectionMarks.D ?? 0) / 5)), marksPerQuestion: 5 },
+    { section: "E" as const, targetQuestions: Math.max(0, Math.floor((sectionMarks.E ?? 0) / 4)), marksPerQuestion: 4 },
+  ];
+}
 
 const MockPaperPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,10 +48,7 @@ const MockPaperPage: React.FC = () => {
   // Subject of this paper (default to Maths)
   const subject: SubjectKey = paperMeta?.subject ?? "Maths";
 
-  // 2️⃣ Pick the right bank for the *fallback* engine.
-  // For now the generic auto-builder is tuned for Maths only, so we
-  // keep using the Maths predictive bank here. Science papers are
-  // expected to provide explicit questionIds via predictivePapers.
+  // 2️⃣ Pick the right bank for fallback generation.
   const questionBank: PredictedQuestion[] = predictedMathQuestions;
 
   // 3️⃣ Build the mock paper from either:
@@ -47,10 +56,54 @@ const MockPaperPage: React.FC = () => {
   //    b) the generic auto-builder engine (fallback for now).
   const mockResult = React.useMemo(() => {
     // If we don't have predictive metadata or explicit question ids yet,
-    // fall back to the existing engine so nothing breaks.
+    // build from the subject-specific bank.
     if (!paperMeta || !paperMeta.questionIds || paperMeta.questionIds.length === 0) {
+      if (subject === "Science") {
+        const sectionMarks = paperMeta?.sectionMarks ?? {
+          A: 20,
+          B: 10,
+          C: 18,
+          D: 20,
+          E: 12,
+        };
+        const sci = buildScienceMockPaperFromBank(
+          {
+            id: paperMeta?.id ?? "SciAuto",
+            title: paperMeta?.title ?? "Science Predictive Paper",
+            slug: paperMeta?.slug ?? "science-auto",
+            targetMarksBySection: sectionMarks,
+          },
+          predictedQuestionsScience,
+          { shuffle: true, allowOverflowMarks: false }
+        );
+
+        const mapped: Record<SectionKey, { sectionMarks: number; questions: AnyPredictedQuestion[] }> = {
+          A: { sectionMarks: sectionMarks.A, questions: [] },
+          B: { sectionMarks: sectionMarks.B, questions: [] },
+          C: { sectionMarks: sectionMarks.C, questions: [] },
+          D: { sectionMarks: sectionMarks.D, questions: [] },
+          E: { sectionMarks: sectionMarks.E, questions: [] },
+        };
+
+        sci.sections.forEach((sec) => {
+          mapped[sec.key] = {
+            sectionMarks: sec.targetMarks,
+            questions: sec.questions,
+          };
+        });
+
+        const marks = Object.values(mapped).reduce((sum, sec) => {
+          return sum + sec.questions.reduce((s, q) => s + (q.marks ?? 0), 0);
+        }, 0);
+
+        return { sections: mapped, totalMarks: marks };
+      }
+
       return buildMockPaperFromBank({
         questionBank,
+        sections: paperMeta
+          ? toMathSectionBlueprint(paperMeta.sectionMarks as Record<SectionKey, number>)
+          : undefined,
       });
     }
 
@@ -318,6 +371,13 @@ const MockPaperPage: React.FC = () => {
                       >
                         {q.questionText}
                       </div>
+                      <QuestionVisualAid
+                        subject={subject}
+                        topicKey={q.topicKey}
+                        questionText={q.questionText}
+                        kind={q.kind}
+                        marks={q.marks}
+                      />
                       {q.options && q.options.length > 0 && (
                         <ul
                           style={{

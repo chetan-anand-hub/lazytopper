@@ -5,6 +5,13 @@ import type {
   SciSectionKey,
   SciDifficultyKey,
 } from "../data/predictedQuestionsScience";
+import { class10ScienceTopicTrends } from "../data/class10ScienceTopicTrends";
+import {
+  buildConstrainedPaper,
+  type ConstrainedPaperCandidate,
+} from "../prediction/constrainedPaperConstructor";
+import { getCanonicalHistoricalDataset } from "../prediction/historicalDataset";
+import { scoreArchetypeWithBayesianSmoothing } from "../prediction/probabilisticScoring";
 
 // --- Types for the built Science mock paper -------------------------
 
@@ -58,6 +65,24 @@ function shuffleArray<T>(items: T[]): T[] {
 
 function titleForSection(sec: SciSectionKey): string {
   return `Section ${sec}`;
+}
+
+function scienceTopicDisplay(topicKey: string): string {
+  const typedKey = topicKey as keyof typeof class10ScienceTopicTrends.topics;
+  return class10ScienceTopicTrends.topics[typedKey]?.topicName ?? topicKey;
+}
+
+function topicTrendWeight(topicKey: string): number {
+  const typedKey = topicKey as keyof typeof class10ScienceTopicTrends.topics;
+  const pct = class10ScienceTopicTrends.topics[typedKey]?.weightagePercent ?? 0;
+  if (pct <= 0) return 1;
+  return Math.max(0.85, Math.min(1.35, pct / 8));
+}
+
+function policyRegimeForYear(year: number) {
+  if (year >= 2023) return "nep_competency_2023_plus" as const;
+  if (year >= 2020) return "nep_transition_2020_2022" as const;
+  return "nep_pre_2020" as const;
 }
 
 // Simple greedy selector that tries to hit target marks using
@@ -156,10 +181,114 @@ export function buildScienceMockPaperFromBank(
   const { shuffle = true, allowOverflowMarks = true } = options || {};
 
   const sectionOrder: SciSectionKey[] = ["A", "B", "C", "D", "E"];
+  const sectionMarks: Record<SciSectionKey, number> = {
+    A: paperMeta.targetMarksBySection.A ?? 0,
+    B: paperMeta.targetMarksBySection.B ?? 0,
+    C: paperMeta.targetMarksBySection.C ?? 0,
+    D: paperMeta.targetMarksBySection.D ?? 0,
+    E: paperMeta.targetMarksBySection.E ?? 0,
+  };
+
+  const targetYear = new Date().getFullYear();
+  const historicalItems = getCanonicalHistoricalDataset().items;
+  const topicFilter = paperMeta.focusTopics?.length
+    ? new Set(paperMeta.focusTopics)
+    : null;
+  const candidateBank = topicFilter
+    ? bank.filter((question) => topicFilter.has(question.topicKey))
+    : bank;
+
+  const byId = new Map(candidateBank.map((question) => [question.id, question]));
+  const constrainedCandidates: ConstrainedPaperCandidate[] = candidateBank.map(
+    (question) => {
+      const scored = scoreArchetypeWithBayesianSmoothing({
+        input: {
+          subject: "Science",
+          topic: scienceTopicDisplay(question.topicKey),
+          subtopic: question.subtopic,
+          marks: question.marks,
+          format: question.kind,
+          bloom: question.bloomSkill,
+          policyTag: question.policyTag,
+          sourceYearHint: Number(question.pastBoardYear || "") || targetYear - 1,
+        },
+        context: {
+          targetYear,
+          policyRegime: policyRegimeForYear(targetYear),
+          topicTrendWeight: topicTrendWeight(question.topicKey),
+        },
+        historicalItems,
+      });
+
+      const isCaseOrAssertion =
+        question.kind === "Case-Based" || question.kind === "Assertion-Reasoning";
+      const competencyType = isCaseOrAssertion
+        ? question.kind.toLowerCase()
+        : question.bloomSkill.toLowerCase();
+
+      return {
+        id: question.id,
+        subject: "Science",
+        topicKey: question.topicKey,
+        subtopic: question.subtopic,
+        section: question.section,
+        marks: question.marks,
+        format: question.kind,
+        competencyType,
+        score: scored.posterior * 10 + scored.confidence * 4,
+      };
+    }
+  );
+
+  const constrained = buildConstrainedPaper({
+    candidates: constrainedCandidates,
+    blueprint: {
+      sectionMarks,
+      competencyFocusedMinShare: 0.5,
+      caseBasedMinCount: 3,
+    },
+  });
 
   const sections: ScienceMockPaperSection[] = [];
   let totalTarget = 0;
   let totalActual = 0;
+
+  const constrainedTargetMarks = sectionOrder.reduce(
+    (sum, sec) => sum + sectionMarks[sec],
+    0
+  );
+
+  if (
+    constrained.selected.length > 0 &&
+    constrained.totalMarks >= constrainedTargetMarks &&
+    constrained.diagnostics.constraintsSatisfied
+  ) {
+    for (const sec of sectionOrder) {
+      const targetMarks = sectionMarks[sec];
+      totalTarget += targetMarks;
+      const questions = constrained.bySection[sec]
+        .map((row) => byId.get(row.id))
+        .filter((question): question is PredictedScienceQuestion => Boolean(question));
+      const marks = questions.reduce((sum, question) => sum + question.marks, 0);
+      totalActual += marks;
+      sections.push({
+        key: sec,
+        title: titleForSection(sec),
+        targetMarks,
+        actualMarks: marks,
+        questions,
+      });
+    }
+
+    return {
+      paperId: paperMeta.id,
+      paperTitle: paperMeta.title,
+      subject: "Science",
+      totalTargetMarks: totalTarget,
+      totalActualMarks: totalActual,
+      sections,
+    };
+  }
 
   for (const sec of sectionOrder) {
     const targetMarks = paperMeta.targetMarksBySection[sec] ?? 0;

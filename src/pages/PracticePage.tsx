@@ -1,4 +1,5 @@
 ﻿// src/pages/PracticePage.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -8,6 +9,7 @@ import { promptDPracticePacks } from "../data/promptDPracticePacks";
 import { resolveTopicKey as resolveCanonicalTopicKey, toPracticePackKey } from "../utils/topicResolver";
 import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
+import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
@@ -360,7 +362,6 @@ function normaliseQuestionText(s: string | undefined | null): string {
     const merged = [...baseQuestions, ...aiQuestions];
     return expandQuestionsForDrill(merged, safeCount);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("AI top-up failed for practice set:", err);
     return expandQuestionsForDrill(baseQuestions, safeCount);
   }
@@ -529,7 +530,6 @@ const packTopicKey = useMemo(() => {
           setExpandedAnswers({});
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("Error generating practice questions:", e);
         if (!cancelled) {
           setQuestions([]);
@@ -1016,6 +1016,12 @@ const packTopicKey = useMemo(() => {
                     >
                       {q.questionText}
                     </p>
+                    <QuestionVisualAid
+                      subject={subjectKey}
+                      topicKey={topicLabel}
+                      questionText={q.questionText}
+                      marks={q.marks}
+                    />
 
                     {/* Primary actions row */}
                     <div
@@ -1091,7 +1097,7 @@ const packTopicKey = useMemo(() => {
     title="Solve With Me (mentor asks 1 question at a time)"
   >
     <span role="img" aria-label="Solve with me">
-      ðŸ§ 
+      Hint
     </span>
     <span>Solve With Me</span>
   </button>
