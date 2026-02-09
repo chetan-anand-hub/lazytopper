@@ -5,16 +5,16 @@ import { useNavigate } from "react-router-dom";
 const Home: React.FC = () => {
   const navigate = useNavigate();
 
-  const goToClass10Maths = () => {
-    navigate("/trends/10/Maths");
-  };
-
   const goToMentor = () => {
     navigate("/dashboard");
   };
 
   const goToTrends = () => {
     navigate("/trends/10/Maths");
+  };
+
+  const goToTopicHub = () => {
+    navigate("/topic-hub");
   };
 
   const goToPredictivePapers = () => {
@@ -123,18 +123,37 @@ const Home: React.FC = () => {
                 </span>
               </div>
 
-              <div className="hero-form">
-                <select className="hero-input hero-select">
-                  <option>Class 10</option>
-                  <option>Class 12</option>
-                </select>
-                <input
-                  className="hero-input hero-text-input"
-                  type="text"
-                  placeholder="Phone or email"
-                />
-                <button type="button" className="hero-primary-btn">
-                  Get my board plan
+              <div
+                className="hero-links-row"
+                data-ux-priority-block="home-next-best-actions"
+                data-testid="home-priority-block"
+              >
+                <button
+                  type="button"
+                  className="pill"
+                  style={{ padding: "10px 14px", fontWeight: 800 }}
+                  data-ux-above-fold-cta="home"
+                  onClick={goToTopicHub}
+                >
+                  Start in TopicHub
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  style={{ padding: "10px 14px" }}
+                  data-ux-above-fold-cta="home"
+                  onClick={goToMentor}
+                >
+                  Open Dashboard
+                </button>
+                <button
+                  type="button"
+                  className="pill"
+                  style={{ padding: "10px 14px" }}
+                  data-ux-above-fold-cta="home"
+                  onClick={goToTrends}
+                >
+                  View Trends
                 </button>
               </div>
 
@@ -156,14 +175,6 @@ const Home: React.FC = () => {
                   className="hero-link hero-link-primary"
                 >
                   See how it works ↓
-                </button>
-                <span className="hero-links-divider">|</span>
-                <button
-                  type="button"
-                  onClick={goToClass10Maths}
-                  className="hero-link"
-                >
-                  Jump into Class 10 Maths trends →
                 </button>
               </div>
             </div>

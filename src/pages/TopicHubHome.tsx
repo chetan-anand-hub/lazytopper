@@ -248,6 +248,23 @@ export default function TopicHubHome() {
           </div>
         </div>
 
+        <div
+          style={{
+            borderRadius: 18,
+            border: "1px solid rgba(15,23,42,0.1)",
+            background: "rgba(255,255,255,0.88)",
+            padding: 16,
+            marginBottom: 14,
+          }}
+          data-ux-priority-block="topichub-entry-flow"
+          data-testid="topichub-priority-block"
+        >
+          <div style={{ fontWeight: 900, fontSize: 18 }}>3-step flow</div>
+          <div style={{ marginTop: 8, opacity: 0.82, lineHeight: 1.5 }}>
+            1. Pick subject and topic. 2. Learn with tutor checkpoints. 3. Move to Grind and Practice for mastery.
+          </div>
+        </div>
+
         {lastRoute ? (
           <div
             style={{
@@ -267,7 +284,12 @@ export default function TopicHubHome() {
               Last opened: {formatUpdatedAt(lastRoute.updatedAt) || "recently"}
             </div>
             <div style={{ marginTop: 10 }}>
-              <button type="button" className="pill" onClick={goToLastRoute}>
+              <button
+                type="button"
+                className="pill"
+                onClick={goToLastRoute}
+                data-ux-above-fold-cta="topichub"
+              >
                 Resume topic
               </button>
             </div>
@@ -426,6 +448,7 @@ export default function TopicHubHome() {
               type="button"
               className="pill"
               style={{ padding: "10px 14px" }}
+              data-ux-above-fold-cta="topichub"
               onClick={goToSelectedTopic}
               disabled={!selectedTopicKey}
             >
@@ -435,6 +458,7 @@ export default function TopicHubHome() {
               type="button"
               className="pill"
               style={{ padding: "10px 14px" }}
+              data-ux-above-fold-cta="topichub"
               onClick={() => navigate(`/trends/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}`)}
             >
               Open Trends

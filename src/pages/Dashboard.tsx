@@ -294,6 +294,7 @@ export default function Dashboard() {
   const gradeNum = String((studentClass || "").replace(/\D/g, "")) || "10";
   const dailyMixMinutes = mode === "zombie" ? 20 : 40;
   const mixTitle = `Your ${nowDayLabel()} Mix (${dailyMixMinutes} mins)`;
+  const subjectForQuickActions: SubjectTitle = planRecord?.subject === "Science" ? "Science" : plannerSubject;
 
   const handleGeneratePlanner = () => {
     if (!targetPercentValue || !hoursPerDayValue || !daysLeftValue) {
@@ -370,6 +371,46 @@ export default function Dashboard() {
   return (
     <div className="page">
       <h2 className="title">Your Personal Dashboard</h2>
+
+      <div className="card" data-ux-priority-block="dashboard-next-best-actions" data-testid="dashboard-priority-block">
+        <h3>Start Here</h3>
+        <p style={{ marginTop: 6, opacity: 0.82 }}>
+          Pick one action and continue your current learning loop.
+        </p>
+        <div className="focus-cta-row">
+          <button
+            className="cta-btn small"
+            data-ux-above-fold-cta="dashboard"
+            onClick={() => navigate(`/topic-hub/${gradeNum}/${subjectForQuickActions}`)}
+          >
+            Continue in TopicHub
+          </button>
+          <button
+            className="cta-btn small"
+            data-ux-above-fold-cta="dashboard"
+            onClick={() =>
+              navigate(
+                `/practice/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(weakestTopicKey)}`
+              )
+            }
+          >
+            Practice Weakest Topic
+          </button>
+          <button
+            className="cta-btn small"
+            data-ux-above-fold-cta="dashboard"
+            onClick={() =>
+              navigate(
+                `/daily-mix/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(
+                  weakestTopicKey
+                )}`
+              )
+            }
+          >
+            Play Today&apos;s Mix
+          </button>
+        </div>
+      </div>
 
       <div className="card">
         <h3>Planner Mentor</h3>
