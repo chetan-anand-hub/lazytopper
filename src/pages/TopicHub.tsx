@@ -1446,6 +1446,20 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     () => getMasteryCounts(guidedOrder, topicMastery),
     [guidedOrder, topicMastery]
   );
+  const masteryBreakdown = useMemo(() => {
+    const counts: Record<TopicHubNodeMasteryState, number> = {
+      unseen: 0,
+      learning: 0,
+      checkpoint_passed: 0,
+      needs_practice: 0,
+      mastered: 0,
+    };
+    guidedOrder.forEach((id) => {
+      const state = getNodeMasteryState(topicMastery, id);
+      counts[state] += 1;
+    });
+    return counts;
+  }, [guidedOrder, topicMastery]);
   const weakestResourceNodes = useMemo(() => {
     const ordered = guidedOrder
       .map((id) => ({
@@ -1926,6 +1940,25 @@ const showInZombie = (sectionId: string) => {
             <button type="button" style={tabButtonStyle(activeTab === 'resources')} onClick={() => setActiveTab('resources')}>
               Resources
             </button>
+          </div>
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12, opacity: 0.72 }}>Mastery</span>
+            {(Object.keys(masteryBadgeMeta) as TopicHubNodeMasteryState[]).map((state) => (
+              <span
+                key={state}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 900,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: masteryBadgeMeta[state].bg,
+                  color: masteryBadgeMeta[state].color,
+                  border: `1px solid ${masteryBadgeMeta[state].border}`,
+                }}
+              >
+                {masteryBadgeMeta[state].label}: {masteryBreakdown[state]}
+              </span>
+            ))}
           </div>
         </div>
 

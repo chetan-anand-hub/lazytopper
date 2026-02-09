@@ -1,7 +1,11 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { DiagramBlock } from "../DiagramBlock";
 import { MENTOR_ENDPOINT } from "../../ai/aiClient";
-import { extractDiagramMeta, validateTutorStructured } from "../../contracts/tutorContracts.ts";
+import {
+  buildTutorFallback,
+  extractDiagramMeta,
+  validateTutorStructured,
+} from "../../contracts/tutorContracts.ts";
 import { getHintVariant } from "../../services/abFlags";
 import { logActivity } from "../../services/sessionLogger";
 import { HumanGradeCoachView } from "../mentor/HumanGradeCoachView";
@@ -84,15 +88,53 @@ const getResponseStructured = (payload: unknown): MentorStructured | null => {
   const parsed = structuredCandidate ?? safeJsonParse(String(textFallback ?? ""));
   return (parsed ?? null) as MentorStructured | null;
 };
-const getResponseText = (payload: unknown): string => {
-  if (!isRecord(payload)) return "";
-  const dataBlock = isRecord(payload.data) ? payload.data : null;
-  return dataBlock && typeof dataBlock.text === "string" ? dataBlock.text : "";
-};
 const MENTOR_REQUEST_TIMEOUT_MS = 30_000;
+const MENTOR_SOFT_TIMEOUT_MS = 12_000;
+const MENTOR_MAX_ATTEMPTS = 2;
+const MENTOR_RETRY_BASE_MS = 900;
+
+const waitMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, Math.max(0, ms));
+  });
+
+const isRetryableStatus = (status: number) =>
+  status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+
+const parseRetryAfterMs = (res: Response, payload: unknown) => {
+  const header = res.headers.get("Retry-After");
+  if (header) {
+    const sec = Number(header);
+    if (Number.isFinite(sec) && sec >= 0) return sec * 1000;
+    const dateMs = Date.parse(header);
+    if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  }
+  if (isRecord(payload)) {
+    const retryAfterMs = Number(payload.retryAfterMs);
+    if (Number.isFinite(retryAfterMs) && retryAfterMs >= 0) return retryAfterMs;
+    const retryAfterSec = Number(payload.retryAfterSec);
+    if (Number.isFinite(retryAfterSec) && retryAfterSec >= 0) return retryAfterSec * 1000;
+  }
+  return null;
+};
+
+const isRetryableMentorError = (err: unknown) => {
+  if (getErrorName(err) === "AbortError") return false;
+  const msg = getErrorMessage(err, "").toLowerCase();
+  return /timed out|timeout|network|failed to fetch|econnreset|enotfound|503|502|504/.test(msg);
+};
+
+const computeBackoffMs = (attempt: number, retryAfterMs: number | null) => {
+  if (Number.isFinite(retryAfterMs as number) && (retryAfterMs as number) >= 0) {
+    return Math.min(6_000, Number(retryAfterMs));
+  }
+  return Math.min(5_000, MENTOR_RETRY_BASE_MS * (attempt + 1));
+};
+
 const fetchMentorPayload = async (
   body: unknown,
-  externalSignal?: AbortSignal
+  externalSignal?: AbortSignal,
+  timeoutMs: number = MENTOR_REQUEST_TIMEOUT_MS
 ): Promise<{ res: Response; data: unknown }> => {
   const controller = new AbortController();
   let timedOut = false;
@@ -107,7 +149,7 @@ const fetchMentorPayload = async (
   const timeoutId = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, MENTOR_REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
   try {
     const res = await fetch(MENTOR_ENDPOINT, {
       method: "POST",
@@ -140,6 +182,15 @@ const toTutorErrorMessage = (err: unknown, fallback: string): string => {
   }
   return msg;
 };
+
+const cleanDisplayText = (value: string): string =>
+  String(value || "")
+    .replace(/\u00e2\u20ac[\u201c\u201d]/g, "-")
+    .replace(/\u00e2\u20ac[\u02dc\u2122]/g, "'")
+    .replace(/\u00e2\u20ac[\u0153\u009d]/g, '"')
+    .replace(/\u00e2\u20ac\u00a6/g, "...")
+    .replace(/\u00c2 /g, " ")
+    .replace(/\u00a0/g, " ");
 
 const deriveMasteryState = (status: string, score: number): TutorMasteryState => {
   const norm = String(status || "").toLowerCase();
@@ -261,6 +312,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const [coachHintWarning, setCoachHintWarning] = useState<string | null>(null);
   const [coachHintFallback, setCoachHintFallback] = useState(false);
   const [showSoftGateWarning, setShowSoftGateWarning] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const [notices, setNotices] = useState<Record<string, string>>({});
   const [hintVariant] = useState(() => getHintVariant());
   const isDev = Boolean(import.meta?.env?.DEV);
   const abortRef = useRef<AbortController | null>(null);
@@ -284,6 +337,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const currentKey = nodeId ? `${tab}:${nodeId}` : "";
   const currentResponse = currentKey ? responses[currentKey] : null;
   const currentError = currentKey ? errors[currentKey] : null;
+  const currentNotice = currentKey ? notices[currentKey] : null;
   const isLoading = loadingKey === currentKey;
   const canAdvanceWithoutWarning =
     nodeMasteryState === "checkpoint_passed" || nodeMasteryState === "mastered";
@@ -330,9 +384,72 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     setLoadingKey(null);
   }, []);
 
+  const requestWithRecovery = useCallback(
+    async (body: unknown, signal?: AbortSignal) => {
+      let lastError: unknown = null;
+      let lastData: unknown = {};
+      let lastRes: Response | null = null;
+      let retryUsed = false;
+
+      for (let attempt = 0; attempt < MENTOR_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          const timeoutMs = attempt === 0 ? MENTOR_SOFT_TIMEOUT_MS : MENTOR_REQUEST_TIMEOUT_MS;
+          const { res, data } = await fetchMentorPayload(body, signal, timeoutMs);
+          lastRes = res;
+          lastData = data;
+          const structured = getResponseStructured(data);
+          const rateLimitedWithStructured = res.status === 429 && Boolean(structured);
+          if ((res.ok || rateLimitedWithStructured) && structured) {
+            return {
+              structured,
+              data,
+              res,
+              warning: retryUsed
+                ? "Mentor recovered after retry."
+                : rateLimitedWithStructured
+                  ? "Mentor is busy; continuing with available guidance."
+                  : "",
+            };
+          }
+          const errMsg = getResponseError(data, "Mentor response incomplete.");
+          lastError = new Error(errMsg);
+
+          if (attempt < MENTOR_MAX_ATTEMPTS - 1 && isRetryableStatus(res.status)) {
+            retryUsed = true;
+            const retryAfterMs = parseRetryAfterMs(res, data);
+            await waitMs(computeBackoffMs(attempt, retryAfterMs));
+            continue;
+          }
+          break;
+        } catch (err) {
+          if (getErrorName(err) === "AbortError") throw err;
+          lastError = err;
+          if (attempt < MENTOR_MAX_ATTEMPTS - 1 && isRetryableMentorError(err)) {
+            retryUsed = true;
+            await waitMs(computeBackoffMs(attempt, null));
+            continue;
+          }
+          break;
+        }
+      }
+
+      const fallbackPayload = isRecord(body) ? body.payload : undefined;
+      const fallbackStructured = buildTutorFallback("learn_teach", fallbackPayload) as MentorStructured;
+      return {
+        structured: fallbackStructured,
+        data: lastData,
+        res: lastRes,
+        warning:
+          "Mentor is unavailable. Showing local human-tutor fallback so your session continues.",
+        fallbackReason: toTutorErrorMessage(lastError, "Mentor error. Please retry."),
+      };
+    },
+    []
+  );
 
 
-  const formatDoubtStructured = (obj: unknown) => {
+
+  const formatDoubtStructured = useCallback((obj: unknown) => {
     if (!isRecord(obj)) return "";
     const tutorObj = getTutorObject(obj as MentorStructured);
     const attemptLoop = isRecord(tutorObj?.attempt_loop) ? tutorObj.attempt_loop : null;
@@ -399,7 +516,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       return lines.join("\n");
     }
     return "";
-  };
+  }, []);
 
   const logHintEvent = (event: string, level: number) => {
     try {
@@ -480,6 +597,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
 
       cancelInFlight();
       setErrors((prev) => ({ ...prev, [key]: "" }));
+      setNotices((prev) => ({ ...prev, [key]: "" }));
       setLoadingKey(key);
 
       const controller = new AbortController();
@@ -491,12 +609,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         const hintLadderState =
           opts?.requestNextHint && isRecord(attemptLoop) ? attemptLoop.hint_ladder : undefined;
         const body = buildPayload(nextTab, undefined, opts?.prompt, opts?.requestNextHint, hintLadderState);
-        const { res, data } = await fetchMentorPayload(body, controller.signal);
-        const nextStructured = getResponseStructured(data);
-        const rateLimitedWithFallback = res.status === 429 && Boolean(nextStructured);
-        if (!res.ok && !rateLimitedWithFallback) {
-          throw new Error(getResponseError(data, "Mentor request failed."));
-        }
+        const result = await requestWithRecovery(body, controller.signal);
+        const nextStructured = result.structured;
         if (!nextStructured) throw new Error("Mentor response incomplete. Please retry.");
 
         const modeApi = "learn_teach";
@@ -520,6 +634,9 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             summary: JSON.stringify(nextStructured).slice(0, 280),
           },
         }));
+        if (result.warning) {
+          setNotices((prev) => ({ ...prev, [key]: result.warning }));
+        }
       } catch (err) {
         if (getErrorName(err) === "AbortError") return;
         setErrors((prev) => ({
@@ -540,6 +657,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       loadingKey,
       cancelInFlight,
       buildPayload,
+      requestWithRecovery,
     ]
   );
 
@@ -552,12 +670,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     const body = buildPayload(tab, undefined, prompt, true, undefined, targetLevel);
 
     try {
-      const { res, data } = await fetchMentorPayload(body);
-      const structured = getResponseStructured(data);
-      const rateLimitedWithFallback = res.status === 429 && Boolean(structured);
-      if (!res.ok && !rateLimitedWithFallback) {
-        throw new Error(getResponseError(data, "Mentor request failed."));
-      }
+      const result = await requestWithRecovery(body);
+      const structured = result.structured;
       if (!structured) throw new Error("Mentor response incomplete. Please retry.");
 
       const meta = extractDiagramMeta(structured);
@@ -575,6 +689,9 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       }));
       setCoachHintLevel(Math.min(3, targetLevel));
       setCoachHintFallback(false);
+      if (result.warning && currentKey) {
+        setNotices((prev) => ({ ...prev, [currentKey]: result.warning }));
+      }
       logHintEvent("hint_level_reached", targetLevel);
     } catch {
       setCoachHintWarning("Hint refresh failed; showing local hint.");
@@ -615,12 +732,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       try {
         const mentorPrompt = promptTrimmed;
         const body = buildPayload(tab, doubtContext, mentorPrompt, false, undefined);
-        const { res, data } = await fetchMentorPayload(body);
-        const structured = getResponseStructured(data);
-        const rateLimitedWithFallback = res.status === 429 && Boolean(structured);
-        if (!res.ok && !rateLimitedWithFallback) {
-          throw new Error(getResponseError(data, "Mentor request failed."));
-        }
+        const result = await requestWithRecovery(body);
+        const structured = result.structured;
         if (structured && currentKey) {
           const meta = extractDiagramMeta(structured);
           setResponses((prev) => ({
@@ -635,8 +748,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               summary: JSON.stringify(structured).slice(0, 280),
             },
           }));
+          if (result.warning) {
+            setNotices((prev) => ({ ...prev, [currentKey]: result.warning }));
+          }
         }
-        const formatted = structured ? formatDoubtStructured(structured) : String(getResponseText(data) || "");
+        const formatted = structured ? formatDoubtStructured(structured) : "";
         const finalAnswer = String(formatted || "").trim()
           ? String(formatted).trim()
           : "I could not generate a clear reply yet. Try: Explain AA similarity with one solved example.";
@@ -644,9 +760,9 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         setDoubtInput("");
       } catch (err) {
         setDoubtError(toTutorErrorMessage(err, "Mentor error. Please retry."));
-    } finally {
-      setDoubtLoading(false);
-    }
+      } finally {
+        setDoubtLoading(false);
+      }
     },
     [
       doubtLoading,
@@ -658,6 +774,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       nodeIndex,
       buildPayload,
       currentKey,
+      formatDoubtStructured,
+      requestWithRecovery,
     ]
   );
 
@@ -667,6 +785,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       setDoubtInput("");
       setDoubtError(null);
       setChatTurns([]);
+      setShowMoreActions(false);
       return;
     }
     if (!nodeId) return;
@@ -690,8 +809,12 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     setCoachHintWarning(null);
     setCoachHintLoading(false);
     setCoachHintFallback(false);
+    if (currentKey) {
+      setNotices((prev) => ({ ...prev, [currentKey]: "" }));
+    }
+    setShowMoreActions(false);
     lastProgressRef.current = "";
-  }, [tab, nodeId]);
+  }, [tab, nodeId, currentKey]);
 
   useEffect(() => {
     const tutorObj = getTutorObject(currentResponse?.structured);
@@ -1046,18 +1169,29 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         : checkpointQuestion;
 
     return {
-      goalLine,
-      keyIdeas,
-      examLines,
-      workedQuestion,
-      workedSteps,
-      workedFinal,
-      workedExamples,
-      checkpointQuestion,
-      checkpointAnswer,
-      commonMistake,
-      commonFix,
-      boardQuestion,
+      goalLine: cleanDisplayText(goalLine),
+      keyIdeas: keyIdeas.map((line) => cleanDisplayText(line)),
+      examLines: examLines.map((line) => cleanDisplayText(line)),
+      workedQuestion: cleanDisplayText(workedQuestion),
+      workedSteps: workedSteps.map((step) => ({
+        ...step,
+        text: cleanDisplayText(String(step.text || "")),
+      })),
+      workedFinal: cleanDisplayText(workedFinal),
+      workedExamples: workedExamples.map((entry) => ({
+        ...entry,
+        question: cleanDisplayText(String(entry.question || "")),
+        finalAnswer: cleanDisplayText(String(entry.finalAnswer || "")),
+        steps: entry.steps.map((step) => ({
+          ...step,
+          text: cleanDisplayText(String(step.text || "")),
+        })),
+      })),
+      checkpointQuestion: cleanDisplayText(checkpointQuestion),
+      checkpointAnswer: cleanDisplayText(checkpointAnswer),
+      commonMistake: cleanDisplayText(commonMistake),
+      commonFix: cleanDisplayText(commonFix),
+      boardQuestion: cleanDisplayText(boardQuestion),
     };
   };
 
@@ -1150,7 +1284,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         />
         {tutorText ? (
           <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.9)", border: "1px solid rgba(0,0,0,0.08)" }}>
-            {String(tutorText)}
+            {cleanDisplayText(String(tutorText))}
           </div>
         ) : null}
         {coachProps ? <HumanGradeCoachView {...coachProps} compact /> : null}
@@ -1181,62 +1315,15 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             >
               <div style={bubbleStyle(msg.role, msg.tone)}>
                 <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{msg.text}</div>
+                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                  {cleanDisplayText(msg.text)}
+                </div>
               </div>
             </div>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
-          >
-            Need hint
-          </button>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => {
-              setDoubtInput("Checkpoint attempt: ");
-              doubtInputRef.current?.focus();
-            }}
-          >
-            Try checkpoint
-          </button>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => handleNextConcept()}
-            disabled={nodeIndex >= order.length - 1}
-          >
-            Continue
-          </button>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => {
-              if (!nodeId || !onPracticeThisNode) return;
-              onPracticeThisNode(nodeId);
-            }}
-            disabled={!nodeId || !onPracticeThisNode}
-          >
-            Practice this node
-          </button>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => doubtInputRef.current?.focus()}
-          >
-            Ask a doubt
-          </button>
-          <button
-            type="button"
-            className="pill"
-            onClick={() => handleTabChange("examples")}
-          >
-            Show an example for this
-          </button>
+        <div style={{ fontSize: 12, opacity: 0.74 }}>
+          Quick controls moved to the footer action bar for a cleaner lesson workspace.
         </div>
       </div>
     );
@@ -1262,7 +1349,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         />
         {tutorText ? (
           <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
-            {String(tutorText)}
+            {cleanDisplayText(String(tutorText))}
           </div>
         ) : null}
         {coachProps ? <HumanGradeCoachView {...coachProps} /> : null}
@@ -1352,7 +1439,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     if (currentError) {
       return (
         <div style={{ padding: 12, borderRadius: 12, border: "1px solid rgba(255,0,0,0.2)", background: "rgba(255,0,0,0.06)" }}>
-          <div>{currentError}</div>
+          <div>{cleanDisplayText(currentError)}</div>
           <button
             type="button"
             className="pill"
@@ -1394,6 +1481,45 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           "Show one more board example for this node.",
           "What is the most common exam mistake here?",
         ];
+  const sessionSteps = ["Learn", "Checkpoint", "Practice", "Mistake Fix", "Exam Drill", "Mastery"];
+  const activeSessionStep = (() => {
+    if (nodeMasteryState === "mastered") return 5;
+    if (tab === "examples") return 4;
+    if (nodeMasteryState === "needs_practice") return 3;
+    if (nodeMasteryState === "checkpoint_passed") return 2;
+    if (currentResponse || chatTurns.length > 0) return 1;
+    return 0;
+  })();
+  const primaryActionLabel = !canAdvanceWithoutWarning
+    ? "Try checkpoint"
+    : tab === "teach" && nodeId && onPracticeThisNode
+      ? "Practice this node"
+      : tab === "teach"
+        ? "Open board example"
+        : nodeIndex < order.length - 1
+          ? "Next concept"
+          : "Restart path";
+  const runPrimaryAction = () => {
+    if (!canAdvanceWithoutWarning) {
+      setDoubtInput("Checkpoint attempt: ");
+      setShowSoftGateWarning(true);
+      doubtInputRef.current?.focus();
+      return;
+    }
+    if (tab === "teach" && nodeId && onPracticeThisNode) {
+      onPracticeThisNode(nodeId);
+      return;
+    }
+    if (tab === "teach") {
+      handleTabChange("examples");
+      return;
+    }
+    if (nodeIndex < order.length - 1) {
+      handleNextConcept(true);
+      return;
+    }
+    goToNodeIndex(0);
+  };
 
   return (
     <div
@@ -1410,20 +1536,18 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       <div
         style={{
           position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: "min(1360px, 98vw)",
-          height: "min(96vh, 980px)",
-          maxHeight: "96vh",
-          minHeight: "620px",
+          inset: 0,
+          width: "100vw",
+          height: "100vh",
+          maxHeight: "100vh",
+          minHeight: "100vh",
           background: drawerBg,
-          borderRadius: 18,
-          border: "1px solid rgba(0,0,0,0.12)",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+          borderRadius: 0,
+          border: "none",
+          boxShadow: "none",
           display: "flex",
           flexDirection: "column",
-          padding: 18,
+          padding: "14px 14px 10px",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1473,6 +1597,48 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
           You're learning: <b>{nodeTitle}</b> - Step {nodeIndex + 1} of {Math.max(1, order.length)}
         </div>
+
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {sessionSteps.map((step, idx) => {
+            const active = idx === activeSessionStep;
+            const done = idx < activeSessionStep;
+            return (
+              <span
+                key={step}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  borderRadius: 999,
+                  padding: "3px 9px",
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  background: active
+                    ? "rgba(15,23,42,0.92)"
+                    : done
+                      ? "rgba(34,197,94,0.12)"
+                      : "rgba(255,255,255,0.85)",
+                  color: active ? "#fff" : done ? "rgba(20,83,45,0.9)" : "rgba(15,23,42,0.8)",
+                }}
+              >
+                {step}
+              </span>
+            );
+          })}
+        </div>
+
+        {currentNotice ? (
+          <div
+            style={{
+              marginTop: 10,
+              borderRadius: 12,
+              padding: "8px 10px",
+              border: "1px solid rgba(14,165,233,0.35)",
+              background: "rgba(14,165,233,0.10)",
+              fontSize: 12,
+            }}
+          >
+            {cleanDisplayText(currentNotice)}
+          </div>
+        ) : null}
 
         {showSoftGateWarning ? (
           <div
@@ -1578,11 +1744,80 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
 
         {doubtError ? (
           <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(255,0,0,0.06)" }}>
-            {doubtError}
+            {cleanDisplayText(doubtError)}
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.78 }}>{checkpointHint}</div>
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            type="button"
+            className="pill"
+            style={{
+              padding: "9px 14px",
+              fontWeight: 900,
+              background: "rgba(15,23,42,0.92)",
+              color: "#fff",
+              borderColor: "rgba(15,23,42,0.92)",
+            }}
+            onClick={runPrimaryAction}
+            disabled={doubtLoading}
+          >
+            {primaryActionLabel}
+          </button>
+          <button
+            type="button"
+            className="pill"
+            style={{ padding: "8px 10px", fontSize: 12 }}
+            onClick={() => setShowMoreActions((prev) => !prev)}
+          >
+            {showMoreActions ? "Hide extra actions" : "More actions"}
+          </button>
+          <div style={{ fontSize: 12, opacity: 0.72 }}>{checkpointHint}</div>
+        </div>
+
+        {showMoreActions ? (
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
+              disabled={doubtLoading}
+            >
+              Need hint
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => {
+                setDoubtInput("Checkpoint attempt: ");
+                doubtInputRef.current?.focus();
+              }}
+              disabled={doubtLoading}
+            >
+              Try checkpoint
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => {
+                if (!nodeId || !onPracticeThisNode) return;
+                onPracticeThisNode(nodeId);
+              }}
+              disabled={doubtLoading || !nodeId || !onPracticeThisNode}
+            >
+              Practice this node
+            </button>
+            <button
+              type="button"
+              className="pill"
+              onClick={() => handleTabChange(tab === "teach" ? "examples" : "teach")}
+              disabled={doubtLoading}
+            >
+              {tab === "teach" ? "Board examples" : "Back to teach"}
+            </button>
+          </div>
+        ) : null}
+
         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
           <input
             ref={doubtInputRef}
@@ -1615,23 +1850,25 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             {doubtLoading ? "Thinking..." : sendButtonLabel}
           </button>
         </div>
-        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {quickPrompts.map((prompt) => (
-            <button
-              key={prompt}
-              type="button"
-              className="pill"
-              style={{ padding: "6px 10px", fontSize: 12 }}
-              onClick={() => {
-                setDoubtInput(prompt);
-                doubtInputRef.current?.focus();
-              }}
-              disabled={doubtLoading}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
+        {showMoreActions ? (
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                className="pill"
+                style={{ padding: "6px 10px", fontSize: 12 }}
+                onClick={() => {
+                  setDoubtInput(prompt);
+                  doubtInputRef.current?.focus();
+                }}
+                disabled={doubtLoading}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
           <button
@@ -1720,7 +1957,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                 </button>
                 {feedbackMessage ? (
                   <div style={{ fontSize: 12, color: feedbackStatus === "error" ? "#b91c1c" : "#166534" }}>
-                    {feedbackMessage}
+                    {cleanDisplayText(feedbackMessage)}
                   </div>
                 ) : null}
               </div>
