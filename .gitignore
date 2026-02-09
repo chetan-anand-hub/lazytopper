@@ -121,6 +121,12 @@ _codex_output/
 _debug_bundle/
 _handover_evidence/
 src/pages/TopicHub.tsx.bak2
+# backup artifacts (never commit)
+_patch_backup_*/
+.patch_backups/
+*.bak
+*.bak_*
+*.bak2
 # --- HARD BOUNDARY OVERRIDE (last-match wins) ---
 .project_memory/**
 docs/session/**
@@ -137,6 +143,11 @@ node_modules/**
 _codex_output/**
 _debug_bundle/**
 _handover_evidence/**
+_patch_backup_*/**
+.patch_backups/**
+**/*.bak
+**/*.bak_*
+**/*.bak2
 _handoff/**
 _rollback/**
 
