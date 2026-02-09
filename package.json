@@ -55,6 +55,7 @@
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"
   },
   "dependencies": {
+    "firebase": "^12.9.0",
     "html-to-image": "^1.10.7",
     "mammoth": "^1.11.0",
     "react": "^19.2.0",

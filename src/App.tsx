@@ -26,6 +26,7 @@ import WeeklyWrappedPage from './pages/WeeklyWrappedPage';
 import { useVibeMode } from './context/vibeModeContext';
 import { parseCommandIntent } from "./services/commandIntent";
 import { normalizeTopicKey } from "./utils/topicResolver";
+import { RequireAuth } from "./components/auth/RequireAuth";
 
 /**
  * BottomNav component renders a simple bottom navigation bar for the mobile view.
@@ -222,13 +223,13 @@ export default function App() {
           {/* Core Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
 
           {/* New Smart Study Planner (grade + subject aware) */}
-          <Route path="/planner/:grade/:subject" element={<StudyPlannerView />} />
+          <Route path="/planner/:grade/:subject" element={<RequireAuth><StudyPlannerView /></RequireAuth>} />
           {/* Legacy planner route (no params) */}
-          <Route path="/planner" element={<StudyPlannerView />} />
+          <Route path="/planner" element={<RequireAuth><StudyPlannerView /></RequireAuth>} />
 
 
           {/* Legacy Topic content hub â€“ maths topics via :topicKey param */}
@@ -274,9 +275,9 @@ export default function App() {
           <Route path="/practice/:grade/:subject" element={<PracticePage />} />
 
           {/* Study Plan with mandatory grade & subject */}
-          <Route path="/study-plan/:grade/:subject" element={<StudyPlanPage />} />
+          <Route path="/study-plan/:grade/:subject" element={<RequireAuth><StudyPlanPage /></RequireAuth>} />
           {/* Legacy Study Plan route */}
-          <Route path="/study-plan" element={<StudyPlanPage />} />
+          <Route path="/study-plan" element={<RequireAuth><StudyPlanPage /></RequireAuth>} />
 
           {/* AI Mentor / Planner routes with mandatory grade & subject */}
           <Route path="/ai-mentor/:grade/:subject" element={<AiMentorPage />} />
@@ -288,13 +289,13 @@ export default function App() {
           {/* Daily Mix route for personalised study mixes */}
           <Route
             path="/daily-mix/:grade/:subject"
-            element={<DailyMixPage />}
+            element={<RequireAuth><DailyMixPage /></RequireAuth>}
           />
 
           {/* Weekly Wrapped recap route */}
           <Route
             path="/weekly-wrapped"
-            element={<WeeklyWrappedPage />}
+            element={<RequireAuth><WeeklyWrappedPage /></RequireAuth>}
           />
 
 

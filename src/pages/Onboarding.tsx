@@ -1,113 +1,113 @@
-import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useProfile } from "../context/ProfileContext";
-import { cbseDates, formatCbseDate } from "../config/cbseDates";
+import { daysLeftFromIsoDate, fetchCbseExamDate } from "../services/cbseExamDate";
+import { cbseDates } from "../config/cbseDates";
 
-function getDaysLeft(targetDateStr?: string | null): number {
-  const today = new Date();
-  if (!targetDateStr) {
-    return 90;
-  }
-  const target = new Date(targetDateStr + "T00:00:00");
-  if (Number.isNaN(target.getTime())) {
-    return 90;
-  }
-  const diffMs = target.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  // If date has passed, give a default 90 days placeholder
-  return diffDays > 0 ? diffDays : 90;
-}
-
-function getBoardExamDateForClass(studentClass: "10" | "12") {
-  return studentClass === "10" ? cbseDates.class10?.boardExam : cbseDates.class12?.boardExam;
+function formatIsoDate(iso: string): string {
+  const date = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "TBD";
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { setProfileAndCompute } = useProfile();
+  const { profile, loadingProfile, setProfileAndCompute } = useProfile();
 
-  const [studentClass, setStudentClass] = useState<"10" | "12">("10");
-  const [assessmentMode, setAssessmentMode] = useState<"diagnostic" | "marks">(
-    "marks"
-  );
+  const [studentClassInput, setStudentClassInput] = useState<"" | "10" | "12">("");
+  const [assessmentMode, setAssessmentMode] = useState<"diagnostic" | "marks">("marks");
 
-  const [autoDaysLeft, setAutoDaysLeft] = useState<number>(() =>
-    getDaysLeft(getBoardExamDateForClass("10"))
-  );
-  const [days, setDays] = useState<string>(() =>
-    String(getDaysLeft(getBoardExamDateForClass("10")))
-  );
+  const [examDate, setExamDate] = useState("");
+  const [examDateSource, setExamDateSource] = useState<"official" | "predicted">("predicted");
+  const [examDateNote, setExamDateNote] = useState("");
 
+  const [autoDaysLeft, setAutoDaysLeft] = useState<number>(90);
+  const [days, setDays] = useState<string>("90");
   const [target, setTarget] = useState("");
   const [hours, setHours] = useState("");
-
-  // last three test marks (for option B)
   const [mark1, setMark1] = useState("");
   const [mark2, setMark2] = useState("");
   const [mark3, setMark3] = useState("");
+  const studentClass: "10" | "12" = studentClassInput || profile?.studentClass || "10";
 
-  // recompute days left whenever class changes
   useEffect(() => {
-    const d = getDaysLeft(getBoardExamDateForClass(studentClass));
-    setAutoDaysLeft(d);
-    setDays(String(d));
+    let cancelled = false;
+    void (async () => {
+      const staticDate =
+        studentClass === "10" ? String(cbseDates.class10?.boardExam || "") : String(cbseDates.class12?.boardExam || "");
+      const result = await fetchCbseExamDate(studentClass);
+      if (cancelled) return;
+      setExamDate(result.examDate || staticDate);
+      setExamDateSource(result.source);
+      setExamDateNote(String(result.note || ""));
+      const left = Math.max(1, daysLeftFromIsoDate(result.examDate || staticDate));
+      setAutoDaysLeft(left);
+      setDays((prev) => {
+        if (!prev || Number(prev) <= 0 || prev === "90") return String(left);
+        return prev;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [studentClass]);
 
   const handleSubmit = () => {
-    const daysLeft = Number(days);
-    const targetPercent = Number(target);
-    const hoursPerDay = Number(hours);
+    const daysLeft = Number(days || profile?.daysLeft || autoDaysLeft);
+    const targetPercent = Number(target || profile?.targetPercent || 0);
+    const hoursPerDay = Number(hours || profile?.hoursPerDay || 0);
 
     if (!daysLeft || !targetPercent || !hoursPerDay) {
-      alert("Please fill days, target % and hours/day with valid numbers 🙂");
+      alert("Please fill days, target %, and hours/day with valid numbers.");
       return;
     }
 
-    let currentPercent: number | undefined = undefined;
-
+    let currentPercent: number | undefined;
     if (assessmentMode === "marks") {
       const m1 = Number(mark1);
       const m2 = Number(mark2);
       const m3 = Number(mark3);
-
       if (!m1 || !m2 || !m3) {
-        alert(
-          "Please enter your last three test/pre-board percentages for a better estimate 🙂"
-        );
+        alert("Please enter your last three test percentages.");
         return;
       }
-
       currentPercent = (m1 + m2 + m3) / 3;
     }
 
-    // For diagnostic mode, currentPercent remains undefined for now.
-    // Later we will plug in the diagnostic test score here.
-
-    const profile: any = {
+    const nextProfile = {
       studentClass,
       daysLeft,
       targetPercent,
       hoursPerDay,
+      currentPercent,
     };
-
-    if (typeof currentPercent === "number") {
-      profile.currentPercent = currentPercent;
-    }
-
-    setProfileAndCompute(profile);
+    setProfileAndCompute(nextProfile);
     navigate("/dashboard");
   };
+
+  if (loadingProfile) {
+    return (
+      <div className="page">
+        <div className="card">
+          <h3>Preparing your onboarding...</h3>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
       <h2 className="title center">Tell us about you</h2>
 
-      {/* Class + boards countdown */}
       <div className="card">
         <label>Class</label>
         <select
           value={studentClass}
-          onChange={(e) => setStudentClass(e.target.value as "10" | "12")}
+          onChange={(e) => setStudentClassInput(e.target.value as "10" | "12")}
         >
           <option value="10">Class 10 (CBSE)</option>
           <option value="12">Class 12 (CBSE)</option>
@@ -115,106 +115,73 @@ export default function Onboarding() {
 
         <p className="subtitle" style={{ marginTop: 12 }}>
           Approx. board exam date for Class {studentClass}:{" "}
-          <strong>{formatCbseDate(getBoardExamDateForClass(studentClass))}</strong> <br />
-          That’s around{" "}
+          <strong>{formatIsoDate(examDate)}</strong>{" "}
+          <span style={{ fontWeight: 700, color: examDateSource === "official" ? "#065f46" : "#92400e" }}>
+            ({examDateSource})
+          </span>
+          <br />
+          That is around{" "}
           <strong>
             {autoDaysLeft} {autoDaysLeft === 1 ? "day" : "days"}
           </strong>{" "}
-          from today. You can adjust if your school has a different schedule.
+          from today. You can adjust it if your school schedule differs.
+          {examDateNote ? <><br />{examDateNote}</> : null}
         </p>
 
-        <label>Days left for your board exam (you can edit)</label>
+        <label>Days left for your board exam (editable)</label>
         <input
           type="number"
           placeholder="e.g., 40"
-          value={days}
+          value={days || String(profile?.daysLeft || autoDaysLeft)}
           onChange={(e) => setDays(e.target.value)}
         />
       </div>
 
-      {/* Assessment mode – A/B choice */}
       <div className="card">
         <h3 style={{ marginBottom: 8 }}>How should we estimate your level?</h3>
         <p className="subtitle" style={{ marginBottom: 12 }}>
-          Choose one. We’ll use this to decide how hard you need to push.
+          Choose one method.
         </p>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <button
             className="pill-btn"
-            style={{
-              background:
-                assessmentMode === "diagnostic" ? "#3467d6" : "#2e2e2e",
-            }}
+            style={{ background: assessmentMode === "diagnostic" ? "#3467d6" : "#2e2e2e" }}
             onClick={() => setAssessmentMode("diagnostic")}
           >
             A. Quick Diagnostic Test
           </button>
           <button
             className="pill-btn"
-            style={{
-              background: assessmentMode === "marks" ? "#3467d6" : "#2e2e2e",
-            }}
+            style={{ background: assessmentMode === "marks" ? "#3467d6" : "#2e2e2e" }}
             onClick={() => setAssessmentMode("marks")}
           >
             B. Use Last 3 Test Marks
           </button>
         </div>
 
-        {assessmentMode === "diagnostic" && (
+        {assessmentMode === "diagnostic" ? (
           <p className="subtitle" style={{ marginTop: 4 }}>
-            We’ll soon add a 20-question diagnostic based on PYQs to auto-detect
-            your current level. For now, we’ll use your target & hours/day to
-            build a plan. (Marks option gives a more accurate prediction.)
+            Diagnostic test integration can be plugged in here. For now, we use target + hours/day.
           </p>
-        )}
-
-        {assessmentMode === "marks" && (
+        ) : (
           <>
             <label>Last test / pre-board % (latest)</label>
-            <input
-              type="number"
-              placeholder="e.g., 72"
-              value={mark1}
-              onChange={(e) => setMark1(e.target.value)}
-            />
-
+            <input type="number" value={mark1 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark1(e.target.value)} placeholder="e.g., 72" />
             <label>Second last test %</label>
-            <input
-              type="number"
-              placeholder="e.g., 68"
-              value={mark2}
-              onChange={(e) => setMark2(e.target.value)}
-            />
-
+            <input type="number" value={mark2 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark2(e.target.value)} placeholder="e.g., 68" />
             <label>Third last test %</label>
-            <input
-              type="number"
-              placeholder="e.g., 65"
-              value={mark3}
-              onChange={(e) => setMark3(e.target.value)}
-            />
+            <input type="number" value={mark3 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark3(e.target.value)} placeholder="e.g., 65" />
           </>
         )}
       </div>
 
-      {/* Target + hours */}
       <div className="card">
         <label>Your target percentage</label>
-        <input
-          type="number"
-          placeholder="e.g., 85"
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-        />
+        <input type="number" value={target || String(profile?.targetPercent || "")} onChange={(e) => setTarget(e.target.value)} placeholder="e.g., 85" />
 
-        <label>Hours you can study per day (honestly)</label>
-        <input
-          type="number"
-          placeholder="e.g., 2"
-          value={hours}
-          onChange={(e) => setHours(e.target.value)}
-        />
+        <label>Hours you can study per day</label>
+        <input type="number" value={hours || String(profile?.hoursPerDay || "")} onChange={(e) => setHours(e.target.value)} placeholder="e.g., 2" />
 
         <button className="cta-btn" onClick={handleSubmit}>
           Generate My Strategy

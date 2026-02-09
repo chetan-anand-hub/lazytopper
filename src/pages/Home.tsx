@@ -10,7 +10,7 @@ const Home: React.FC = () => {
   };
 
   const goToMentor = () => {
-    navigate("/mentor");
+    navigate("/dashboard");
   };
 
   const goToTrends = () => {
@@ -313,7 +313,7 @@ const Home: React.FC = () => {
                 onClick={goToMentor}
                 className="piece-btn piece-btn-blue"
               >
-                Open AI mentor →
+                Open dashboard planner →
               </button>
             </div>
           </div>
@@ -348,7 +348,7 @@ const Home: React.FC = () => {
                 onClick={goToMentor}
                 className="mentor-btn"
               >
-                Open planner →
+                Open dashboard planner →
               </button>
             </div>
 
