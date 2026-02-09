@@ -210,7 +210,10 @@ export default function App() {
       {/* Top navigation bar with brand name and vibe toggle */}
       <div className="navbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>LazyTopper</span>
-        <VibeToggle variant="navbar" />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: "0.78rem", opacity: 0.8 }}>Press Ctrl/Cmd + K to search</span>
+          <VibeToggle variant="navbar" />
+        </div>
       </div>
       {/* Command palette overlay */}
       <CommandPalette

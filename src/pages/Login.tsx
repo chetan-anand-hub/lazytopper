@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useVibeMode } from "../context/vibeModeContext";
 
 type LocationState = { from?: string };
 
@@ -16,6 +17,7 @@ function normalizePhone(raw: string): string {
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { mode, setMode } = useVibeMode();
   const { user, firebaseReady, signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, continueLocalSession } = useAuth();
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -82,6 +84,32 @@ export default function Login() {
       <h2 className="title center">Student Sign In</h2>
       <div className="card">
         <p className="subtitle">Use Gmail or phone OTP to create your personal dashboard.</p>
+        <div style={{ marginTop: 10, marginBottom: 12 }}>
+          <label style={{ fontWeight: 700 }}>Energy Level:</label>
+          <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="pill-btn"
+              style={{ background: mode === "zombie" ? "#1e293b" : undefined, color: mode === "zombie" ? "#fff" : undefined }}
+              onClick={() => setMode("zombie")}
+            >
+              Low
+            </button>
+            <button
+              type="button"
+              className="pill-btn"
+              style={{ background: mode === "beast" ? "#1e293b" : undefined, color: mode === "beast" ? "#fff" : undefined }}
+              onClick={() => setMode("beast")}
+            >
+              High
+            </button>
+            <span style={{ fontSize: "0.86rem", opacity: 0.85 }}>
+              {mode === "zombie"
+                ? "Got it. Let's just do 10 mins of light revision today. No heavy lifting."
+                : "Nice. Full-rigor mode is active for harder drills."}
+            </span>
+          </div>
+        </div>
 
         {firebaseReady ? (
           <>
@@ -136,4 +164,3 @@ export default function Login() {
     </div>
   );
 }
-

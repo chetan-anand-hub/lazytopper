@@ -505,6 +505,13 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="focus-cta-row" style={{ marginTop: 12 }}>
+            <button
+              className="cta-btn"
+              style={{ fontWeight: 800, minWidth: 220 }}
+              onClick={() => navigate(`/daily-mix/${gradeNum}/${planRecord.subject}?topic=${encodeURIComponent(weakestTopicKey)}`)}
+            >
+              Play {mixTitle}
+            </button>
             <button className="cta-btn small" onClick={() => navigate(`/daily-mix/${gradeNum}/${planRecord.subject}?topic=${encodeURIComponent(weakestTopicKey)}`)}>
               Play Mix
             </button>

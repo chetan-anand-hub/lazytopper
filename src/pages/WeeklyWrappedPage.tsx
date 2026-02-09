@@ -25,6 +25,8 @@ export default function WeeklyWrappedPage() {
   // Compute the date range for the past 7 days
   const [end] = useState(() => Date.now());
   const start = end - 7 * 24 * 60 * 60 * 1000;
+  const isSunday = useMemo(() => new Date(end).getDay() === 0, [end]);
+  const [showEarly, setShowEarly] = useState(false);
 
   // Load all attempts in this interval
   const attempts = useMemo(() => getAttempts({ start, end }), [start, end]);
@@ -57,6 +59,16 @@ export default function WeeklyWrappedPage() {
           No study data for the past week yet. Practise some questions to see your
           progress!
         </p>
+      ) : !isSunday && !showEarly ? (
+        <div className="card">
+          <h3>Weekly Recap unlocks on Sunday</h3>
+          <p style={{ marginTop: 8, opacity: 0.85 }}>
+            Keep going. Your complete wrapped story unlocks on Sunday for a full weekly snapshot.
+          </p>
+          <button className="pill-btn" style={{ marginTop: 10 }} onClick={() => setShowEarly(true)}>
+            Preview now
+          </button>
+        </div>
       ) : (
         <div>
           <div
