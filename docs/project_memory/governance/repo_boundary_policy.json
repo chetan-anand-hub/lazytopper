@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "Canonical lane boundaries for scope guard and session-safe workflow.",
   "lanes": {
     "product": [
@@ -27,13 +27,16 @@
       "eslint.config.js",
       "playwright.config.ts",
       "README.md",
-      "CHANGELOG.md"
+      "CHANGELOG.md",
+      "NOTES/",
+      "GPT_CHANGELOG*.md"
     ],
     "generatedEvidence": [
       ".project_memory/",
       "docs/session/",
       "docs/ops/out/",
-      "run_",
+      "RUN_*",
+      "**/RUN_*",
       ".codex_runs/",
       "dist/",
       "build/",

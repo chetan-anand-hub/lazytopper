@@ -52,6 +52,14 @@ function matchesRule(filePath, rule) {
   const matchRule = toRule(rule);
   if (!matchRule) return false;
   if (matchRule.endsWith("/")) return file.startsWith(matchRule);
+  if (matchRule.includes("*")) {
+    const escaped = matchRule.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    const globPattern = escaped
+      .replace(/\*\*/g, ".*")
+      .replace(/\*/g, "[^/]*");
+    const regex = new RegExp(`^${globPattern}(?:/.*)?$`);
+    return regex.test(file);
+  }
   return file === matchRule || file.startsWith(`${matchRule}/`);
 }
 
