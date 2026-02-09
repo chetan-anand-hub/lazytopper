@@ -12,6 +12,8 @@ type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
 type InternalDifficultyBucket = "Easy" | "Medium" | "Hard";
+const MIN_QUESTION_COUNT = 3;
+const MAX_QUESTION_COUNT = 100;
 
 function difficultyChoiceToMix(
   choice: DifficultyChoice
@@ -38,7 +40,7 @@ function buildPracticeQuestionsFromEngine(args: {
   focusBankIds?: string[];
   boardPattern?: string;
 }): PracticeQuestion[] {
-  const safeCount = Math.max(3, Math.min(25, args.count || 10));
+  const safeCount = Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, args.count || 10));
   const difficultyMix = difficultyChoiceToMix(args.difficulty);
 
   const practiceSet = generatePracticeSet({
@@ -199,7 +201,7 @@ interface AiTopupArgs {
 async function buildPracticeQuestionsWithAiTopup(
   args: AiTopupArgs
 ): Promise<PracticeQuestion[]> {
-  const safeCount = Math.max(3, Math.min(25, args.count || 10));
+  const safeCount = Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, args.count || 10));
 
   // 1) Try the canonical/trends engine first (uses display-topic keys)
   const engineQuestions = buildPracticeQuestionsFromEngine({
@@ -245,10 +247,27 @@ const bankQuestionsFiltered = desiredSection
 
 const baseQuestions = bankQuestionsFiltered.slice(0, safeCount);
 
+function expandQuestionsForDrill(source: PracticeQuestion[], targetCount: number): PracticeQuestion[] {
+  if (!Array.isArray(source) || source.length === 0) return [];
+  const out = [...source];
+  let cursor = 0;
+  while (out.length < targetCount) {
+    const base = source[cursor % source.length];
+    const variantNo = Math.floor(cursor / source.length) + 1;
+    out.push({
+      ...base,
+      id: `${String(base.id || "Q")}-DRILL-${variantNo}-${cursor + 1}`,
+      questionText: `${String(base.questionText || "").trim()} (Drill ${variantNo})`,
+    });
+    cursor += 1;
+  }
+  return out.slice(0, targetCount);
+}
+
   const missing = safeCount - baseQuestions.length;
 
   if (missing <= 0) {
-    return baseQuestions;
+    return baseQuestions.slice(0, safeCount);
   }
 
   // Build a seed question so AI has context even if the bank is empty.
@@ -339,11 +358,11 @@ function normaliseQuestionText(s: string | undefined | null): string {
         });
 
     const merged = [...baseQuestions, ...aiQuestions];
-    return merged.slice(0, safeCount);
+    return expandQuestionsForDrill(merged, safeCount);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("AI top-up failed for practice set:", err);
-    return baseQuestions;
+    return expandQuestionsForDrill(baseQuestions, safeCount);
   }
 }
 
@@ -546,6 +565,30 @@ const packTopicKey = useMemo(() => {
   const regenerateQuestions = () => {
     setRegenerationKey((prev) => prev + 1);
   };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey) return;
+      if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        regenerateQuestions();
+        return;
+      }
+      const presetMap: Record<string, number> = {
+        "1": 10,
+        "2": 20,
+        "3": 40,
+        "4": 60,
+        "5": 100,
+      };
+      const next = presetMap[event.key];
+      if (!next) return;
+      event.preventDefault();
+      setQuestionCount(Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, next)));
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const handleToggleAnswer = (id: string) => {
     setExpandedAnswers((prev) => ({
@@ -762,12 +805,12 @@ const packTopicKey = useMemo(() => {
               Questions:{" "}
               <input
                 type="number"
-                min={3}
-                max={25}
+                min={MIN_QUESTION_COUNT}
+                max={MAX_QUESTION_COUNT}
                 value={questionCount}
                 onChange={(e) =>
                   setQuestionCount(
-                    Math.max(3, Math.min(25, Number(e.target.value) || 0))
+                    Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, Number(e.target.value) || 0))
                   )
                 }
                 style={{
@@ -799,7 +842,45 @@ const packTopicKey = useMemo(() => {
               <span>ðŸ”</span>
               <span>Regenerate set</span>
             </button>
+            <button
+              type="button"
+              onClick={() =>
+                setQuestionCount((prev) =>
+                  Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, prev + 10))
+                )
+              }
+              style={{
+                borderRadius: 999,
+                padding: "5px 12px",
+                border: "1px solid rgba(37,99,235,0.8)",
+                backgroundColor: "#dbeafe",
+                color: "#1e3a8a",
+                fontSize: "0.78rem",
+                cursor: "pointer",
+              }}
+              title="Demand 10 more questions for this topic"
+            >
+              +10 more
+            </button>
           </div>
+        </section>
+
+        <section style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Fast drill presets:</span>
+          {[10, 20, 40, 60, 100].map((count) => (
+            <button
+              key={count}
+              type="button"
+              className="pill"
+              style={{ padding: "4px 10px", fontSize: "0.74rem" }}
+              onClick={() => setQuestionCount(Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, count)))}
+            >
+              {count}Q
+            </button>
+          ))}
+          <span style={{ fontSize: "0.72rem", color: "#64748b" }}>
+            Shortcut: Alt+1/2/3/4/5 and Alt+R.
+          </span>
         </section>
 
         {/* Questions list */}

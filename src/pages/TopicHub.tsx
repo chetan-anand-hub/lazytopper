@@ -1666,6 +1666,7 @@ const showInZombie = (sectionId: string) => {
   const isLearn = activeTab === 'learn';
   const isGrind = activeTab === 'grind';
   const isResources = activeTab === 'resources';
+  const timelineStepIndex = isLearn ? 0 : isGrind ? 1 : 2;
 
   const toSectionFilter = useCallback((value: unknown): PracticeSectionFilter | undefined => {
     const raw = String(value ?? "").trim().toUpperCase();
@@ -1940,6 +1941,50 @@ const showInZombie = (sectionId: string) => {
             <button type="button" style={tabButtonStyle(activeTab === 'resources')} onClick={() => setActiveTab('resources')}>
               Resources
             </button>
+          </div>
+          <div
+            style={{
+              marginTop: 10,
+              borderRadius: 14,
+              border: "1px solid rgba(15,23,42,0.12)",
+              background: "rgba(255,255,255,0.78)",
+              padding: "10px 12px",
+            }}
+            data-testid="topichub-learn-grind-practice-timeline"
+          >
+            <div style={{ fontSize: 12, fontWeight: 900, opacity: 0.78 }}>Study flow</div>
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {[
+                { key: "learn", label: "1. Learn", onClick: () => setActiveTab("learn") },
+                { key: "grind", label: "2. Grind", onClick: () => setActiveTab("grind") },
+                {
+                  key: "practice",
+                  label: "3. Practice",
+                  onClick: () => openPracticeFromTopicHub({ tab: activeTab }),
+                },
+              ].map((item, idx) => {
+                const active = idx === timelineStepIndex;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className="pill"
+                    onClick={item.onClick}
+                    style={{
+                      padding: "6px 10px",
+                      background: active ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
+                      color: active ? "#fff" : "rgba(15,23,42,0.9)",
+                      borderColor: active ? "rgba(15,23,42,0.92)" : "rgba(15,23,42,0.24)",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.74 }}>
+              Recommended order: Learn concept {"->"} Grind writing format {"->"} Practice timed questions.
+            </div>
           </div>
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 12, opacity: 0.72 }}>Mastery</span>

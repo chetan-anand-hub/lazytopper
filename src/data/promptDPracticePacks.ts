@@ -2909,6 +2909,45 @@ export const promptDPracticePacks: PracticePacksIndex =
 }
 ;
 
+// Alias + expansion for weak-topic drill demand:
+// canonical topic key `trigonometry` should have a dense question bank so
+// students can request high counts for focused weakness repair.
+{
+  const intro = promptDPracticePacks.maths.introduction_to_trigonometry?.questions || [];
+  const applications = promptDPracticePacks.maths.applications_of_trigonometry?.questions || [];
+  const seed = [...intro, ...applications];
+  const expanded = [...seed];
+  for (let i = 0; i < seed.length; i++) {
+    const q = seed[i];
+    expanded.push({
+      ...q,
+      id: `${String(q.id || `TRIG-${i + 1}`)}-D2`,
+      text: `${String(q.text || "").trim()} (Drill variant)`,
+    });
+  }
+
+  promptDPracticePacks.maths.trigonometry = {
+    subject: "maths",
+    topicKey: "trigonometry",
+    topicName: "Trigonometry",
+    modes: {
+      speed_practice: {
+        targetCount: 20,
+        difficultyMix: { Easy: 8, Medium: 8, Hard: 4 },
+      },
+      exam_mix: {
+        targetCount: 20,
+        difficultyMix: { Easy: 6, Medium: 10, Hard: 4 },
+      },
+      weak_topic_recovery: {
+        targetCount: 40,
+        difficultyMix: { Easy: 12, Medium: 18, Hard: 10 },
+      },
+    },
+    questions: expanded.slice(0, 40),
+  };
+}
+
 // Backwards compatibility: re-export promptDPracticePacks under the original name
 // used by the practice engine.  This alias allows existing imports of
 // `practicePacks` to continue working without modification.

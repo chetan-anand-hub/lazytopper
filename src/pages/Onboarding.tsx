@@ -18,6 +18,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const { profile, loadingProfile, setProfileAndCompute } = useProfile();
 
+  const [learningSupportMode, setLearningSupportMode] = useState<"guided" | "standard">("guided");
   const [studentClassInput, setStudentClassInput] = useState<"" | "10" | "12">("");
   const [assessmentMode, setAssessmentMode] = useState<"diagnostic" | "marks">("marks");
 
@@ -33,6 +34,22 @@ export default function Onboarding() {
   const [mark2, setMark2] = useState("");
   const [mark3, setMark3] = useState("");
   const studentClass: "10" | "12" = studentClassInput || profile?.studentClass || "10";
+
+  const applyGuidedDefaults = () => {
+    setLearningSupportMode("guided");
+    setAssessmentMode("marks");
+    setTarget((prev) => prev || "75");
+    setHours((prev) => prev || "1.5");
+    setMark1((prev) => prev || "55");
+    setMark2((prev) => prev || "58");
+    setMark3((prev) => prev || "60");
+  };
+
+  const applyStandardDefaults = () => {
+    setLearningSupportMode("standard");
+    setTarget((prev) => prev || "85");
+    setHours((prev) => prev || "2");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +119,34 @@ export default function Onboarding() {
   return (
     <div className="page">
       <h2 className="title center">Tell us about you</h2>
+
+      <div className="card" data-testid="onboarding-support-cues">
+        <h3 style={{ marginBottom: 8 }}>Choose your start mode</h3>
+        <p className="subtitle" style={{ marginBottom: 10 }}>
+          If you feel weak in basics, pick guided mode. We will keep the plan lighter and step-by-step.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="pill-btn"
+            style={{ background: learningSupportMode === "guided" ? "#3467d6" : "#2e2e2e" }}
+            onClick={applyGuidedDefaults}
+          >
+            Guided start (recommended)
+          </button>
+          <button
+            type="button"
+            className="pill-btn"
+            style={{ background: learningSupportMode === "standard" ? "#3467d6" : "#2e2e2e" }}
+            onClick={applyStandardDefaults}
+          >
+            Standard start
+          </button>
+        </div>
+        <div style={{ marginTop: 10, fontSize: "0.86rem", opacity: 0.82, lineHeight: 1.55 }}>
+          1. Fill quick details. 2. Generate your study strategy. 3. Start from TopicHub Learn and move to Grind + Practice.
+        </div>
+      </div>
 
       <div className="card">
         <label>Class</label>
