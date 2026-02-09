@@ -41,6 +41,7 @@ async function run() {
   const wrappedGeneratorText = await readText("src/services/weeklyWrappedGenerator.ts");
   const wrappedCarouselText = await readText("src/components/WeeklyWrappedCarousel.tsx");
   const wrappedPageText = await readText("src/pages/WeeklyWrappedPage.tsx");
+  const loginText = await readText("src/pages/Login.tsx");
 
   // Step 1 - Daily Focus Mix contract + flow.
   addCheck(
@@ -59,6 +60,13 @@ async function run() {
       dailyMixPageText.includes("count={5}") &&
       dailyMixPageText.includes("intensity={intensity}"),
     "DailyMixPage should wire generated playlist and intensity."
+  );
+  addCheck(
+    checks,
+    "step1_dashboard_primary_play_cta",
+    dashboardText.includes("Play {mixTitle}") &&
+      dashboardText.includes("Play Mix"),
+    "Dashboard should expose a prominent one-tap Play CTA for daily mix."
   );
   addCheck(
     checks,
@@ -106,6 +114,15 @@ async function run() {
       dashboardText.includes("Mix ("),
     "Dashboard should expose low/high energy controls for daily flow."
   );
+  addCheck(
+    checks,
+    "step3_login_vibe_check",
+    loginText.includes("Energy Level:") &&
+      loginText.includes("setMode(\"zombie\")") &&
+      loginText.includes("setMode(\"beast\")") &&
+      loginText.includes("Got it. Let's just do 10 mins of light revision today."),
+    "Login should support low/high energy vibe selection."
+  );
 
   // Step 4 - Command intent parser.
   addCheck(
@@ -125,6 +142,12 @@ async function run() {
       appText.includes("parseCommandIntent(query)"),
     "Palette enter key should resolve typed commands."
   );
+  addCheck(
+    checks,
+    "step4_cmdk_nav_hint",
+    appText.includes("Press Ctrl/Cmd + K to search"),
+    "Top nav should hint Cmd/Ctrl+K command palette usage."
+  );
 
   // Step 5 - Weekly wrapped upgrade.
   addCheck(
@@ -142,6 +165,13 @@ async function run() {
       wrappedPageText.includes("consistencyPercentile") &&
       wrappedPageText.includes("powerHourLabel"),
     "Weekly wrapped UI should expose stronger share story."
+  );
+  addCheck(
+    checks,
+    "step5_weekly_wrapped_sunday_unlock",
+    wrappedPageText.includes("Weekly Recap unlocks on Sunday") &&
+      wrappedPageText.includes("Preview now"),
+    "Weekly wrapped should include Sunday unlock behavior."
   );
 
   // Dashboard matrix requirement.
