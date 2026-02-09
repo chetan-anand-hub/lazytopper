@@ -1,30 +1,13 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { DailyMixItem } from "../services/dailyMixPlayback";
 import { useDailyMixPlayback } from "../services/dailyMixPlayback";
 
-/**
- * DailyMixPlayer
- * - Lightweight playback UI for a "Daily Mix" playlist.
- * - It can be used in two ways:
- *    1) Preferred: pass `items` explicitly (player-only responsibility).
- *    2) Compatibility (MS-D7): callers may pass `grade`/`subject` and generate items upstream.
- *
- * Notes:
- * - This component intentionally does not generate the mix by itself.
- * - `grade`, `subject`, and `onExit` are accepted to keep routing/pages simple and
- *   avoid prop-type errors in the calling page.
- */
 export interface DailyMixPlayerProps {
-  /** The already-generated mix items to play. */
   items?: DailyMixItem[];
-
-  /** Optional context for display / callers (does not affect playback). */
   grade?: string;
   subject?: string;
-
-  /** Optional callback used by pages to return to dashboard, etc. */
   onExit?: () => void | Promise<void>;
-
+  autoAdvanceMs?: number;
   className?: string;
 }
 
@@ -33,6 +16,7 @@ export function DailyMixPlayer({
   grade,
   subject,
   onExit,
+  autoAdvanceMs = 12000,
   className,
 }: DailyMixPlayerProps) {
   const safeItems = useMemo(() => items ?? [], [items]);
@@ -50,29 +34,32 @@ export function DailyMixPlayer({
     seek,
   } = useDailyMixPlayback(safeItems);
 
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (!canNext) {
+      pause();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      next();
+    }, Math.max(3000, autoAdvanceMs));
+    return () => window.clearTimeout(timer);
+  }, [isPlaying, canNext, next, pause, autoAdvanceMs, currentIndex]);
+
   if (!safeItems.length) {
     return (
       <div className={className}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ fontWeight: 700 }}>Daily Mix</div>
+          <div style={{ fontWeight: 800 }}>Daily Focus Mix</div>
           {onExit ? (
             <button type="button" onClick={() => void onExit()}>
-              ✕ Close
+              Close
             </button>
           ) : null}
         </div>
 
-        {grade || subject ? (
-          <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
-            {grade ? `Grade: ${grade}` : ""}
-            {grade && subject ? " • " : ""}
-            {subject ? `Subject: ${subject}` : ""}
-          </div>
-        ) : null}
-
-        <div style={{ marginTop: 12, opacity: 0.85 }}>No Daily Mix items yet.</div>
-        <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
-          Tip: generate the mix items in the page/service and pass them via the <code>items</code> prop.
+        <div style={{ marginTop: 8, opacity: 0.75, fontSize: 13 }}>
+          No Daily Mix items are available yet.
         </div>
       </div>
     );
@@ -80,62 +67,87 @@ export function DailyMixPlayer({
 
   const title = current?.title ?? "Untitled";
   const description = current?.description ?? "";
-  const kind = (current?.type as any) ?? "item";
+  const kind = String(current?.type || "item");
 
   return (
     <div className={className}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
         <div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <div style={{ fontWeight: 700 }}>{title}</div>
-            <div style={{ opacity: 0.7, fontSize: 12 }}>{kind}</div>
+          <div style={{ fontWeight: 900, fontSize: 22 }}>Your Daily Focus Mix</div>
+          <div style={{ marginTop: 4, opacity: 0.76, fontSize: 13 }}>
+            Press Play once. The flow auto-advances item by item.
           </div>
-
-          {grade || subject ? (
+          {(grade || subject) && (
             <div style={{ marginTop: 4, opacity: 0.7, fontSize: 12 }}>
-              {grade ? `Grade: ${grade}` : ""}
-              {grade && subject ? " • " : ""}
-              {subject ? `Subject: ${subject}` : ""}
+              Class {grade || "10"} | {subject || "Maths"}
             </div>
-          ) : null}
+          )}
         </div>
-
         {onExit ? (
           <button type="button" onClick={() => void onExit()}>
-            ✕ Close
+            Back
           </button>
         ) : null}
       </div>
 
-      {description ? (
-        <div style={{ marginTop: 8, opacity: 0.9 }}>{description}</div>
-      ) : null}
+      <div
+        style={{
+          marginTop: 14,
+          border: "1px solid rgba(15,23,42,0.14)",
+          borderRadius: 14,
+          background: "rgba(255,255,255,0.9)",
+          padding: 12,
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              borderRadius: 999,
+              border: "1px solid rgba(15,23,42,0.2)",
+              padding: "2px 8px",
+              textTransform: "uppercase",
+            }}
+          >
+            {kind}
+          </span>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>
+            Item {currentIndex + 1} of {safeItems.length}
+          </span>
+        </div>
+        <div style={{ marginTop: 8, fontWeight: 800, fontSize: 18 }}>{title}</div>
+        {description ? <div style={{ marginTop: 6, opacity: 0.86 }}>{description}</div> : null}
+      </div>
 
       <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" onClick={prev} disabled={!canPrev}>
-          ◀ Prev
+          Prev
         </button>
 
         {isPlaying ? (
           <button type="button" onClick={pause}>
-            ⏸ Pause
+            Pause
           </button>
         ) : (
           <button type="button" onClick={play}>
-            ▶ Play
+            Play
           </button>
         )}
 
         <button type="button" onClick={next} disabled={!canNext}>
-          Next ▶
+          Next
         </button>
-
-        <span style={{ marginLeft: 8, opacity: 0.75 }}>
-          {currentIndex + 1} / {safeItems.length}
-        </span>
       </div>
 
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 12 }}>
         <input
           aria-label="Daily mix position"
           type="range"

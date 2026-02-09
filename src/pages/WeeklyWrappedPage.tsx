@@ -39,7 +39,7 @@ export default function WeeklyWrappedPage() {
     const res = await shareNodeAsImage(captureRef.current, {
       fileName: 'lazytopper-weekly-wrapped.png',
       title: 'LazyTopper Weekly Wrapped',
-      text: 'My LazyTopper Weekly Wrapped',
+      text: `My LazyTopper Weekly Wrapped - ${summary.consistencyPercentile}% consistency, power hour ${summary.powerHourLabel}`,
     });
 
     if (!res.ok) {
@@ -58,12 +58,28 @@ export default function WeeklyWrappedPage() {
           progress!
         </p>
       ) : (
-        <div id="weekly-wrapped-capture" ref={captureRef}>
-          <WeeklyWrappedCarousel
-            summary={summary}
-            onClose={handleClose}
-            onShare={handleShare}
-          />
+        <div>
+          <div
+            style={{
+              marginBottom: 12,
+              border: "1px solid rgba(15,23,42,0.12)",
+              borderRadius: 12,
+              padding: 12,
+              background: "rgba(255,255,255,0.86)",
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>This week summary</div>
+            <div style={{ marginTop: 4, opacity: 0.85, fontSize: 14 }}>
+              Topics conquered: {summary.topicsConquered} | Power hour: {summary.powerHourLabel} | Consistency: {summary.consistencyPercentile}%
+            </div>
+          </div>
+          <div id="weekly-wrapped-capture" ref={captureRef}>
+            <WeeklyWrappedCarousel
+              summary={summary}
+              onClose={handleClose}
+              onShare={handleShare}
+            />
+          </div>
         </div>
       )}
     </div>

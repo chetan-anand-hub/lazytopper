@@ -48,6 +48,7 @@
     "test:triangles:human-tutor": "node scripts/ops/triangles_human_tutor_acceptance.mjs",
     "test:topic-grind-contracts": "node scripts/ops/topic_grind_contracts_acceptance.mjs",
     "test:topichub:doc-alignment": "node scripts/ops/topichub_doc_alignment_acceptance.mjs",
+    "test:pro-tips:acceptance": "node scripts/ops/pro_tips_product_acceptance.mjs",
     "test:repo-boundary": "node scripts/ops/repo_boundary_acceptance.mjs",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",

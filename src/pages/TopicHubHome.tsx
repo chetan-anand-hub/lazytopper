@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { topicHubV2Content } from "../data/topicHubV2Full";
+import { useSmartLearning } from "../engine/smartLearningStore";
+import type { ChapterMeta } from "../engine/smartLearningTypes";
 import { loadTopicMasterySnapshot } from "../services/topicHubMastery";
 import { normalizeTopicKey } from "../utils/topicHubV2Store";
 
@@ -103,6 +105,7 @@ function formatUpdatedAt(value: string): string {
 export default function TopicHubHome() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
+  const { getMatchScoreForChapter } = useSmartLearning();
   const [lastRoute] = useState<LastTopicHubRoute | null>(() => readLastRoute());
 
   const [grade, setGrade] = useState<string>(() => {
@@ -162,6 +165,40 @@ export default function TopicHubHome() {
     () => topicOptions.find((item) => item.key === selectedTopicKey) || null,
     [selectedTopicKey, topicOptions]
   );
+
+  const maxBoardWeightageForSubject = useMemo(() => {
+    const values = topicOptions
+      .map((item) => {
+        const rec = (topicHubV2Content as Record<string, unknown>)[item.key] as Record<
+          string,
+          unknown
+        >;
+        return Number(rec?.weightagePercent ?? rec?.approxWeightage ?? 0);
+      })
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return values.length ? Math.max(...values) : 14;
+  }, [topicOptions]);
+
+  const matchScoreByTopic = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const item of topicOptions) {
+      const rec = (topicHubV2Content as Record<string, unknown>)[item.key] as Record<
+        string,
+        unknown
+      >;
+      const chapterMeta: ChapterMeta = {
+        id: `${grade}-${subject}-${item.key}`,
+        grade: String(grade || "10"),
+        subject,
+        topicKey: item.key,
+        name: item.name,
+        boardWeightage: Number(rec?.weightagePercent ?? rec?.approxWeightage ?? 0),
+        tier: item.tier === "topic" ? "high-roi" : item.tier,
+      };
+      out[item.key] = getMatchScoreForChapter(chapterMeta, maxBoardWeightageForSubject);
+    }
+    return out;
+  }, [topicOptions, grade, subject, getMatchScoreForChapter, maxBoardWeightageForSubject]);
 
   const masteryHint = useMemo(() => {
     if (!selectedTopicKey) return "Pick a topic to start.";
@@ -324,7 +361,7 @@ export default function TopicHubHome() {
                 {filteredOptions.length ? (
                   filteredOptions.map((option) => (
                     <option key={option.key} value={option.key}>
-                      {option.name} ({option.tier})
+                      {option.name} ({option.tier} | {matchScoreByTopic[option.key] ?? 0}% match)
                     </option>
                   ))
                 ) : (
@@ -348,6 +385,21 @@ export default function TopicHubHome() {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 900, opacity: 0.78 }}>Selected:</span>
               <span style={{ fontWeight: 900 }}>{selectedTopic?.name || "None"}</span>
+              {selectedTopic ? (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    borderRadius: 999,
+                    border: "1px solid rgba(22,163,74,0.45)",
+                    padding: "2px 8px",
+                    background: "rgba(220,252,231,0.95)",
+                    color: "rgba(22,101,52,1)",
+                  }}
+                >
+                  {matchScoreByTopic[selectedTopic.key] ?? 0}% Match
+                </span>
+              ) : null}
               <span
                 style={{
                   fontSize: 11,

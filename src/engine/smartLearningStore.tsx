@@ -3,7 +3,7 @@
 import React, {
   createContext,
   useContext,
-  useMemo,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -47,6 +47,21 @@ const SmartLearningContext = createContext<SmartLearningState | undefined>(
   undefined
 );
 
+const SMART_LEARNING_STORAGE_KEY = "lazytopper.smartLearning.stats.v1";
+
+function loadPersistedStats(): Record<ChapterId, UserChapterStats> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SMART_LEARNING_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Record<ChapterId, UserChapterStats>;
+  } catch {
+    return {};
+  }
+}
+
 interface ProviderProps {
   children: ReactNode;
 }
@@ -61,7 +76,7 @@ export const SmartLearningProvider: React.FC<ProviderProps> = ({
 }) => {
   const [statsByChapter, setStatsByChapter] = useState<
     Record<ChapterId, UserChapterStats>
-  >({});
+  >(() => loadPersistedStats());
 
   const getStatsForChapter = (chapterId: ChapterId) => statsByChapter[chapterId];
 
@@ -88,15 +103,24 @@ export const SmartLearningProvider: React.FC<ProviderProps> = ({
     });
   };
 
-  const value = useMemo<SmartLearningState>(
-    () => ({
-      statsByChapter,
-      getStatsForChapter,
-      recordHpqAttempt,
-      getMatchScoreForChapter,
-    }),
-    [statsByChapter]
-  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        SMART_LEARNING_STORAGE_KEY,
+        JSON.stringify(statsByChapter)
+      );
+    } catch {
+      // Best effort persistence only.
+    }
+  }, [statsByChapter]);
+
+  const value: SmartLearningState = {
+    statsByChapter,
+    getStatsForChapter,
+    recordHpqAttempt,
+    getMatchScoreForChapter,
+  };
 
   return (
     <SmartLearningContext.Provider value={value}>
@@ -108,6 +132,7 @@ export const SmartLearningProvider: React.FC<ProviderProps> = ({
 /**
  * Hook to use inside pages like TopicHub, HPQ page, Daily Mix, etc.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- context hook is co-located with provider intentionally.
 export function useSmartLearning(): SmartLearningState {
   const ctx = useContext(SmartLearningContext);
   if (!ctx) {

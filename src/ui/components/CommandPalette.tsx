@@ -19,7 +19,7 @@ import { vibeCommandBadgeCopy } from '../microcopy/vibeCommandBadgeCopy';
 export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (action: QuickAction) => void;
+  onSelect: (action: QuickAction, query: string) => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, onSelect }) => {
@@ -56,6 +56,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     if (e.key === 'Escape') {
       e.stopPropagation();
       onClose();
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const first = filtered[0];
+      if (first) onSelect(first, query);
     }
   };
 
@@ -87,7 +93,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
             <li key={action.id} role="option">
               <button
                 type="button"
-                onClick={() => onSelect(action)}
+                onClick={() => onSelect(action, query)}
                 className="command-palette-option"
               >
                 <div className="command-option-label" style={{ fontWeight: 600 }}>{action.label}</div>

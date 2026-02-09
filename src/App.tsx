@@ -24,6 +24,8 @@ import { useState, useEffect } from 'react';
 import DailyMixPage from './pages/DailyMixPage';
 import WeeklyWrappedPage from './pages/WeeklyWrappedPage';
 import { useVibeMode } from './context/vibeModeContext';
+import { parseCommandIntent } from "./services/commandIntent";
+import { normalizeTopicKey } from "./utils/topicResolver";
 
 /**
  * BottomNav component renders a simple bottom navigation bar for the mobile view.
@@ -133,13 +135,18 @@ export default function App() {
   const navigate = useNavigate();
   const { mode, setMode } = useVibeMode();
 
-  const handleCommandSelect = (action: { id: string; handler: string }) => {
-    switch (action.handler) {
+  const handleCommandSelect = (action: { id: string; handler: string }, query: string) => {
+    const parsed = parseCommandIntent(query);
+    const resolvedHandler = parsed.recognized ? parsed.handler : action.handler;
+    const normalizedTopic = normalizeTopicKey(parsed.topic || "");
+    const topicParam = normalizedTopic ? `?topic=${encodeURIComponent(normalizedTopic)}` : "";
+
+    switch (resolvedHandler) {
       case 'navigateToDashboard':
         navigate('/dashboard');
         break;
       case 'navigateToPractice':
-        navigate('/practice/10/Maths');
+        navigate(`/practice/10/Maths${topicParam}`);
         break;
       case 'navigateToHPQ':
         navigate('/highly-probable/10/Maths');
@@ -151,7 +158,11 @@ export default function App() {
         navigate('/mock-builder/10/Maths');
         break;
       case 'navigateToTopicHub':
-        navigate('/topic-hub');
+        if (normalizedTopic) {
+          navigate(`/topic-hub/10/Maths/${encodeURIComponent(normalizedTopic)}`);
+        } else {
+          navigate('/topic-hub');
+        }
         break;
       case 'navigateToMentor':
         navigate('/mentor/10/Maths');
@@ -163,7 +174,13 @@ export default function App() {
         navigate('/weekly-wrapped');
         break;
       case 'navigateToDailyMix':
-        navigate('/daily-mix/10/Maths');
+        navigate(`/daily-mix/10/Maths${topicParam}`);
+        break;
+      case "setVibeLow":
+        setMode("zombie");
+        break;
+      case "setVibeHigh":
+        setMode("beast");
         break;
       case 'toggleVibeMode':
         setMode(mode === 'beast' ? 'zombie' : 'beast');

@@ -1,16 +1,5 @@
-/*
- * Weekly Wrapped Generator
- *
- * Given a set of practice attempts (e.g. from practiceInsights.ts), this
- * module computes a summary of the learner’s activity over a defined
- * interval. The output shape is intentionally decoupled from any UI
- * concerns so that different presentation layers (web, mobile, email) can
- * render the same summary consistently.
- */
+import type { PracticeAttempt, DifficultyLevel, LTSubject } from "./practiceInsights";
 
-import type { PracticeAttempt, DifficultyLevel, LTSubject } from './practiceInsights';
-
-// Interface describing the aggregated performance for a single topic.
 export interface TopicPerformance {
   topicKey: string;
   topicName?: string;
@@ -20,43 +9,63 @@ export interface TopicPerformance {
   accuracy: number;
 }
 
-// Main summary structure returned by generateWeeklyWrapped().
 export interface WeeklyWrappedSummary {
-  /** ISO date string marking the start of the interval (inclusive). */
   startDate: string;
-  /** ISO date string marking the end of the interval (exclusive). */
   endDate: string;
-  /** Total number of attempts during the interval. */
   totalAttempts: number;
-  /** Total correct answers. */
   totalCorrect: number;
-  /** Overall accuracy percentage (0–100). */
   accuracy: number;
-  /** Distribution of attempts by difficulty. Values are counts, not percentages. */
   difficultyCounts: Record<DifficultyLevel, number>;
-  /** Bloom skill distribution. Keys are Bloom skills; values are counts. */
   bloomCounts: Record<string, number>;
-  /** Per‑topic performance metrics, sorted descending by total attempts. */
   topics: TopicPerformance[];
-  /** List of topic keys considered strong (accuracy ≥ 0.8 and ≥ 3 attempts). */
   strongTopics: string[];
-  /** List of topic keys considered weak (accuracy ≤ 0.5 and ≥ 3 attempts). */
   weakTopics: string[];
+  activeDays: number;
+  estimatedStudyMinutes: number;
+  powerHourLabel: string;
+  consistencyPercentile: number;
+  topicsConquered: number;
 }
 
-/**
- * Compute a Weekly Wrapped summary for the provided attempts. The caller
- * should filter attempts to the desired date range before passing them
- * here. The returned summary contains aggregated statistics and topic
- * breakdowns suitable for display in a weekly recap.
- */
-export function generateWeeklyWrapped(attempts: PracticeAttempt[], interval: {
-  start: number;
-  end: number;
-}): WeeklyWrappedSummary {
+function estimateAttemptMinutes(level: DifficultyLevel): number {
+  if (level === "Hard") return 6;
+  if (level === "Medium") return 4;
+  return 2;
+}
+
+function toDateKey(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+function formatPowerHour(hour: number): string {
+  const start = ((hour % 24) + 24) % 24;
+  const end = (start + 1) % 24;
+  const fmt = (value: number) => {
+    const suffix = value >= 12 ? "PM" : "AM";
+    const hr = value % 12 === 0 ? 12 : value % 12;
+    return `${hr} ${suffix}`;
+  };
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
+function estimateConsistencyPercentile(activeDays: number, attempts: number): number {
+  const dayScore = Math.min(1, activeDays / 7);
+  const volumeScore = Math.min(1, attempts / 40);
+  const composite = 0.7 * dayScore + 0.3 * volumeScore;
+  return Math.max(1, Math.min(99, Math.round(composite * 100)));
+}
+
+export function generateWeeklyWrapped(
+  attempts: PracticeAttempt[],
+  interval: {
+    start: number;
+    end: number;
+  }
+): WeeklyWrappedSummary {
   const { start, end } = interval;
   const startDate = new Date(start).toISOString();
   const endDate = new Date(end).toISOString();
+
   const difficultyCounts: Record<DifficultyLevel, number> = {
     Easy: 0,
     Medium: 0,
@@ -64,23 +73,30 @@ export function generateWeeklyWrapped(attempts: PracticeAttempt[], interval: {
   };
   const bloomCounts: Record<string, number> = {};
   const topicStats: Record<string, TopicPerformance> = {};
+  const hourCounts: Record<number, number> = {};
+  const activeDateSet = new Set<string>();
+
   let totalCorrect = 0;
+  let estimatedStudyMinutes = 0;
+  let totalAttempts = 0;
 
   for (const attempt of attempts) {
-    // Skip attempts outside the interval — caller may pass unfiltered data.
     if (attempt.timestamp < start || attempt.timestamp >= end) continue;
+    totalAttempts += 1;
 
-    // Difficulty distribution
     difficultyCounts[attempt.difficulty] =
       (difficultyCounts[attempt.difficulty] || 0) + 1;
+    estimatedStudyMinutes += estimateAttemptMinutes(attempt.difficulty);
 
-    // Bloom distribution
+    const hour = new Date(attempt.timestamp).getHours();
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+    activeDateSet.add(toDateKey(attempt.timestamp));
+
     if (attempt.bloomSkill) {
       const key = attempt.bloomSkill.trim().toLowerCase();
       bloomCounts[key] = (bloomCounts[key] || 0) + 1;
     }
 
-    // Topic performance
     const tKey = attempt.topicKey;
     if (!topicStats[tKey]) {
       topicStats[tKey] = {
@@ -93,19 +109,19 @@ export function generateWeeklyWrapped(attempts: PracticeAttempt[], interval: {
       };
     }
     const stats = topicStats[tKey];
-    stats.total++;
+    stats.total += 1;
     if (attempt.correct) {
-      stats.correct++;
-      totalCorrect++;
+      stats.correct += 1;
+      totalCorrect += 1;
     }
   }
 
-  // Compute accuracies and classify strong/weak topics
   const topics: TopicPerformance[] = Object.values(topicStats).map((tp) => {
     const accuracy = tp.total > 0 ? tp.correct / tp.total : 0;
     return { ...tp, accuracy };
   });
   topics.sort((a, b) => b.total - a.total);
+
   const strongTopics = topics
     .filter((t) => t.total >= 3 && t.accuracy >= 0.8)
     .map((t) => t.topicKey);
@@ -113,8 +129,15 @@ export function generateWeeklyWrapped(attempts: PracticeAttempt[], interval: {
     .filter((t) => t.total >= 3 && t.accuracy <= 0.5)
     .map((t) => t.topicKey);
 
-  const totalAttempts = attempts.filter((a) => a.timestamp >= start && a.timestamp < end).length;
+  const activeDays = activeDateSet.size;
   const accuracy = totalAttempts > 0 ? totalCorrect / totalAttempts : 0;
+  const topicsConquered = topics.filter((t) => t.total >= 3 && t.accuracy >= 0.75).length;
+  const consistencyPercentile = estimateConsistencyPercentile(activeDays, totalAttempts);
+
+  const powerHour = Object.entries(hourCounts)
+    .map(([hour, count]) => ({ hour: Number(hour), count }))
+    .sort((a, b) => b.count - a.count)[0];
+  const powerHourLabel = powerHour ? formatPowerHour(powerHour.hour) : "No peak hour yet";
 
   return {
     startDate,
@@ -127,5 +150,10 @@ export function generateWeeklyWrapped(attempts: PracticeAttempt[], interval: {
     topics,
     strongTopics,
     weakTopics,
+    activeDays,
+    estimatedStudyMinutes,
+    powerHourLabel,
+    consistencyPercentile,
+    topicsConquered,
   };
 }

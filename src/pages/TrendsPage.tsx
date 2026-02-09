@@ -1,6 +1,8 @@
 // src/pages/TrendsPage.tsx
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useSmartLearning } from "../engine/smartLearningStore";
+import type { ChapterMeta } from "../engine/smartLearningTypes";
 import {
   class10MathTopicTrends,
   type Class10MathTopicTrendsData,
@@ -19,6 +21,7 @@ import {
   buildMockBuilderUrl,
   buildAiMentorUrl,
 } from "../utils/buildUrl";
+import { normalizeTopicKey } from "../utils/topicResolver";
 
 // --- Local types -------------------------------------------------
 
@@ -39,6 +42,10 @@ interface DifficultyMix {
   Easy: number;
   Medium: number;
   Hard: number;
+}
+
+function isTierKey(value: unknown): value is TierKey {
+  return value === "must-crack" || value === "high-roi" || value === "good-to-do";
 }
 
 // --- Small helpers -----------------------------------------------
@@ -105,7 +112,7 @@ function normaliseMathDataset(
       {
         tier: meta.tier as TierKey,
         weightagePercent: meta.weightagePercent,
-        summary: (meta as any).summary,
+        summary: (meta as { summary?: string }).summary,
         conceptWeightage: meta.conceptWeightage,
       },
     ]
@@ -169,6 +176,7 @@ function getStream(meta: TopicMeta): StreamKey {
 
 const TrendsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { getMatchScoreForChapter } = useSmartLearning();
 
   const params = useParams<"grade" | "subject">();
   const grade = params.grade || "10";
@@ -200,7 +208,7 @@ const TrendsPage: React.FC = () => {
     }
 
     if (activeTier !== "all") {
-      entries = entries.filter(([_, meta]) => meta.tier === activeTier);
+      entries = entries.filter(([, meta]) => meta.tier === activeTier);
     }
 
     return entries;
@@ -210,6 +218,13 @@ const TrendsPage: React.FC = () => {
     (sum, [, meta]) => sum + (meta.weightagePercent ?? 0),
     0
   );
+
+  const maxBoardWeightage = useMemo(() => {
+    const values = topicEntries
+      .map(([, meta]) => Number(meta.weightagePercent ?? 0))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return values.length ? Math.max(...values) : 14;
+  }, [topicEntries]);
 
   const handleBackToHome = () => {
     navigate("/");
@@ -800,10 +815,18 @@ const TrendsPage: React.FC = () => {
               }}
             >
               {filteredTopicEntries.map(([topicName, meta]) => {
-                const tier: TierKey =
-                  meta.tier && (tierMeta as any)[meta.tier]
-                    ? (meta.tier as TierKey)
-                    : "good-to-do";
+                const tier: TierKey = isTierKey(meta.tier) ? meta.tier : "good-to-do";
+                const topicKey = normalizeTopicKey(topicName);
+                const chapterMeta: ChapterMeta = {
+                  id: `${grade}-${subjectKey}-${topicKey}`,
+                  grade: String(grade || "10"),
+                  subject: subjectKey,
+                  topicKey,
+                  name: topicName,
+                  boardWeightage: Number(meta.weightagePercent ?? 0),
+                  tier,
+                };
+                const matchScore = getMatchScoreForChapter(chapterMeta, maxBoardWeightage);
 
                 const sortedConcepts = Object.entries(
                   meta.conceptWeightage ?? {}
@@ -882,6 +905,21 @@ const TrendsPage: React.FC = () => {
                           >
                             <span>{tierInfo.emoji}</span>
                             <span>{tierInfo.label}</span>
+                          </span>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              borderRadius: 999,
+                              padding: "4px 10px",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              backgroundColor: "rgba(220,252,231,0.95)",
+                              color: "#166534",
+                              border: "1px solid rgba(34,197,94,0.45)",
+                            }}
+                          >
+                            {matchScore}% Match
                           </span>
                         </div>
                         <p
