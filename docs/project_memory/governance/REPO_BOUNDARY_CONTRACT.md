@@ -1,4 +1,4 @@
-<!-- Category: Tracked Tooling (Governance); Purpose: Define hard repo boundaries so sessions don’t mix product code, tooling, evidence, or local-only artifacts. -->
+<!-- Category: Tracked Tooling (Governance); Purpose: Define hard repo boundaries so sessions don't mix product code, tooling, evidence, or local-only artifacts. -->
 # Repo Boundary Contract (LazyTopper)
 
 Effective date: February 1, 2026

@@ -54,6 +54,7 @@
     "test:hpq:drift": "node scripts/ops/hpq_drift_monitor.mjs",
     "test:work-buddy": "node scripts/ops/work_buddy_auditor.mjs",
     "test:repo-boundary": "node scripts/ops/repo_boundary_acceptance.mjs",
+    "test:mojibake": "node scripts/ops/mojibake_acceptance.mjs",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"

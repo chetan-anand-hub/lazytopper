@@ -644,7 +644,7 @@ const packTopicKey = useMemo(() => {
             cursor: "pointer",
           }}
         >
-          <span>â†</span>
+          <span>←</span>
           <span>{backLabel}</span>
         </button>
 
@@ -669,7 +669,7 @@ const packTopicKey = useMemo(() => {
               marginBottom: 6,
             }}
           >
-            Class {grade} Â· {subjectKey} Â· Practice
+            Class {grade} · {subjectKey} · Practice
           </div>
           <h1
             style={{
@@ -983,8 +983,8 @@ const packTopicKey = useMemo(() => {
                             {idx + 1}
                           </span>
                           <span>
-                            {q.marks} mark{q.marks !== 1 ? "s" : ""} Â·{" "}
-                            {q.difficulty} Â· {q.section}
+                            {q.marks} mark{q.marks !== 1 ? "s" : ""} ·{" "}
+                            {q.difficulty} · {q.section}
                           </span>
                         </div>
                       </div>
@@ -1409,7 +1409,7 @@ function MentorSolveDrawer(props: {
           }}
         >
           <div style={{ fontWeight: 950, fontSize: 14 }}>
-            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} Â· {seed.title}
+            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} · {seed.title}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button

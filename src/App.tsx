@@ -27,6 +27,7 @@ import { useVibeMode } from './context/vibeModeContext';
 import { parseCommandIntent } from "./services/commandIntent";
 import { normalizeTopicKey } from "./utils/topicResolver";
 import { RequireAuth } from "./components/auth/RequireAuth";
+import { useAuth } from "./context/AuthContext";
 
 /**
  * BottomNav component renders a simple bottom navigation bar for the mobile view.
@@ -133,8 +134,10 @@ function BottomNav() {
  */
 export default function App() {
   const [isPaletteOpen, setPaletteOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const navigate = useNavigate();
   const { mode, setMode } = useVibeMode();
+  const { user, logout } = useAuth();
 
   const handleCommandSelect = (action: { id: string; handler: string }, query: string) => {
     const parsed = parseCommandIntent(query);
@@ -205,6 +208,18 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  const handleLogout = async () => {
+    setLogoutBusy(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch {
+      navigate("/login", { replace: true });
+    } finally {
+      setLogoutBusy(false);
+    }
+  };
+
   return (
     <>
       {/* Top navigation bar with brand name and vibe toggle */}
@@ -213,6 +228,18 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: "0.78rem", opacity: 0.8 }}>Press Ctrl/Cmd + K to search</span>
           <VibeToggle variant="navbar" />
+          {user ? (
+            <button
+              type="button"
+              className="pill-btn"
+              style={{ padding: "5px 12px", fontSize: "0.8rem" }}
+              onClick={handleLogout}
+              disabled={logoutBusy}
+              title="Log out"
+            >
+              {logoutBusy ? "Logging out..." : "Log out"}
+            </button>
+          ) : null}
         </div>
       </div>
       {/* Command palette overlay */}
@@ -235,15 +262,15 @@ export default function App() {
           <Route path="/planner" element={<RequireAuth><StudyPlannerView /></RequireAuth>} />
 
 
-          {/* Legacy Topic content hub â€“ maths topics via :topicKey param */}
-          <Route path="/topics/:topicKey" element={<TopicHub />} />
+          {/* Legacy Topic content hub – maths topics via :topicKey param */}
+          <Route path="/topics/:topicKey" element={<RequireAuth><TopicHub /></RequireAuth>} />
 
           {/* Preferred Topic Hub entry with grade & subject in path */}
-          <Route path="/topic-hub/:grade/:subject" element={<TopicHub />} />
-          <Route path="/topic-hub/:grade/:subject/:topicKey" element={<TopicHub />} />
+          <Route path="/topic-hub/:grade/:subject" element={<RequireAuth><TopicHub /></RequireAuth>} />
+          <Route path="/topic-hub/:grade/:subject/:topicKey" element={<RequireAuth><TopicHub /></RequireAuth>} />
 
           {/* TopicHub launcher page */}
-          <Route path="/topic-hub" element={<TopicHubHome />} />
+          <Route path="/topic-hub" element={<RequireAuth><TopicHubHome /></RequireAuth>} />
 
       
 

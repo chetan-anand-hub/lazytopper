@@ -9,7 +9,7 @@ import {
   type ConfirmationResult,
   type User,
 } from "firebase/auth";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { authClient, firebaseConfigured } from "../services/firebaseClient";
 
 export type AuthUser = {
@@ -20,11 +20,15 @@ export type AuthUser = {
   isLocalSession?: boolean;
 };
 
+export type PhoneRecaptchaStatus = "idle" | "ready" | "solved" | "expired" | "error";
+
 type AuthContextType = {
   user: AuthUser | null;
   loading: boolean;
   firebaseReady: boolean;
+  phoneRecaptchaStatus: PhoneRecaptchaStatus;
   signInWithGoogle: () => Promise<void>;
+  initPhoneRecaptcha: (recaptchaContainerId: string) => Promise<void>;
   sendPhoneOtp: (phoneE164: string, recaptchaContainerId: string) => Promise<void>;
   verifyPhoneOtp: (code: string) => Promise<void>;
   continueLocalSession: () => void;
@@ -73,8 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return readLocalSession();
   });
   const [loading, setLoading] = useState<boolean>(firebaseConfigured);
+  const [phoneRecaptchaStatus, setPhoneRecaptchaStatus] = useState<PhoneRecaptchaStatus>("idle");
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+
+  const resetRecaptcha = async () => {
+    const verifier = recaptchaRef.current;
+    if (!verifier) return;
+    try {
+      const widgetId = await verifier.render();
+      const grecaptchaObj = (window as { grecaptcha?: { reset: (id?: number) => void } }).grecaptcha;
+      if (grecaptchaObj && typeof grecaptchaObj.reset === "function") {
+        grecaptchaObj.reset(widgetId);
+      }
+      setPhoneRecaptchaStatus("ready");
+    } catch {
+      // ignore reset failures
+    }
+  };
 
   useEffect(() => {
     if (!firebaseConfigured || !authClient) return;
@@ -94,22 +114,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(authClient, provider);
   };
 
+  const initPhoneRecaptchaHandler = async (recaptchaContainerId: string) => {
+    if (!firebaseConfigured || !authClient) {
+      throw new Error("Firebase is not configured.");
+    }
+    if (!recaptchaRef.current) {
+      recaptchaRef.current = new RecaptchaVerifier(authClient, recaptchaContainerId, {
+        size: "normal",
+        callback: () => {
+          setPhoneRecaptchaStatus("solved");
+        },
+        "expired-callback": () => {
+          setPhoneRecaptchaStatus("expired");
+        },
+        "error-callback": () => {
+          setPhoneRecaptchaStatus("error");
+        },
+      });
+      await recaptchaRef.current.render();
+      setPhoneRecaptchaStatus("ready");
+    }
+  };
+
   const sendPhoneOtpHandler = async (phoneE164: string, recaptchaContainerId: string) => {
     if (!firebaseConfigured || !authClient) {
       throw new Error("Firebase is not configured.");
     }
 
-    const existing = recaptchaRef.current;
-    if (existing) {
-      existing.clear();
-      recaptchaRef.current = null;
+    await initPhoneRecaptchaHandler(recaptchaContainerId);
+    const verifier = recaptchaRef.current;
+    if (!verifier) {
+      throw new Error("reCAPTCHA initialization failed.");
     }
 
-    const verifier = new RecaptchaVerifier(authClient, recaptchaContainerId, {
-      size: "normal",
-    });
-    recaptchaRef.current = verifier;
-    confirmationRef.current = await signInWithPhoneNumber(authClient, phoneE164, verifier);
+    try {
+      await verifier.verify();
+      setPhoneRecaptchaStatus("solved");
+      confirmationRef.current = await signInWithPhoneNumber(authClient, phoneE164, verifier);
+    } catch (error) {
+      await resetRecaptcha();
+      throw error;
+    }
   };
 
   const verifyPhoneOtpHandler = async (code: string) => {
@@ -142,19 +187,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(authClient);
   };
 
-  const value = useMemo<AuthContextType>(
-    () => ({
-      user,
-      loading,
-      firebaseReady: firebaseConfigured,
-      signInWithGoogle: signInWithGoogleHandler,
-      sendPhoneOtp: sendPhoneOtpHandler,
-      verifyPhoneOtp: verifyPhoneOtpHandler,
-      continueLocalSession,
-      logout: logoutHandler,
-    }),
-    [user, loading]
-  );
+  const value: AuthContextType = {
+    user,
+    loading,
+    firebaseReady: firebaseConfigured,
+    phoneRecaptchaStatus,
+    signInWithGoogle: signInWithGoogleHandler,
+    initPhoneRecaptcha: initPhoneRecaptchaHandler,
+    sendPhoneOtp: sendPhoneOtpHandler,
+    verifyPhoneOtp: verifyPhoneOtpHandler,
+    continueLocalSession,
+    logout: logoutHandler,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

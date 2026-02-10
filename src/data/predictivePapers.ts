@@ -1,6 +1,6 @@
 ﻿// src/data/predictivePapers.ts
 
-// NOTE: we no longer need PredictedQuestion here â€“ the hub + MockPaper
+// NOTE: we no longer need PredictedQuestion here – the hub + MockPaper
 // only use the predictive paper metadata + list of questionIds.
 // import type { PredictedQuestion } from "./predictedQuestions";
 
@@ -22,7 +22,7 @@ export interface PredictivePaper {
   questionIds?: string[];
 }
 
-// NOTE: For now questionIds are left empty â€“ MockPaper falls back
+// NOTE: For now questionIds are left empty – MockPaper falls back
 // to the full prediction bank if a paper has no ids yet.
 // Later, we'll populate these to get a true 80-mark curated paper.
 
@@ -109,7 +109,7 @@ export const predictivePapers: PredictivePaper[] = [
     title: "Predictive Paper 8",
     slug: "paper-8-algebra-geometry-stats",
     vibe: "Algebra + geometry + a dash of stats.",
-    tagline: "Good mid-journey mock once syllabus is 70â€“80% done.",
+    tagline: "Good mid-journey mock once syllabus is 70–80% done.",
     markTotal: 80,
     subject: "Maths",
     sectionMarks: { A: 20, B: 10, C: 18, D: 20, E: 12 },

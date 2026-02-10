@@ -5,6 +5,13 @@ import { useVibeMode } from "../context/vibeModeContext";
 
 type LocationState = { from?: string };
 
+const FIREBASE_ENV_TEMPLATE = `VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com`;
+
 function normalizePhone(raw: string): string {
   const digits = String(raw || "").replace(/\D+/g, "");
   if (!digits) return "";
@@ -18,10 +25,20 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { mode, setMode } = useVibeMode();
-  const { user, firebaseReady, signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, continueLocalSession } = useAuth();
+  const {
+    user,
+    firebaseReady,
+    phoneRecaptchaStatus,
+    signInWithGoogle,
+    initPhoneRecaptcha,
+    sendPhoneOtp,
+    verifyPhoneOtp,
+    continueLocalSession,
+  } = useAuth();
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [realOtpOnly, setRealOtpOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const nextPath = useMemo(() => {
@@ -32,6 +49,13 @@ export default function Login() {
   useEffect(() => {
     if (user) navigate(nextPath, { replace: true });
   }, [user, nextPath, navigate]);
+
+  useEffect(() => {
+    if (!firebaseReady) return;
+    void initPhoneRecaptcha("firebase-recaptcha-container").catch(() => {
+      // keep login usable; error will surface during send if config/network is broken
+    });
+  }, [firebaseReady, initPhoneRecaptcha]);
 
   const handleGoogle = async () => {
     setBusy(true);
@@ -57,7 +81,14 @@ export default function Login() {
       await sendPhoneOtp(normalized, "firebase-recaptcha-container");
       setOtpSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP.");
+      const message = err instanceof Error ? err.message : "Failed to send OTP.";
+      if (message.includes("auth/invalid-app-credential")) {
+        setError(
+          "Phone verification failed: invalid app credential. Please solve reCAPTCHA fully and retry. If this persists, use Email login and we will keep phone as fallback."
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
@@ -66,6 +97,12 @@ export default function Login() {
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
       setError("Enter OTP.");
+      return;
+    }
+    if (realOtpOnly && otp.trim() === "123456") {
+      setError(
+        "Test OTP detected. For real SMS OTP, remove testing numbers from Firebase Auth -> Phone provider."
+      );
       return;
     }
     setBusy(true);
@@ -84,6 +121,9 @@ export default function Login() {
       <h2 className="title center">Student Sign In</h2>
       <div className="card">
         <p className="subtitle">Use Gmail or phone OTP to create your personal dashboard.</p>
+        <p className="subtitle" style={{ marginTop: 6 }}>
+          After sign-in, you will continue to <strong>{nextPath}</strong>.
+        </p>
         <div style={{ marginTop: 10, marginBottom: 12 }}>
           <label style={{ fontWeight: 700 }}>Energy Level:</label>
           <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -113,20 +153,41 @@ export default function Login() {
 
         {firebaseReady ? (
           <>
-            <button className="cta-btn" onClick={handleGoogle} disabled={busy}>
-              Continue with Google
+            <button className="cta-btn" onClick={handleGoogle} disabled={busy} data-testid="login-email-google">
+              Continue with Email (Google)
             </button>
 
             <div style={{ marginTop: 14 }}>
-              <label>Phone number</label>
+              <label>Phone number (OTP)</label>
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setOtpSent(false);
+                  setOtp("");
+                }}
                 placeholder="+91XXXXXXXXXX"
               />
+              <p className="subtitle" style={{ marginTop: 6, marginBottom: 8 }}>
+                Real OTP is sent by Firebase SMS. If you keep test numbers in Firebase, preset OTPs will bypass SMS.
+              </p>
+              <p className="subtitle" style={{ marginTop: 0, marginBottom: 8 }}>
+                Step 1: solve reCAPTCHA below. Step 2: click Send OTP.
+              </p>
+              <p className="subtitle" style={{ marginTop: 0, marginBottom: 8 }}>
+                reCAPTCHA status: <strong>{phoneRecaptchaStatus}</strong>
+              </p>
+              <label style={{ display: "inline-flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={realOtpOnly}
+                  onChange={(e) => setRealOtpOnly(e.target.checked)}
+                />
+                Require real SMS OTP (recommended)
+              </label>
               {!otpSent ? (
-                <button className="pill-btn" onClick={handleSendOtp} disabled={busy}>
+                <button className="pill-btn" onClick={handleSendOtp} disabled={busy || phoneRecaptchaStatus === "idle"}>
                   Send OTP
                 </button>
               ) : (
@@ -151,6 +212,28 @@ export default function Login() {
             <p className="subtitle" style={{ marginTop: 8 }}>
               Firebase is not configured in this environment. Set `VITE_FIREBASE_*` env keys to enable Gmail/Phone auth.
             </p>
+            <div style={{ marginTop: 8, background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 10, padding: 10 }}>
+              <p style={{ margin: 0, fontWeight: 700 }}>Firebase setup (one-time)</p>
+              <p style={{ marginTop: 6, marginBottom: 6, fontSize: "0.86rem" }}>
+                1. Enable <strong>Google</strong> and <strong>Phone</strong> providers in Firebase Auth.
+                2. Add your site domain to authorized domains.
+                3. Create `.env.local` in project root with:
+              </p>
+              <pre
+                style={{
+                  margin: 0,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  fontSize: "0.8rem",
+                  background: "#0f172a",
+                  color: "#e2e8f0",
+                  padding: 10,
+                  borderRadius: 8,
+                }}
+              >
+                {FIREBASE_ENV_TEMPLATE}
+              </pre>
+            </div>
             <button className="pill-btn" onClick={continueLocalSession} disabled={busy}>
               Continue in Local Session
             </button>
