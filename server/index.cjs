@@ -1484,9 +1484,19 @@ function isStubMode() {
 
 let bsreEvaluatorInstance = null;
 function getBsreEvaluator() {
+  if (bsreEvaluatorInstance === false) {
+    return null;
+  }
   if (!bsreEvaluatorInstance) {
-    const { BsreEvaluator } = require('../src/engine/bsre/evaluator.ts');
-    bsreEvaluatorInstance = new BsreEvaluator();
+    try {
+      const { BsreEvaluator } = require('../src/engine/bsre/evaluator.ts');
+      bsreEvaluatorInstance = new BsreEvaluator();
+    } catch (err) {
+      telemetry.increment('bsre_eval_loader_failed');
+      console.warn('[bsre] evaluator unavailable:', String(err?.message || err));
+      bsreEvaluatorInstance = false;
+      return null;
+    }
   }
   return bsreEvaluatorInstance;
 }
@@ -1572,6 +1582,10 @@ function runBsreEvaluation(payload, attempt, rubricIdOverride) {
 
   const rubricId = String(rubricIdOverride || determineBsreRubricId(payload));
   const evaluator = getBsreEvaluator();
+  if (!evaluator || typeof evaluator.evaluateAnswer !== 'function') {
+    telemetry.increment('bsre_eval_unavailable');
+    throw new Error('BSRE evaluator unavailable.');
+  }
   telemetry.increment('bsre_eval_called');
 
   const evaluation = evaluator.evaluateAnswer(studentAnswer, rubricId);
