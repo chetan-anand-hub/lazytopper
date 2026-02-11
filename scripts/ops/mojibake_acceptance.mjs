@@ -9,7 +9,7 @@ const outDir = path.join(repoRoot, ".project_memory", "ops", "out");
 const outPath = path.join(outDir, "mojibake_acceptance.json");
 
 const mojibakeRegex =
-  /(?:\uFFFD|\u0393\u00C7|[\u00C2\u00C3\u00CE\u00CF\u00E2][\u0080-\u00BF\u00C0-\u00FF\u2013-\u201F\u2020-\u2022\u2030\u2039\u203A\u20AC\u2122\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u02C6\u02DC])/u;
+  /(?:\uFFFD|\u0393\u00C7|[\u00C2\u00C3\u00CE\u00CF\u00E2\u00F0][\u0080-\u00BF\u00C0-\u00FF\u2013-\u201F\u2020-\u2022\u2030\u2039\u203A\u20AC\u2122\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u02C6\u02DC])/u;
 
 function normalizePath(input) {
   return String(input || "").replace(/\\/g, "/");
@@ -24,8 +24,11 @@ async function run() {
   const knownBadSamples = [
     "don\uFFFDt",
     "x = 5 \u00E2\u2021\u2019 y = 7",
+    "Jump into HPQs \u00E2\u2020\u2019",
+    "Step 2 \u00E2\u20AC\u00A2 Practice",
     "40 \u00C3\u2014 30",
     "2\u00CF\u20ACr",
+    "\u00F0\u0178\u2018\u20AC",
     "\u0393\u00C7",
   ];
   const knownGoodSamples = [

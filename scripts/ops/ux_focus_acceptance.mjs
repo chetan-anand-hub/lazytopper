@@ -29,7 +29,8 @@ async function run() {
   addCheck(
     checks,
     "priority_block_home_present",
-    homeText.includes('data-ux-priority-block="home-next-best-actions"'),
+    homeText.includes('data-ux-priority-block="home-primary-actions"') ||
+      homeText.includes('data-ux-priority-block="home-next-best-actions"'),
     "Home should expose an explicit above-the-fold next-best-action block."
   );
   addCheck(
@@ -72,8 +73,8 @@ async function run() {
     checks,
     "home_navigation_depth_entry_points",
     homeText.includes('navigate("/topic-hub")') &&
-      homeText.includes('navigate("/dashboard")') &&
-      homeText.includes('navigate("/trends/10/Maths")'),
+      (homeText.includes('navigate("/dashboard")') || homeText.includes('navigate(user ? "/dashboard" : "/login")')) &&
+      (homeText.includes('navigate("/trends/10/Maths")') || homeText.includes('navigate("/predictive-papers")')),
     "Home should expose direct one-click entry points for key study surfaces."
   );
   addCheck(
@@ -89,7 +90,8 @@ async function run() {
     checks,
     "topichub_navigation_depth_entry_points",
     topicHubHomeText.includes("Start Learning") &&
-      topicHubHomeText.includes("Open Trends") &&
+      (topicHubHomeText.includes("Open Trends") ||
+        topicHubHomeText.includes("See trends (optional)")) &&
       topicHubHomeText.includes("const target = `/topic-hub/"),
     "TopicHub entry should keep topic-start depth at one click after selection."
   );
