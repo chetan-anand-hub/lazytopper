@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router-dom";
 
 import { type PracticeQuestion } from "../data/predictionDataService";
 import { generatePracticeSet, inferBoardPatternFromQuestion, normalizeBoardPattern } from "../data/practiceSetGenerator";
+import { generateUnifiedPracticeQuestions } from "../data/questionGenerator";
 import { promptDPracticePacks } from "../data/promptDPracticePacks";
 import { resolveTopicKey as resolveCanonicalTopicKey, toPracticePackKey } from "../utils/topicResolver";
 import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
@@ -199,6 +200,20 @@ interface AiTopupArgs {
   sectionFilter?: string;
 }
 
+function mapUnifiedQuestionToPractice(question: any, fallbackId: string): PracticeQuestion {
+  return {
+    id: String(question?.id ?? fallbackId),
+    marks: Number(question?.marks ?? 1),
+    difficulty: (question?.difficulty ?? "Medium") as PracticeQuestion["difficulty"],
+    section: String(question?.section ?? ""),
+    bloomSkill: String(question?.bloomSkill ?? ""),
+    questionText: String(question?.questionText ?? "").trim(),
+    solutionSteps: Array.isArray(question?.solutionSteps) ? question.solutionSteps : [],
+    explanation: String(question?.explanation ?? ""),
+    answer: String(question?.answer ?? ""),
+  } as PracticeQuestion;
+}
+
 /**
  * Generate a bank-backed practice set, then top it up with AI variants
  * if we still don't have enough questions.
@@ -275,8 +290,28 @@ function expandQuestionsForDrill(source: PracticeQuestion[], targetCount: number
     return baseQuestions.slice(0, safeCount);
   }
 
+  const canonicalFallback = generateUnifiedPracticeQuestions({
+    subject: args.subjectKey,
+    topicKey: args.topicLabel as any,
+    count: missing,
+    section: desiredSection || undefined,
+    difficulty: args.difficulty === "All" ? undefined : (args.difficulty as any),
+    mixMode: "generated-first",
+  })
+    .map((question, index) =>
+      mapUnifiedQuestionToPractice(question, `CANONICAL-${index + 1}`)
+    )
+    .filter((question) => (desiredSection ? inferBoardPatternFromQuestion(question) === desiredSection : true));
+
+  const mergedWithCanonical = [...baseQuestions, ...canonicalFallback].slice(0, safeCount);
+  const missingAfterCanonical = safeCount - mergedWithCanonical.length;
+
+  if (missingAfterCanonical <= 0) {
+    return mergedWithCanonical.slice(0, safeCount);
+  }
+
   // Build a seed question so AI has context even if the bank is empty.
-  const seedFromBank: PracticeQuestion | undefined = baseQuestions[0];
+  const seedFromBank: PracticeQuestion | undefined = mergedWithCanonical[0];
   const fallbackDifficulty: InternalDifficultyBucket =
     args.difficulty === "All"
       ? "Medium"
@@ -316,7 +351,7 @@ function expandQuestionsForDrill(source: PracticeQuestion[], targetCount: number
         difficulty: seedDifficulty,
         bloomSkill: seedBloomSkill,
       },
-      numVariants: missing,
+      numVariants: missingAfterCanonical,
     });
 
     const variants = response?.variants ?? [];
@@ -325,7 +360,7 @@ function expandQuestionsForDrill(source: PracticeQuestion[], targetCount: number
     // PracticeQuestion (from predictionDataService) may include required fields
     // like subject/topic metadata. Instead, clone a real bank question template
     // and only override the fields we actually want to change.
-    const template: PracticeQuestion | undefined = seed ?? baseQuestions[0];
+    const template: PracticeQuestion | undefined = seed ?? mergedWithCanonical[0];
 
     // If we somehow have no template (empty bank and no seed), skip AI top-up to
     // avoid emitting broken placeholder questions.
@@ -362,11 +397,11 @@ function normaliseQuestionText(s: string | undefined | null): string {
           };
         });
 
-    const merged = [...baseQuestions, ...aiQuestions];
+    const merged = [...mergedWithCanonical, ...aiQuestions];
     return expandQuestionsForDrill(merged, safeCount);
   } catch (err) {
     console.error("AI top-up failed for practice set:", err);
-    return expandQuestionsForDrill(baseQuestions, safeCount);
+    return expandQuestionsForDrill(mergedWithCanonical, safeCount);
   }
 }
 
