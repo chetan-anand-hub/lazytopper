@@ -7,7 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { getTopicV2Content, normalizeTopicKey } from "../utils/topicHubV2Store";
 import { topicHubV2Content } from "../data/topicHubV2Full";
@@ -44,6 +44,9 @@ import {
   type TopicHubNodeMasteryState,
   upsertNodeProgress,
 } from "../services/topicHubMastery";
+import JourneyStrip from "../components/ux/JourneyStrip";
+import ReturnContextBar from "../components/ux/ReturnContextBar";
+import { trackUxEvent } from "../services/uxTelemetry";
 
 type TeachDiagram = {
   required: boolean;
@@ -671,6 +674,24 @@ const masteryBadgeMeta: Record<
 };
 
 const TOPICHUB_LAST_ROUTE_KEY = "lazytopper.topicHub.lastRoute.v1";
+const TOPICHUB_RECENT_TOPICS_KEY = "lazytopper.topicHub.recentTopics.v1";
+
+type RecentTopicRecord = {
+  grade: string;
+  subject: string;
+  topicKey: string;
+  topicName: string;
+  path: string;
+  updatedAt: string;
+};
+
+function upsertRecentTopic(list: RecentTopicRecord[], next: RecentTopicRecord): RecentTopicRecord[] {
+  const normalizedKey = `${next.grade}:${next.subject}:${next.topicKey}`;
+  const filtered = list.filter(
+    (item) => `${item.grade}:${item.subject}:${item.topicKey}` !== normalizedKey
+  );
+  return [next, ...filtered].slice(0, 6);
+}
 
 function mapGrindNodeToGuidedNodeId(grindNodeId: string): string {
   const id = String(grindNodeId || "").toUpperCase();
@@ -696,6 +717,7 @@ export default function TopicHub() {
   const params = useParams();
   const [sp] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const grade = String(params.grade || sp.get("grade") || "10");
   const subject = asSubjectKey(String(params.subject || sp.get("subject") || "maths"));
   const subjectTitle = subject === "science" ? "Science" : "Maths";
@@ -709,6 +731,9 @@ export default function TopicHub() {
     "";
 
   const topicKey = normalizeTopicKey(rawTopicKey) || defaultTopicKeyFor(subject);
+  const navState = (location.state as { back?: string; backLabel?: string } | null) || null;
+  const backTo = String(navState?.back || `/trends/${grade}/${subject}`);
+  const backLabel = String(navState?.backLabel || "Back to trends");
 
   // Never-blank rule: if they hit /topic-hub/10/maths (no topicKey), redirect.
   useEffect(() => {
@@ -736,6 +761,10 @@ export default function TopicHub() {
     };
     try {
       window.localStorage.setItem(TOPICHUB_LAST_ROUTE_KEY, JSON.stringify(payload));
+      const recentRaw = window.localStorage.getItem(TOPICHUB_RECENT_TOPICS_KEY);
+      const recent = recentRaw ? (JSON.parse(recentRaw) as RecentTopicRecord[]) : [];
+      const nextRecent = upsertRecentTopic(Array.isArray(recent) ? recent : [], payload);
+      window.localStorage.setItem(TOPICHUB_RECENT_TOPICS_KEY, JSON.stringify(nextRecent));
     } catch {
       // Ignore localStorage failures to avoid affecting learning flow.
     }
@@ -781,6 +810,7 @@ export default function TopicHub() {
   const [grindNodeId, setGrindNodeId] = useState<string>("" );
   const [tutorTab, setTutorTab] = useState<TutorTab>("teach");
   const [tutorNodeIndex, setTutorNodeIndex] = useState(0);
+  const teachAutoOpenKeyRef = useRef<string>("");
 
   const closeMentorDrawer = () => {
     setMentorDrawerOpen(false);
@@ -1658,6 +1688,16 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     ]
   );
 
+  useEffect(() => {
+    const shouldAutoTeach = String(sp.get("teach") || "") === "1";
+    if (!shouldAutoTeach) return;
+    const key = `${grade}|${subject}|${topicKey}|${sp.toString()}`;
+    if (teachAutoOpenKeyRef.current === key) return;
+    teachAutoOpenKeyRef.current = key;
+    setActiveTab("learn");
+    openTutorDrawer({ tab: "teach" });
+  }, [grade, subject, topicKey, sp, openTutorDrawer]);
+
 const showInZombie = (sectionId: string) => {
     if (mode === "beast") return true;
     return ["summary", "exam-patterns", "key-definitions", "quick-quiz", "worked-examples"].includes(sectionId);
@@ -1753,6 +1793,12 @@ const showInZombie = (sectionId: string) => {
         inferSectionFromSubtopicHint(opts.subtopicHint) ||
         inferSectionFromGrindNode(grindNodeId);
       const backTab = opts.tab || activeTab;
+      trackUxEvent("topichub_open_practice", "topichub", {
+        topicKey,
+        tab: backTab,
+        nodeId: nodeId || grindNodeId || "",
+        sectionFilter: sectionFilter || "none",
+      });
       navigateToPractice(navigate, {
         grade,
         subject: subjectTitle,
@@ -1851,6 +1897,16 @@ const showInZombie = (sectionId: string) => {
   return (
     <div className="page">
       <div style={{ maxWidth: 1120, margin: "0 auto", padding: "18px 14px 40px" }}>
+        <ReturnContextBar
+          backTo={backTo}
+          backLabel={backLabel}
+          quickLinks={[
+            { label: "Trends", to: `/trends/${grade}/${subjectTitle}` },
+            { label: "Practice", to: `/practice/${grade}/${subjectTitle}?topic=${encodeURIComponent(title)}` },
+            { label: "HPQ", to: `/highly-probable/${grade}/${subjectTitle}?topic=${encodeURIComponent(title)}` },
+          ]}
+        />
+        <JourneyStrip current="topichub" grade={grade} subject={subjectTitle} topic={title} />
         {/* Topic header (clean) */}
         <div
           style={{
@@ -1867,7 +1923,7 @@ const showInZombie = (sectionId: string) => {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <Link className="pill" to={`/trends/${grade}/${subject}`}>
-              ? Trends
+              Open trends
             </Link>
 
             <div
@@ -2040,7 +2096,7 @@ const showInZombie = (sectionId: string) => {
                   className="pill"
                   onClick={() => openTutorDrawer({ tab: "teach" })}
                 >
-                  Let me teach you
+                  Teach this topic
                 </button>
                 <button
                   type="button"
@@ -2207,7 +2263,7 @@ const showInZombie = (sectionId: string) => {
                       <div style={{ fontWeight: 900 }}>{t.title}</div>
                       <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.5 }}>{t.description}</div>
                       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                        Marks: {t.marks}  Focus: {t.focus.replace("_", " ")}
+                        Marks: {t.marks} | Focus: {t.focus.replace("_", " ")}
                       </div>
                       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button

@@ -21,7 +21,7 @@ import {
 } from "../data/highlyProbableQuestions";
 
 import {
-  // 🔹 NEW: to mirror TopicHub’s Mark Yield + topic metadata
+  // NEW: to mirror TopicHub's Mark Yield + topic metadata
   type TopicContentConfig,
   getTopicContent,
   buildGenericTopicConfig,
@@ -43,8 +43,11 @@ import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 // return type for each AI-generated question variant.  We also pull in
 // generateMoreLikeThis so that the HPQ page can request variants on-demand.
 import { generateMoreLikeThis, type MoreLikeThisVariant } from "../ai/aiClient";
+import JourneyStrip from "../components/ux/JourneyStrip";
+import ReturnContextBar from "../components/ux/ReturnContextBar";
+import { trackUxEvent } from "../services/uxTelemetry";
 
-// 🔹 NEW: same normalisation constant as TopicHub
+// NEW: same normalisation constant as TopicHub
 const MAX_BOARD_WEIGHTAGE_FOR_CLASS10 = 14;
 
 // ---------- Local types / helpers ----------
@@ -71,22 +74,22 @@ const tierMeta: Record<
   HPQTier,
   { label: string; emoji: string; blurb: string }
 > = {
-  "must-crack": {
-    label: "Must-crack",
-    emoji: "🔥",
-    blurb: "Shows up almost every year – non-negotiable.",
-  },
-  "high-roi": {
-    label: "High-ROI",
-    emoji: "💎",
-    blurb: "Big marks for the time you invest – do after must-crack.",
-  },
-  "good-to-do": {
-    label: "Good-to-do",
-    emoji: "🌈",
-    blurb: "Nice safety net once the big boys are done.",
-  },
-};
+    "must-crack": {
+      label: "Must-crack",
+      emoji: "",
+      blurb: "Shows up almost every year. Start here first.",
+    },
+    "high-roi": {
+      label: "High-ROI",
+      emoji: "",
+      blurb: "Big marks for the time you invest - do after must-crack.",
+    },
+    "good-to-do": {
+      label: "Good-to-do",
+      emoji: "",
+      blurb: "Useful once core topics are complete.",
+    },
+  };
 
 const difficultyChipStyle: Record<HPQDifficulty, { bg: string; color: string }> =
   {
@@ -148,7 +151,7 @@ const HighlyProbableQuestions: React.FC = () => {
   // Smart Learning Engine
   const {
     recordHpqAttempt,
-    // 🔹 NEW: read stats + match score
+    // NEW: read stats + match score
     getStatsForChapter,
     getMatchScoreForChapter,
   } = useSmartLearning();
@@ -168,6 +171,7 @@ const HighlyProbableQuestions: React.FC = () => {
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [difficultyFilter, setDifficultyFilter] =
     useState<DifficultyFilter>("all");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Topic filter (dropdown + deep-link from Trends)
   const topicParam = searchParams.get("topic");
@@ -195,6 +199,7 @@ const HighlyProbableQuestions: React.FC = () => {
     setActiveStream("all");
     setTierFilter("all");
     setDifficultyFilter("all");
+    setShowAdvancedFilters(false);
     setExpandedTopics({});
     setHpqFeedback({});
     setTopicFilter("all");
@@ -204,9 +209,9 @@ const HighlyProbableQuestions: React.FC = () => {
   }, [subjectKey]);
 
   // --- AI variant state ---
-  // When students request AI‑generated variants of an HPQ, we store
+  // When students request AI-generated variants of an HPQ, we store
   // loading/error flags and the resulting variants keyed by question ID.
-  // This ensures each question’s variant state is tracked independently.
+  // This ensures each question's variant state is tracked independently.
   const [aiVariants, setAiVariants] = useState<Record<string, MoreLikeThisVariant[]>>({});
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [aiError, setAiError] = useState<Record<string, string | undefined>>({});
@@ -257,7 +262,7 @@ const HighlyProbableQuestions: React.FC = () => {
     [subjectBuckets]
   );
 
-  // 🔹 NEW: derive "current topic" & its bucket for stats snippet
+  // NEW: derive "current topic" & its bucket for stats snippet
   const currentTopicKey: string | undefined =
     (topicFilter !== "all" ? topicFilter : topicParam) || undefined;
 
@@ -363,11 +368,11 @@ const HighlyProbableQuestions: React.FC = () => {
     let matchLabel: string | undefined;
     if (matchScore !== undefined) {
       if (matchScore >= 75) {
-        matchLabel = "🔥 high match score";
+        matchLabel = "high match score";
       } else if (matchScore >= 40) {
-        matchLabel = "🟡 medium match score";
+        matchLabel = "medium match score";
       } else {
-        matchLabel = "🧊 low match score";
+        matchLabel = "low match score";
       }
     }
 
@@ -411,14 +416,6 @@ const HighlyProbableQuestions: React.FC = () => {
     setActiveStream(next);
   };
 
-  const handleBackToTrends = () => {
-    if (back) {
-      navigate(back);
-    } else {
-      navigate(buildTrendsUrl(grade, subjectKey));
-    }
-  };
-
   const handleOpenMockBuilder = () => {
     // save basket and open mock builder with grade & subject in path
     persistBasket(basket);
@@ -431,6 +428,10 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   const handleOpenTopicHubFromBucket = (bucket: HPQTopicBucket) => {
+    trackUxEvent("hpq_open_topic_hub", "hpq", {
+      topic: bucket.topic,
+      subject: subjectKey,
+    });
     navigate(
       buildTopicHubUrl(grade, subjectKey, bucket.topic),
       {
@@ -512,6 +513,11 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   const handleMoreLikeThisPractice = (bucket: HPQTopicBucket, q: HPQQuestion) => {
+    trackUxEvent("hpq_open_practice", "hpq", {
+      topic: bucket.topic,
+      subject: subjectKey,
+      questionId: q.id,
+    });
     const topicKey = bucket.topic;
     const topicName = bucket.topic;
     const backPath = currentURL;
@@ -536,7 +542,7 @@ const HighlyProbableQuestions: React.FC = () => {
    * unified mentor page with `explain` mode and passes along the
    * question context so the backend can generate a concise concept
    * explanation.  We include a GPT directive to nudge the assistant
-   * towards CBSE‑friendly language and highlight key concepts.
+   * towards CBSE-friendly language and highlight key concepts.
    */
   const handleExplainAiMentor = (
     bucket: HPQTopicBucket,
@@ -561,7 +567,7 @@ const HighlyProbableQuestions: React.FC = () => {
   };
 
   /**
-   * Generate AI variants for a given HPQ.  We call the more‑like‑this
+   * Generate AI variants for a given HPQ.  We call the more-like-this
    * endpoint with the question text, marks and difficulty to request
    * several alternative versions.  Loading and error state are tracked
    * per question so that multiple requests can be made in parallel.
@@ -600,7 +606,7 @@ const HighlyProbableQuestions: React.FC = () => {
     }
   };
 
-  // 🔁 Smart Learning: log HPQ attempts (correct / incorrect)
+  // Smart Learning: log HPQ attempts (correct / incorrect)
   const handleMarkHpqAttempt = (
     bucket: HPQTopicBucket,
     q: HPQQuestion,
@@ -631,7 +637,7 @@ const HighlyProbableQuestions: React.FC = () => {
       }));
       // (Optional micro-feedback in future: small toast / chip)
     } catch (err) {
-      // Fail silently for now – Smart Learning is a bonus layer, not critical path.
+      // Fail silently for now - Smart Learning is a bonus layer, not critical path.
       console.error("Failed to record HPQ attempt", err);
     }
   };
@@ -641,7 +647,7 @@ const HighlyProbableQuestions: React.FC = () => {
     [basket]
   );
 
-  // 🔄 Clear all filters helper
+  // Clear all filters helper
   const handleClearAllFilters = () => {
     setTierFilter("all");
     setDifficultyFilter("all");
@@ -662,7 +668,7 @@ const HighlyProbableQuestions: React.FC = () => {
       buckets = buckets.filter((b) => b.topic.toLowerCase() === topicLower);
     }
 
-    // Stream filter – only for Science
+    // Stream filter - only for Science
     if (subjectKey === "Science" && activeStream !== "all") {
       buckets = buckets.filter((bucket) => {
         if (bucket.stream && bucket.stream !== "General") {
@@ -683,7 +689,7 @@ const HighlyProbableQuestions: React.FC = () => {
       buckets = buckets.filter((bucket) => getBucketTier(bucket) === tierFilter);
     }
 
-    // Difficulty filter – keep only questions of that difficulty
+    // Difficulty filter - keep only questions of that difficulty
     if (difficultyFilter !== "all") {
       buckets = buckets
         .map((bucket) => ({
@@ -848,24 +854,21 @@ const HighlyProbableQuestions: React.FC = () => {
           padding: "16px 16px 32px",
         }}
       >
-        {/* Back link */}
-        <button
-          onClick={handleBackToTrends}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#4b5563",
-            fontSize: "0.85rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer",
-            marginBottom: 12,
-          }}
-        >
-          <span style={{ fontSize: "1rem" }}>←</span>
-          <span>{backLabel}</span>
-        </button>
+        <ReturnContextBar
+          backTo={back || buildTrendsUrl(grade, subjectKey)}
+          backLabel={backLabel}
+          quickLinks={[
+            { label: "Trends", to: buildTrendsUrl(grade, subjectKey) },
+            { label: "TopicHub", to: buildTopicHubUrl(grade, subjectKey, currentTopicKey && currentTopicKey !== "all" ? currentTopicKey : "") },
+            { label: "Practice", to: `/practice/${grade}/${subjectKey}${currentTopicKey && currentTopicKey !== "all" ? `?topic=${encodeURIComponent(currentTopicKey)}` : ""}` },
+          ]}
+        />
+        <JourneyStrip
+          current="hpq"
+          grade={grade}
+          subject={subjectKey}
+          topic={currentTopicKey && currentTopicKey !== "all" ? currentTopicKey : undefined}
+        />
 
         {/* Hero: HPQ hub */}
         <section
@@ -893,7 +896,7 @@ const HighlyProbableQuestions: React.FC = () => {
                 marginBottom: 8,
               }}
             >
-              Class {grade} • {subjectKey} • HPQ Bank
+              Class {grade} - {subjectKey} - HPQ Bank
             </div>
             <h1
               style={{
@@ -912,127 +915,168 @@ const HighlyProbableQuestions: React.FC = () => {
                 opacity: 0.96,
               }}
             >
-              Your{" "}
-              <strong style={{ fontWeight: 700 }}>last-week weapon</strong>:
-              topic-wise questions that keep coming back. Flip between{" "}
+              Your high-impact revision zone for exam week:
+              topic-wise questions that keep coming back. Switch between{" "}
               <strong>Maths</strong> and{" "}
-              <strong>Science + Physics/Chem/Bio filters</strong>, then send any
-              juicy Q straight to your mock paper.
+              <strong>Science + Physics/Chem/Bio filters</strong>, then send a
+              selected question straight into your mock paper.
             </p>
 
-            {/* Tier filter row */}
             <div
               style={{
                 marginTop: 16,
                 display: "flex",
                 gap: 8,
                 flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
-              {(
-                [
-                  { id: "all", label: "All tiers" },
-                  { id: "must-crack", label: "🔥 Must-crack" },
-                  { id: "high-roi", label: "💎 High-ROI" },
-                  { id: "good-to-do", label: "🌈 Good-to-do" },
-                ] as { id: TierFilter; label: string }[]
-              ).map((item) => {
-                const active = tierFilter === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setTierFilter(item.id)}
-                    style={{
-                      borderRadius: 999,
-                      padding: "6px 14px",
-                      border: active
-                        ? "1px solid rgba(15,23,42,0.2)"
-                        : "1px solid rgba(241,245,249,0.3)",
-                      background: active
-                        ? "#f9fafb"
-                        : "rgba(15,23,42,0.35)",
-                      color: active ? "#020617" : "#e5e7eb",
-                      fontSize: "0.75rem",
-                      fontWeight: active ? 600 : 500,
-                      cursor: "pointer",
-                      boxShadow: active
-                        ? "0 6px 18px rgba(15,23,42,0.4)"
-                        : "none",
-                      transition: "all 0.15s ease-out",
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Difficulty filter row */}
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                fontSize: "0.78rem",
-              }}
-            >
-              {(
-                [
-                  { id: "all", label: "All levels" },
-                  { id: "Easy", label: "🟢 Easy focus" },
-                  { id: "Medium", label: "🟡 Medium focus" },
-                  { id: "Hard", label: "🔴 Hard / full rigour" },
-                ] as { id: DifficultyFilter; label: string }[]
-              ).map((item) => {
-                const active = difficultyFilter === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setDifficultyFilter(item.id)}
-                    style={{
-                      borderRadius: 999,
-                      padding: "5px 11px",
-                      border: active
-                        ? "1px solid rgba(248,250,252,0.9)"
-                        : "1px solid rgba(248,250,252,0.35)",
-                      background: active
-                        ? "rgba(248,250,252,0.95)"
-                        : "transparent",
-                      color: active ? "#020617" : "#e5e7eb",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease-out",
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Clear all filters inline action */}
-            <div
-              style={{
-                marginTop: 8,
-                fontSize: "0.78rem",
-                color: "#e5e7eb",
-              }}
-            >
-              <button
-                onClick={handleClearAllFilters}
+              <span
                 style={{
                   borderRadius: 999,
-                  padding: "4px 10px",
-                  border: "1px dashed rgba(248,250,252,0.7)",
-                  background: "rgba(15,23,42,0.25)",
+                  border: "1px solid rgba(241,245,249,0.4)",
+                  background: "rgba(15,23,42,0.35)",
                   color: "#e5e7eb",
-                  cursor: "pointer",
-                  fontSize: "0.78rem",
+                  fontSize: "0.75rem",
+                  padding: "6px 12px",
                 }}
               >
-                ⭯ Clear all filters
+                {showAdvancedFilters ? "Advanced filters on" : "Simple mode"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters((prev) => !prev)}
+                style={{
+                  borderRadius: 999,
+                  padding: "6px 14px",
+                  border: "1px solid rgba(241,245,249,0.4)",
+                  background: "rgba(15,23,42,0.35)",
+                  color: "#e5e7eb",
+                  fontSize: "0.75rem",
+                  cursor: "pointer",
+                }}
+              >
+                {showAdvancedFilters ? "Hide advanced filters" : "Show advanced filters"}
               </button>
             </div>
+
+            {showAdvancedFilters && (
+              <>
+                {/* Tier filter row */}
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(
+                    [
+                      { id: "all", label: "All tiers" },
+                      { id: "must-crack", label: "Must-crack" },
+                      { id: "high-roi", label: "High-ROI" },
+                      { id: "good-to-do", label: "Good-to-do" },
+                    ] as { id: TierFilter; label: string }[]
+                  ).map((item) => {
+                    const active = tierFilter === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setTierFilter(item.id)}
+                        style={{
+                          borderRadius: 999,
+                          padding: "6px 14px",
+                          border: active
+                            ? "1px solid rgba(15,23,42,0.2)"
+                            : "1px solid rgba(241,245,249,0.3)",
+                          background: active
+                            ? "#f9fafb"
+                            : "rgba(15,23,42,0.35)",
+                          color: active ? "#020617" : "#e5e7eb",
+                          fontSize: "0.75rem",
+                          fontWeight: active ? 600 : 500,
+                          cursor: "pointer",
+                          boxShadow: active
+                            ? "0 6px 18px rgba(15,23,42,0.4)"
+                            : "none",
+                          transition: "all 0.15s ease-out",
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Difficulty filter row */}
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    fontSize: "0.78rem",
+                  }}
+                >
+                  {(
+                    [
+                      { id: "all", label: "All levels" },
+                      { id: "Easy", label: "Easy focus" },
+                      { id: "Medium", label: "Medium focus" },
+                      { id: "Hard", label: "Hard focus" },
+                    ] as { id: DifficultyFilter; label: string }[]
+                  ).map((item) => {
+                    const active = difficultyFilter === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setDifficultyFilter(item.id)}
+                        style={{
+                          borderRadius: 999,
+                          padding: "5px 11px",
+                          border: active
+                            ? "1px solid rgba(248,250,252,0.9)"
+                            : "1px solid rgba(248,250,252,0.35)",
+                          background: active
+                            ? "rgba(248,250,252,0.95)"
+                            : "transparent",
+                          color: active ? "#020617" : "#e5e7eb",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease-out",
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Clear all filters inline action */}
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: "0.78rem",
+                    color: "#e5e7eb",
+                  }}
+                >
+                  <button
+                    onClick={handleClearAllFilters}
+                    style={{
+                      borderRadius: 999,
+                      padding: "4px 10px",
+                      border: "1px dashed rgba(248,250,252,0.7)",
+                      background: "rgba(15,23,42,0.25)",
+                      color: "#e5e7eb",
+                      cursor: "pointer",
+                      fontSize: "0.78rem",
+                    }}
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Subject + stream toggles + basket summary */}
@@ -1083,8 +1127,8 @@ const HighlyProbableQuestions: React.FC = () => {
               })}
             </div>
 
-            {/* Stream filter – only for Science */}
-            {subjectKey === "Science" && (
+            {/* Stream filter - only for Science (advanced mode) */}
+            {subjectKey === "Science" && showAdvancedFilters && (
               <div
                 style={{
                   marginTop: 10,
@@ -1170,7 +1214,7 @@ const HighlyProbableQuestions: React.FC = () => {
               <div>
                 Mock basket:{" "}
                 <strong>
-                  {basket.length} Q • {totalBasketMarks} marks
+                  {basket.length} Q - {totalBasketMarks} marks
                 </strong>
               </div>
               <button
@@ -1187,7 +1231,7 @@ const HighlyProbableQuestions: React.FC = () => {
                   cursor: "pointer",
                 }}
               >
-                📄 Open mock builder
+                Open mock builder
               </button>
             </div>
           </div>
@@ -1213,7 +1257,7 @@ const HighlyProbableQuestions: React.FC = () => {
                   marginBottom: 4,
                 }}
               >
-                Class {grade} {subjectKey} — Highly Probable Questions
+                Class {grade} {subjectKey} - Highly Probable Questions
               </h2>
               <p
                 style={{
@@ -1223,10 +1267,10 @@ const HighlyProbableQuestions: React.FC = () => {
               >
                 Each card = one chapter. Inside you get a mini{" "}
                 <strong>HPQ stack</strong>: quick MCQs, ARs, short/long,
-                case-based – exactly the pattern that keeps repeating in boards.
+                case-based - exactly the pattern that keeps repeating in boards.
               </p>
 
-              {/* 🔹 NEW: mirrored mini stats snippet (TopicHub-style) */}
+              {/* NEW: mirrored mini stats snippet (TopicHub-style) */}
               {chapterMetaForStats &&
                 totalAttemptsForStats > 0 && (
                   <div
@@ -1252,10 +1296,10 @@ const HighlyProbableQuestions: React.FC = () => {
                       Your {chapterMetaForStats.name} stats:
                     </span>
 
-                    <span>📚 {totalAttemptsForStats} Q attempted</span>
+                    <span>{totalAttemptsForStats} Q attempted</span>
 
                     {typeof accuracyPercentForStats === "number" && (
-                      <span>🎯 {accuracyPercentForStats}% correct</span>
+                      <span>{accuracyPercentForStats}% correct</span>
                     )}
 
                     {typeof matchScoreForStats === "number" &&
@@ -1461,7 +1505,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             }}
                             aria-label={expanded ? "Collapse chapter" : "Expand chapter"}
                           >
-                            {expanded ? "▾ Hide stack" : "▸ Show stack"}
+                            {expanded ? "Hide stack" : "Show stack"}
                           </button>
                           {isScience && streamLabel && (
                             <span
@@ -1486,7 +1530,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             marginBottom: 4,
                           }}
                         >
-                          {tMeta.blurb} • This stack has{" "}
+                          {tMeta.blurb} - This stack has{" "}
                           <strong>{totalQuestions} Q</strong> (~
                           {totalMarks} marks) in board-style formats
                           (MCQs/AR/short/case-based).
@@ -1515,7 +1559,7 @@ const HighlyProbableQuestions: React.FC = () => {
                               cursor: "pointer",
                             }}
                           >
-                            Add full stack to mock 🧺
+                            Add full stack to mock
                           </button>
 
                           <button
@@ -1534,7 +1578,7 @@ const HighlyProbableQuestions: React.FC = () => {
                               cursor: "pointer",
                             }}
                           >
-                            Revise full topic in TopicHub →
+                            Revise full topic in TopicHub
                           </button>
                         </div>
 
@@ -1610,7 +1654,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             }}
                           >
                             {/*
-                              Assertion–Reason items often store the real prompt
+                              Assertion-Reason items often store the real prompt
                               inside `assertion` + `reason`. If we only render
                               `q.question`, the card looks empty/incomplete.
                             */}
@@ -1619,7 +1663,7 @@ const HighlyProbableQuestions: React.FC = () => {
                             (q as any).type === "AssertionReason" ? (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                 <div style={{ fontWeight: 600 }}>
-                                  {q.question || "Assertion–Reason: refer to assertion and reason below."}
+                                  {q.question || "Assertion-Reason: refer to assertion and reason below."}
                                 </div>
                                 {q.assertion && (
                                   <div>
@@ -1750,7 +1794,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                ✅ I got this right
+                                I got this right
                               </button>
                               <button
                                 type="button"
@@ -1776,7 +1820,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                🧩 I need more practice
+                                I need more practice
                               </button>
                             </div>
 
@@ -1801,7 +1845,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                🧠 Solve
+                                Solve
                               </button>
                               <button
                                 onClick={() => handleExplainAiMentor(bucket, q)}
@@ -1815,7 +1859,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                🧑‍🏫 Explain
+                                Explain
                               </button>
                               <button
                                 onClick={() => handleGenerateAiVariants(bucket, q)}
@@ -1829,7 +1873,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                🌀 AI variants
+                                AI variants
                               </button>
                               <button
                                 onClick={() => handleMoreLikeThisPractice(bucket, q)}
@@ -1843,7 +1887,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   cursor: "pointer",
                                 }}
                               >
-                                📚 Bank practice
+                                Bank practice
                               </button>
                               <button
                                 onClick={() => {
@@ -1867,7 +1911,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                   opacity: isInBasket(q.id) ? 0.95 : 1,
                                 }}
                               >
-                                {isInBasket(q.id) ? "✅ Added to mock" : "➕ Add to mock"}
+                                {isInBasket(q.id) ? "Added to mock" : "Add to mock"}
                               </button>
 
                               {/* AI variant display: loading, error and generated variants */}
@@ -1879,7 +1923,7 @@ const HighlyProbableQuestions: React.FC = () => {
                                     color: "#1d4ed8",
                                   }}
                                 >
-                                  Generating AI variants…
+                                  Generating AI variants...
                                 </div>
                               )}
                               {aiError[q.id] && (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useVibeMode } from "../context/vibeModeContext";
+import { trackUxEvent } from "../services/uxTelemetry";
 
 type LocationState = { from?: string };
 
@@ -60,6 +61,7 @@ export default function Login() {
   const handleGoogle = async () => {
     setBusy(true);
     setError("");
+    trackUxEvent("login_google_click", "login", { nextPath });
     try {
       await signInWithGoogle();
     } catch (err) {
@@ -77,15 +79,19 @@ export default function Login() {
     }
     setBusy(true);
     setError("");
+    trackUxEvent("login_phone_send_otp", "login", { phone: normalized, recaptchaStatus: phoneRecaptchaStatus });
     try {
       await sendPhoneOtp(normalized, "firebase-recaptcha-container");
       setOtpSent(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to send OTP.";
+      trackUxEvent("login_phone_error", "login", { stage: "send_otp", message });
       if (message.includes("auth/invalid-app-credential")) {
         setError(
-          "Phone verification failed: invalid app credential. Please solve reCAPTCHA fully and retry. If this persists, use Email login and we will keep phone as fallback."
+          "Phone verification failed due to reCAPTCHA/app credential validation. Complete reCAPTCHA, then retry. If it still fails, continue with Email (Google)."
         );
+      } else if (message.includes("auth/too-many-requests")) {
+        setError("Too many attempts. Wait a few minutes, then retry or use Email (Google).");
       } else {
         setError(message);
       }
@@ -107,6 +113,7 @@ export default function Login() {
     }
     setBusy(true);
     setError("");
+    trackUxEvent("login_phone_verify_otp", "login", { otpLength: otp.trim().length });
     try {
       await verifyPhoneOtp(otp.trim());
     } catch (err) {
@@ -154,58 +161,64 @@ export default function Login() {
         {firebaseReady ? (
           <>
             <button className="cta-btn" onClick={handleGoogle} disabled={busy} data-testid="login-email-google">
-              Continue with Email (Google)
+              Continue with Email (Google) - Recommended
             </button>
 
-            <div style={{ marginTop: 14 }}>
-              <label>Phone number (OTP)</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setOtpSent(false);
-                  setOtp("");
-                }}
-                placeholder="+91XXXXXXXXXX"
-              />
-              <p className="subtitle" style={{ marginTop: 6, marginBottom: 8 }}>
-                Real OTP is sent by Firebase SMS. If you keep test numbers in Firebase, preset OTPs will bypass SMS.
-              </p>
-              <p className="subtitle" style={{ marginTop: 0, marginBottom: 8 }}>
-                Step 1: solve reCAPTCHA below. Step 2: click Send OTP.
-              </p>
-              <p className="subtitle" style={{ marginTop: 0, marginBottom: 8 }}>
-                reCAPTCHA status: <strong>{phoneRecaptchaStatus}</strong>
-              </p>
-              <label style={{ display: "inline-flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <details style={{ marginTop: 14 }}>
+              <summary style={{ cursor: "pointer", fontWeight: 800 }}>
+                Use Phone OTP (advanced)
+              </summary>
+              <div style={{ marginTop: 10 }}>
+                <label>Phone number (OTP)</label>
                 <input
-                  type="checkbox"
-                  checked={realOtpOnly}
-                  onChange={(e) => setRealOtpOnly(e.target.checked)}
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setOtpSent(false);
+                    setOtp("");
+                  }}
+                  placeholder="+91XXXXXXXXXX"
                 />
-                Require real SMS OTP (recommended)
-              </label>
-              {!otpSent ? (
-                <button className="pill-btn" onClick={handleSendOtp} disabled={busy || phoneRecaptchaStatus === "idle"}>
-                  Send OTP
-                </button>
-              ) : (
-                <>
-                  <label style={{ marginTop: 8 }}>OTP</label>
+                <p className="subtitle" style={{ marginTop: 6, marginBottom: 8 }}>
+                  Step 1: solve reCAPTCHA. Step 2: click Send OTP. Step 3: enter OTP.
+                </p>
+                <p className="subtitle" style={{ marginTop: 0, marginBottom: 8 }}>
+                  reCAPTCHA status: <strong>{phoneRecaptchaStatus}</strong>
+                </p>
+                <label style={{ display: "inline-flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
                   <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="6-digit OTP"
+                    type="checkbox"
+                    checked={realOtpOnly}
+                    onChange={(e) => setRealOtpOnly(e.target.checked)}
                   />
-                  <button className="pill-btn" onClick={handleVerifyOtp} disabled={busy}>
-                    Verify OTP
+                  Require real SMS OTP
+                </label>
+                {!otpSent ? (
+                  <button
+                    className="pill-btn"
+                    onClick={handleSendOtp}
+                    disabled={busy || phoneRecaptchaStatus === "idle" || phoneRecaptchaStatus === "error"}
+                  >
+                    Send OTP
                   </button>
-                </>
-              )}
-              <div id="firebase-recaptcha-container" style={{ marginTop: 10 }} />
-            </div>
+                ) : (
+                  <>
+                    <label style={{ marginTop: 8 }}>OTP</label>
+                    <input
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="6-digit OTP"
+                    />
+                    <button className="pill-btn" onClick={handleVerifyOtp} disabled={busy}>
+                      Verify OTP
+                    </button>
+                  </>
+                )}
+                <div id="firebase-recaptcha-container" style={{ marginTop: 10 }} />
+              </div>
+            </details>
           </>
         ) : (
           <>

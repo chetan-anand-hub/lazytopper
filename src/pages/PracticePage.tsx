@@ -1,7 +1,7 @@
-﻿// src/pages/PracticePage.tsx
+// src/pages/PracticePage.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 
 import { type PracticeQuestion } from "../data/predictionDataService";
 import { generatePracticeSet, inferBoardPatternFromQuestion, normalizeBoardPattern } from "../data/practiceSetGenerator";
@@ -10,6 +10,9 @@ import { resolveTopicKey as resolveCanonicalTopicKey, toPracticePackKey } from "
 import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
 import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
+import JourneyStrip from "../components/ux/JourneyStrip";
+import ReturnContextBar from "../components/ux/ReturnContextBar";
+import { trackUxEvent } from "../services/uxTelemetry";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
@@ -136,7 +139,7 @@ function resolvePracticePackKey(args: {
     | Record<string, any>
     | undefined;
 
-  // ✅ If caller already passes an underscore pack key, honour it (back-compat)
+  // If caller already passes an underscore pack key, honor it (back-compat)
   if (args.explicitTopicKey) {
     const explicitPackKey = normaliseKey(args.explicitTopicKey);
     if (packsForSubject?.[explicitPackKey]) return explicitPackKey;
@@ -240,7 +243,7 @@ async function buildPracticeQuestionsWithAiTopup(
 
   const bankQuestions = engineQuestions.length > 0 ? engineQuestions : packQuestions;
 
-// If a Board section filter (A–E) is active, apply it BEFORE slicing and before AI top-up,
+// If a Board section filter (A-E) is active, apply it BEFORE slicing and before AI top-up,
 // so we can still return the requested count after filtering.
 const desiredSection = normalizeBoardPattern(args.sectionFilter);
 const bankQuestionsFiltered = desiredSection
@@ -333,8 +336,8 @@ function normaliseQuestionText(s: string | undefined | null): string {
   const text = String(s || "");
   return text
     .replace(/\s+/g, " ")
-    .replace(/[”]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/[\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
     .trim();
 }
 
@@ -368,7 +371,6 @@ function normaliseQuestionText(s: string | undefined | null): string {
 }
 
 const PracticePage: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const params = useParams<{ grade?: string; subject?: string }>();
 
@@ -597,13 +599,30 @@ const packTopicKey = useMemo(() => {
     }));
   };
 
-  const handleBack = () => {
-    if (back) {
-      navigate(back);
-    } else {
-      navigate(`/trends/${grade}/${subjectKey}`);
-    }
-  };
+  const openMentorForQuestion = useCallback(
+    (
+      q: PracticeQuestion,
+      idx: number,
+      solveStyle: "socratic" | "board",
+      trigger?: EventTarget | null
+    ) => {
+      setMentorSeedExample({
+        title: `Q${idx + 1}`,
+        question: String(q.questionText || ""),
+        marks: Number((q as any).marks) || undefined,
+        section: String((q as any).section || ""),
+      });
+      setMentorSolveStyle(solveStyle);
+      setMentorDrawerOpen(true);
+      if (trigger instanceof HTMLElement) {
+        const detailsEl = trigger.closest("details");
+        if (detailsEl instanceof HTMLDetailsElement) {
+          detailsEl.open = false;
+        }
+      }
+    },
+    []
+  );
 
   const title = useMemo(() => {
     if (!topicParam || topicParam === "Generic") {
@@ -628,25 +647,16 @@ const packTopicKey = useMemo(() => {
           padding: "16px 16px 32px",
         }}
       >
-        {/* Back link */}
-        <button
-          type="button"
-          onClick={handleBack}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#4b5563",
-            fontSize: "0.85rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 10,
-            cursor: "pointer",
-          }}
-        >
-          <span>←</span>
-          <span>{backLabel}</span>
-        </button>
+        <ReturnContextBar
+          backTo={back || `/trends/${grade}/${subjectKey}`}
+          backLabel={backLabel}
+          quickLinks={[
+            { label: "Trends", to: `/trends/${grade}/${subjectKey}` },
+            { label: "TopicHub", to: `/topic-hub/${grade}/${subjectKey}${topicParam && topicParam !== "Generic" ? `/${encodeURIComponent(topicParam)}` : ""}` },
+            { label: "HPQ", to: `/highly-probable/${grade}/${subjectKey}${topicParam && topicParam !== "Generic" ? `?topic=${encodeURIComponent(topicParam)}` : ""}` },
+          ]}
+        />
+        <JourneyStrip current="practice" grade={grade} subject={subjectKey} topic={topicParam !== "Generic" ? topicParam : undefined} />
 
         {/* Hero */}
         <section
@@ -669,7 +679,7 @@ const packTopicKey = useMemo(() => {
               marginBottom: 6,
             }}
           >
-            Class {grade} · {subjectKey} · Practice
+            Class {grade} - {subjectKey} - Practice
           </div>
           <h1
             style={{
@@ -692,8 +702,7 @@ const packTopicKey = useMemo(() => {
             Auto-generated{" "}
             <strong>{questionCount}</strong> questions from your trends engine
             for this topic. Try them like a mini drill: solve on paper first,
-            then tap <strong>"Show solution"</strong> or{" "}
-            <strong>"Solve With Me"</strong> / <strong>"Board Steps"</strong> to reveal help.
+            then tap <strong>"Show solution"</strong> or <strong>"Get help"</strong> to open mentor modes.
           </p>
         </section>
 
@@ -825,7 +834,15 @@ const packTopicKey = useMemo(() => {
             </label>
             <button
               type="button"
-              onClick={regenerateQuestions}
+              onClick={() => {
+                trackUxEvent("practice_regenerate_click", "practice", {
+                  action: "regenerate_set",
+                  topic: topicParam,
+                  subject: subjectKey,
+                  questionCount,
+                });
+                regenerateQuestions();
+              }}
               style={{
                 borderRadius: 999,
                 padding: "5px 12px",
@@ -839,8 +856,7 @@ const packTopicKey = useMemo(() => {
                 gap: 6,
               }}
             >
-              <span>ðŸ”</span>
-              <span>Regenerate set</span>
+              Regenerate set
             </button>
             <button
               type="button"
@@ -983,8 +999,8 @@ const packTopicKey = useMemo(() => {
                             {idx + 1}
                           </span>
                           <span>
-                            {q.marks} mark{q.marks !== 1 ? "s" : ""} ·{" "}
-                            {q.difficulty} · {q.section}
+                            {q.marks} mark{q.marks !== 1 ? "s" : ""} -{" "}
+                            {q.difficulty} - {q.section}
                           </span>
                         </div>
                       </div>
@@ -1051,90 +1067,91 @@ const packTopicKey = useMemo(() => {
                           gap: 6,
                         }}
                       >
-                        <span role="img" aria-label="Show solution">
-                          ðŸ‘€
-                        </span>
                         <span>{isOpen ? "Hide solution" : "Show solution"}</span>
                       </button>
                     </div>
 
-                    
-{/* Mentor actions row (replaces old Ask Mentor buttons) */}
-<div
-  style={{
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  }}
->
-  <button
-    type="button"
-    onClick={() => {
-      setMentorSeedExample({
-        title: `Q${idx + 1}`,
-        question: String(q.questionText || ""),
-        marks: Number((q as any).marks) || undefined,
-        section: String((q as any).section || ""),
-      });
-      setMentorSolveStyle("socratic");
-      setMentorDrawerOpen(true);
-    }}
-    style={{
-      borderRadius: 999,
-      padding: "5px 12px",
-      border: "1px solid rgba(34,197,94,0.65)",
-      backgroundColor: "rgba(240,253,244,0.92)",
-      fontSize: "0.78rem",
-      color: "#166534",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      fontWeight: 900,
-    }}
-    title="Solve With Me (mentor asks 1 question at a time)"
-  >
-    <span role="img" aria-label="Solve with me">
-      Hint
-    </span>
-    <span>Solve With Me</span>
-  </button>
-
-  <button
-    type="button"
-    onClick={() => {
-      setMentorSeedExample({
-        title: `Q${idx + 1}`,
-        question: String(q.questionText || ""),
-        marks: Number((q as any).marks) || undefined,
-        section: String((q as any).section || ""),
-      });
-      setMentorSolveStyle("board");
-      setMentorDrawerOpen(true);
-    }}
-    style={{
-      borderRadius: 999,
-      padding: "5px 12px",
-      border: "1px solid rgba(99,102,241,0.55)",
-      backgroundColor: "rgba(238,242,255,0.92)",
-      fontSize: "0.78rem",
-      color: "#3730a3",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      fontWeight: 900,
-    }}
-    title="Board Steps + Marking Scheme"
-  >
-    <span role="img" aria-label="Board steps">
-      🧾
-    </span>
-    <span>Board Steps</span>
-  </button>
-</div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <details>
+                        <summary
+                          style={{
+                            borderRadius: 999,
+                            padding: "5px 12px",
+                            border: "1px solid rgba(34,197,94,0.65)",
+                            backgroundColor: "rgba(240,253,244,0.92)",
+                            fontSize: "0.78rem",
+                            color: "#166534",
+                            cursor: "pointer",
+                            listStyle: "none",
+                            fontWeight: 900,
+                          }}
+                        >
+                          Mentor help
+                        </summary>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: "grid",
+                            gap: 6,
+                            minWidth: 180,
+                            padding: 8,
+                            borderRadius: 12,
+                            border: "1px solid rgba(148,163,184,0.45)",
+                            background: "rgba(255,255,255,0.98)",
+                            boxShadow: "0 10px 26px rgba(15,23,42,0.16)",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(event) =>
+                              openMentorForQuestion(q, idx, "socratic", event.currentTarget)
+                            }
+                            style={{
+                              borderRadius: 10,
+                              padding: "6px 10px",
+                              border: "1px solid rgba(34,197,94,0.65)",
+                              backgroundColor: "rgba(240,253,244,0.92)",
+                              fontSize: "0.76rem",
+                              color: "#166534",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontWeight: 800,
+                            }}
+                            title="Solve With Me (mentor asks 1 question at a time)"
+                          >
+                            Solve With Me
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) =>
+                              openMentorForQuestion(q, idx, "board", event.currentTarget)
+                            }
+                            style={{
+                              borderRadius: 10,
+                              padding: "6px 10px",
+                              border: "1px solid rgba(99,102,241,0.55)",
+                              backgroundColor: "rgba(238,242,255,0.92)",
+                              fontSize: "0.76rem",
+                              color: "#3730a3",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              fontWeight: 800,
+                            }}
+                            title="Board Steps + Marking Scheme"
+                          >
+                            Board Steps
+                          </button>
+                        </div>
+                      </details>
+                    </div>
 </article>
                 );
               })}
@@ -1223,25 +1240,25 @@ function MentorSolveDrawer(props: {
       const total = Number(obj.totalMarks) || undefined;
       const steps = Array.isArray(obj.steps) ? obj.steps : [];
       const lines: string[] = [];
-      lines.push(`🧾 Board Steps + Marking Scheme${total ? ` (Total: ${total} marks)` : ""}`);
+      lines.push(`Board Steps + Marking Scheme${total ? ` (Total: ${total} marks)` : ""}`);
       steps.forEach((s: any, idx: number) => {
         const m = s && s.marks != null ? Number(s.marks) : 0;
         const text = s && s.text ? String(s.text) : "";
         lines.push("");
         lines.push(`${idx + 1}) [${m}] ${text}`);
-        if (s?.whyThisGetsMarks) lines.push(`   • Why: ${String(s.whyThisGetsMarks)}`);
-        if (s?.commonMistake) lines.push(`   • Common mistake: ${String(s.commonMistake)}`);
+        if (s?.whyThisGetsMarks) lines.push(`   - Why: ${String(s.whyThisGetsMarks)}`);
+        if (s?.commonMistake) lines.push(`   - Common mistake: ${String(s.commonMistake)}`);
       });
       if (obj.finalAnswer) {
         lines.push("");
-        lines.push(`✅ Final Answer: ${String(obj.finalAnswer)}`);
+        lines.push(`Final Answer: ${String(obj.finalAnswer)}`);
       }
       return lines.join("\n");
     }
 
     const lines: string[] = [];
-    if (obj.kind === "hint") lines.push("💡 Hint:");
-    if (obj.kind === "final") lines.push("✅ Final:");
+    if (obj.kind === "hint") lines.push("Hint:");
+    if (obj.kind === "final") lines.push("Final:");
     lines.push(String(obj.tutor || ""));
     if (obj.mcq && typeof obj.mcq === "object") {
       const opts = ["A", "B", "C", "D"]
@@ -1409,7 +1426,7 @@ function MentorSolveDrawer(props: {
           }}
         >
           <div style={{ fontWeight: 950, fontSize: 14 }}>
-            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} · {seed.title}
+            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} - {seed.title}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
@@ -1461,7 +1478,7 @@ function MentorSolveDrawer(props: {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <div style={{ fontWeight: 950 }}>
-                    🧾 CBSE Board Steps (Offline) · {subjectKey} · Section {section}
+                    CBSE Board Steps (Offline) - {subjectKey} - Section {section}
                   </div>
                   <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.8 }}>
                     {tpl.marksTotal} marks template
@@ -1471,7 +1488,7 @@ function MentorSolveDrawer(props: {
                 {Array.isArray(tpl.notes) && tpl.notes.length > 0 && (
                   <div style={{ fontSize: 13, marginBottom: 8, opacity: 0.9 }}>
                     {tpl.notes.map((n: string, i: number) => (
-                      <div key={i}>• {n}</div>
+                      <div key={i}>- {n}</div>
                     ))}
                   </div>
                 )}
@@ -1513,7 +1530,7 @@ function MentorSolveDrawer(props: {
                 </div>
 
                 <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                  Tip: You can still hit “Reset” to ask the mentor for a question-specific marking breakdown.
+                  Tip: You can still hit "Reset" to ask the mentor for a question-specific marking breakdown.
                 </div>
               </div>
             );

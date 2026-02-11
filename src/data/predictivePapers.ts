@@ -14,7 +14,7 @@ export interface PredictivePaper {
   vibe: string;
   tagline: string;
   markTotal: number;
-  subject: SubjectKey; // ðŸ‘ˆ NEW
+  subject: SubjectKey; // NEW
   // Total marks per section (now includes E)
   sectionMarks: Record<SectionKey, number>;
   // List of PredictedQuestion.id values that belong to this paper.

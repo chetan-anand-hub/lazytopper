@@ -373,9 +373,9 @@ export default function Dashboard() {
       <h2 className="title">Your Personal Dashboard</h2>
 
       <div className="card" data-ux-priority-block="dashboard-next-best-actions" data-testid="dashboard-priority-block">
-        <h3>Start Here</h3>
+        <h3>Today - Start Here</h3>
         <p style={{ marginTop: 6, opacity: 0.82 }}>
-          Pick one action and continue your current learning loop.
+          Pick one action and continue your Learn to Practice to Mastery loop.
         </p>
         <div className="focus-cta-row">
           <button
@@ -396,20 +396,21 @@ export default function Dashboard() {
           >
             Practice Weakest Topic
           </button>
-          <button
-            className="cta-btn small"
-            data-ux-above-fold-cta="dashboard"
-            onClick={() =>
-              navigate(
-                `/daily-mix/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(
-                  weakestTopicKey
-                )}`
-              )
-            }
-          >
-            Play Today&apos;s Mix
-          </button>
         </div>
+        {planRecord ? (
+          <p style={{ marginTop: 10, fontSize: "0.85rem", opacity: 0.82 }}>
+            Need a quick daily sprint?{" "}
+            <button
+              type="button"
+              className="pill-btn"
+              onClick={() =>
+                navigate(`/daily-mix/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(weakestTopicKey)}`)
+              }
+            >
+              Play Today&apos;s Mix
+            </button>
+          </p>
+        ) : null}
       </div>
 
       <div className="card">
@@ -553,16 +554,17 @@ export default function Dashboard() {
             >
               Play {mixTitle}
             </button>
-            <button className="cta-btn small" onClick={() => navigate(`/daily-mix/${gradeNum}/${planRecord.subject}?topic=${encodeURIComponent(weakestTopicKey)}`)}>
-              Play Mix
-            </button>
             <button className="cta-btn small" onClick={() => navigate(`/topic-hub/${gradeNum}/${planRecord.subject}`)}>
               Open TopicHub
             </button>
-            <button className="cta-btn small" onClick={() => navigate(`/weekly-wrapped`)}>
+          </div>
+          <p style={{ marginTop: 10, fontSize: "0.84rem", opacity: 0.82 }}>
+            Review long-term momentum in{" "}
+            <button type="button" className="pill-btn" onClick={() => navigate(`/weekly-wrapped`)}>
               Weekly Wrapped
             </button>
-          </div>
+            .
+          </p>
         </div>
       ) : null}
 

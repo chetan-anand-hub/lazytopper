@@ -7198,3 +7198,96 @@ select:focus {
 .mix-list{margin:10px 0 0 18px;padding:0}
 .focus-cta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .cta-btn.small{padding:8px 10px;font-size:.9rem;border-radius:999px}
+
+/* --- Shared UX strips (P2 + P3) --- */
+.ux-return-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ux-return-bar__back {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  background: rgba(255, 255, 255, 0.9);
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.ux-return-bar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ux-return-bar__chip {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(255, 255, 255, 0.82);
+  color: #475569;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.ux-return-bar__back:focus-visible,
+.ux-return-bar__chip:focus-visible,
+.ux-journey-strip__chip:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.ux-journey-strip {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.75);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.ux-journey-strip__title {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 900;
+}
+.ux-journey-strip__row {
+  margin-top: 7px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ux-journey-strip__chip {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.75);
+  background: rgba(255, 255, 255, 0.9);
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.ux-journey-strip__chip[data-active="true"] {
+  border-color: rgba(15, 23, 42, 0.9);
+  background: rgba(15, 23, 42, 0.9);
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .ux-return-bar__back {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+  .ux-return-bar__chip,
+  .ux-journey-strip__chip {
+    padding: 7px 11px;
+    font-size: 0.76rem;
+  }
+  .ux-journey-strip {
+    position: sticky;
+    top: 54px;
+    z-index: 8;
+    backdrop-filter: blur(6px);
+  }
+}

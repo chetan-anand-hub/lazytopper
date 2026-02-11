@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { topicHubV2Content } from "../data/topicHubV2Full";
@@ -26,6 +26,16 @@ type LastTopicHubRoute = {
 };
 
 const TOPICHUB_LAST_ROUTE_KEY = "lazytopper.topicHub.lastRoute.v1";
+const TOPICHUB_RECENT_TOPICS_KEY = "lazytopper.topicHub.recentTopics.v1";
+
+type RecentTopicRecord = {
+  grade: string;
+  subject: SubjectTitle;
+  topicKey: string;
+  topicName?: string;
+  path: string;
+  updatedAt: string;
+};
 
 function toSubjectTitle(raw: unknown): SubjectTitle {
   return String(raw || "").toLowerCase().includes("science") ? "Science" : "Maths";
@@ -102,6 +112,21 @@ function formatUpdatedAt(value: string): string {
   }
 }
 
+function readRecentTopics(subject: SubjectTitle): RecentTopicRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(TOPICHUB_RECENT_TOPICS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as RecentTopicRecord[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && item.subject === subject && item.topicKey && item.path)
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 export default function TopicHubHome() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
@@ -116,8 +141,13 @@ export default function TopicHubHome() {
     toSubjectTitle(sp.get("subject") || lastRoute?.subject || "Maths")
   );
   const [query, setQuery] = useState<string>("");
+  const [recentTopics, setRecentTopics] = useState<RecentTopicRecord[]>([]);
 
   const topicOptions = useMemo(() => buildTopicOptions(subject), [subject]);
+
+  useEffect(() => {
+    setRecentTopics(readRecentTopics(subject));
+  }, [subject]);
 
   const [selectedTopicKeyRaw, setSelectedTopicKeyRaw] = useState<string>(() => {
     const rawQueryTopic = String(sp.get("topic") || "").trim();
@@ -296,6 +326,33 @@ export default function TopicHubHome() {
           </div>
         ) : null}
 
+        {recentTopics.length > 0 ? (
+          <div
+            style={{
+              borderRadius: 18,
+              border: "1px solid rgba(15,23,42,0.09)",
+              background: "rgba(255,255,255,0.86)",
+              padding: 14,
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Recent topics</div>
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {recentTopics.map((topic) => (
+                <button
+                  key={`${topic.grade}:${topic.subject}:${topic.topicKey}`}
+                  type="button"
+                  className="pill"
+                  style={{ padding: "7px 10px", fontSize: 13 }}
+                  onClick={() => navigate(topic.path)}
+                >
+                  {topic.topicName || topic.topicKey}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div
           style={{
             borderRadius: 18,
@@ -461,7 +518,7 @@ export default function TopicHubHome() {
               data-ux-above-fold-cta="topichub"
               onClick={() => navigate(`/trends/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}`)}
             >
-              Open Trends
+              See trends (optional)
             </button>
           </div>
         </div>

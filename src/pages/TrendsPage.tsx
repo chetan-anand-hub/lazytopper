@@ -1,6 +1,6 @@
 // src/pages/TrendsPage.tsx
 import React, { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterMeta } from "../engine/smartLearningTypes";
 import {
@@ -22,6 +22,9 @@ import {
   buildAiMentorUrl,
 } from "../utils/buildUrl";
 import { normalizeTopicKey } from "../utils/topicResolver";
+import JourneyStrip from "../components/ux/JourneyStrip";
+import ReturnContextBar from "../components/ux/ReturnContextBar";
+import { trackUxEvent } from "../services/uxTelemetry";
 
 // --- Local types -------------------------------------------------
 
@@ -56,17 +59,17 @@ const tierMeta: Record<
 > = {
   "must-crack": {
     label: "Must-crack",
-    emoji: "🔥",
-    blurb: "Appears almost every year – do these first.",
+    emoji: "",
+    blurb: "Appears almost every year - do these first.",
   },
   "high-roi": {
     label: "High-ROI",
-    emoji: "💎",
-    blurb: "Great marks for the time spent – do after must-crack.",
+    emoji: "",
+    blurb: "Great marks for the time spent - do after must-crack.",
   },
   "good-to-do": {
     label: "Good-to-do",
-    emoji: "🌈",
+    emoji: "",
     blurb: "Safety net + confidence once core topics are done.",
   },
 };
@@ -143,7 +146,7 @@ function normaliseScienceDataset(
       {
         tier: topic.tier,
         weightagePercent: topic.weightagePercent,
-        // For now, take the first concept’s tips as a short summary
+        // For now, take the first concept's tips as a short summary
         summary: topic.concepts[0]?.summary_and_exam_tips,
         conceptWeightage,
         stream,
@@ -176,6 +179,7 @@ function getStream(meta: TopicMeta): StreamKey {
 
 const TrendsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { getMatchScoreForChapter } = useSmartLearning();
 
   const params = useParams<"grade" | "subject">();
@@ -184,6 +188,9 @@ const TrendsPage: React.FC = () => {
 
   // Capture the current URL for back-navigation
   const currentURL = useCurrentURL();
+  const navState = (location.state as { back?: string; backLabel?: string } | null) || null;
+  const backTo = String(navState?.back || "/");
+  const backLabel = String(navState?.backLabel || "Back to home");
 
   const [activeTier, setActiveTier] = useState<TierFilter>("all");
   const [activeStream, setActiveStream] = useState<StreamKey>("all");
@@ -226,10 +233,6 @@ const TrendsPage: React.FC = () => {
     return values.length ? Math.max(...values) : 14;
   }, [topicEntries]);
 
-  const handleBackToHome = () => {
-    navigate("/");
-  };
-
   const handleSubjectToggle = (next: SubjectKey) => {
     navigate(`/trends/${grade}/${next}`);
   };
@@ -243,6 +246,7 @@ const TrendsPage: React.FC = () => {
 
   // UPDATED navigation handlers to use build functions and back-state
   const handleSampleQuestion = (topicName: string) => {
+    trackUxEvent("trends_topic_more_click", "trends", { action: "hpq", topicName, subject: subjectKey });
     navigate(
       buildHPQUrl(grade, subjectKey, { topic: topicName }),
       {
@@ -268,6 +272,7 @@ const TrendsPage: React.FC = () => {
 
 
   const handleQuickTopicMock = (topicName: string) => {
+    trackUxEvent("trends_topic_more_click", "trends", { action: "mock", topicName, subject: subjectKey });
     navigate(
       buildMockBuilderUrl(grade, subjectKey, {
         from: "trends-topic",
@@ -283,6 +288,7 @@ const TrendsPage: React.FC = () => {
   };
 
   const handlePracticeFromTopic = (topicName: string) => {
+    trackUxEvent("trends_topic_practice_click", "trends", { topicName, subject: subjectKey });
     const url = `/practice/${grade}/${subjectKey}?topic=${encodeURIComponent(topicName)}`;
     navigate(url, {
       state: {
@@ -292,22 +298,18 @@ const TrendsPage: React.FC = () => {
     });
   };
 
-  /**
-   * Ask the mentor to explain an entire topic.  Navigates to the AI mentor
-   * page with `topic_explain` mode.  The topic name is passed as both
-   * `topic` and `topicKey` for basic routing; backend will map the human name
-   * to its internal key if needed.
-   */
   const handleExplainTopic = (topicName: string) => {
-    navigate(buildAiMentorUrl(grade, subjectKey), {
+    trackUxEvent("trends_topic_teach_click", "trends", { topicName, subject: subjectKey });
+    const topicHubUrl = buildTopicHubUrl(grade, subjectKey, topicName);
+    const [pathOnly, query = ""] = topicHubUrl.split("?");
+    const params = new URLSearchParams(query);
+    params.set("tab", "learn");
+    params.set("teach", "1");
+    params.set("teachSource", "trends_explain");
+    navigate(`${pathOnly}?${params.toString()}`, {
       state: {
         back: currentURL,
         backLabel: "Back to trends",
-        payload: {
-          topic: topicName,
-          topicKey: topicName,
-        },
-        mode: "topic_explain",
       },
     });
   };
@@ -317,6 +319,7 @@ const TrendsPage: React.FC = () => {
    * navigates to the AI mentor page using the `topic_exam_tips` mode.
    */
   const handleExamTips = (topicName: string) => {
+    trackUxEvent("trends_topic_more_click", "trends", { action: "exam_tips", topicName, subject: subjectKey });
     navigate(buildAiMentorUrl(grade, subjectKey), {
       state: {
         back: currentURL,
@@ -355,6 +358,16 @@ const TrendsPage: React.FC = () => {
     );
   };
 
+  const goToMasteryCompanion = () => {
+    const nextTopic =
+      filteredTopicEntries[0]?.[0] || topicEntries[0]?.[0] || "";
+    if (nextTopic) {
+      handleExplainTopic(nextTopic);
+      return;
+    }
+    navigate(buildTopicHubUrl(grade, subjectKey));
+  };
+
   return (
     <div
       style={{
@@ -372,23 +385,16 @@ const TrendsPage: React.FC = () => {
         }}
       >
         {/* Back link */}
-        <button
-          onClick={handleBackToHome}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#4b5563",
-            fontSize: "0.85rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer",
-            marginBottom: 12,
-          }}
-        >
-          <span style={{ fontSize: "1rem" }}>←</span>
-          <span>Back to home</span>
-        </button>
+        <ReturnContextBar
+          backTo={backTo}
+          backLabel={backLabel}
+          quickLinks={[
+            { label: "TopicHub", to: `/topic-hub/${grade}/${subjectKey}` },
+            { label: "Practice", to: `/practice/${grade}/${subjectKey}` },
+            { label: "HPQ", to: `/highly-probable/${grade}/${subjectKey}` },
+          ]}
+        />
+        <JourneyStrip current="trends" grade={grade} subject={subjectKey} />
 
         {/* Hero card */}
         <section
@@ -416,7 +422,7 @@ const TrendsPage: React.FC = () => {
                 marginBottom: 8,
               }}
             >
-              Class {grade} • {subjectKey} • Exam trends
+              Class {grade} - {subjectKey} - Exam trends
             </div>
             <h1
               style={{
@@ -435,13 +441,13 @@ const TrendsPage: React.FC = () => {
                 opacity: 0.96,
               }}
             >
-              Your <strong>exam-vogue radar</strong> for this subject. See
+              Your exam trend radar for this subject. See
               which chapters are{" "}
               <strong style={{ fontWeight: 700 }}>must-crack</strong>,{" "}
               <strong style={{ fontWeight: 700 }}>high-ROI</strong>, or{" "}
               <strong style={{ fontWeight: 700 }}>good-to-do</strong> based on
-              CBSE board trends. Tap any card to open full concept notes,
-              examples, and board-style tips.
+              CBSE board trends. Open each topic to learn, practice, and revise
+              with a clear next step.
             </p>
 
             {/* Tier filters */}
@@ -455,9 +461,9 @@ const TrendsPage: React.FC = () => {
             >
               {[
                 { id: "all" as const, label: "All tiers" },
-                { id: "must-crack" as const, label: "🔥 Must-crack" },
-                { id: "high-roi" as const, label: "💎 High-ROI" },
-                { id: "good-to-do" as const, label: "🌈 Good-to-do" },
+                { id: "must-crack" as const, label: "Must-crack" },
+                { id: "high-roi" as const, label: "High-ROI" },
+                { id: "good-to-do" as const, label: "Good-to-do" },
               ].map((item) => {
                 const active = activeTier === item.id;
                 return (
@@ -541,7 +547,7 @@ const TrendsPage: React.FC = () => {
               })}
             </div>
 
-            {/* Stream filter – only visible for Science */}
+            {/* Stream filter - only visible for Science */}
             {subjectKey === "Science" && (
               <div
                 style={{
@@ -727,7 +733,7 @@ const TrendsPage: React.FC = () => {
                 "Section A (MCQs / Objective, 1 mark)",
                 "Section B (Very Short Answer, 2 marks)",
                 "Section C (Short Answer, 3 marks)",
-                "Section D (Long Answer, 4–5 marks)",
+                "Section D (Long Answer, 4-5 marks)",
                 "Section E (Case-based, 4 marks)",
               ].map((chip) => (
                 <span
@@ -767,7 +773,7 @@ const TrendsPage: React.FC = () => {
                   marginBottom: 4,
                 }}
               >
-                Class {grade} {subjectKey} — chapter &amp; concept trends
+                Class {grade} {subjectKey} - chapter &amp; concept trends
               </h2>
               <p
                 style={{
@@ -776,9 +782,9 @@ const TrendsPage: React.FC = () => {
                 }}
               >
                 Darker / bolder cards are heavier. Hit the{" "}
-                <span>🔥 must-crack</span> ones first, then the{" "}
-                <span>💎 high-ROI</span> ones. Chill with{" "}
-                <span>🌈 good-to-do</span> once the big boys are done.
+                <span>must-crack</span> ones first, then the{" "}
+                <span>high-ROI</span> ones. Keep{" "}
+                <span>good-to-do</span> once the core chapters are done.
               </p>
             </div>
             <div
@@ -803,7 +809,7 @@ const TrendsPage: React.FC = () => {
                 padding: "8px 4px",
               }}
             >
-              Nothing visible with the current filters. Tap 🔥 / 💎 / 🌈 tier
+              Nothing visible with the current filters. Switch tier
               chips above again to roll the topics back down.
             </p>
           ) : (
@@ -941,57 +947,18 @@ const TrendsPage: React.FC = () => {
                           }}
                         >
                           <button
-                            onClick={() =>
-                              handleSampleQuestion(topicName)
-                            }
+                            onClick={() => handleExplainTopic(topicName)}
                             style={{
                               borderRadius: 999,
                               padding: "5px 11px",
-                              border:
-                                "1px solid rgba(37,99,235,0.4)",
-                              background: "rgba(239,246,255,0.9)",
+                              border: "1px solid rgba(59,130,246,0.6)",
+                              background: "rgba(219,234,254,0.95)",
                               fontSize: "0.75rem",
                               color: "#1d4ed8",
                               cursor: "pointer",
                             }}
                           >
-                            Jump into HPQs →
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              handleGoToTopicHub(topicName)
-                            }
-                            style={{
-                              borderRadius: 999,
-                              padding: "5px 11px",
-                              border:
-                                "1px solid rgba(148,163,184,0.6)",
-                              background: "rgba(248,250,252,0.95)",
-                              fontSize: "0.75rem",
-                              color: "#475569",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Go to topic hub →
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              handleQuickTopicMock(topicName)
-                            }
-                            style={{
-                              borderRadius: 999,
-                              padding: "5px 11px",
-                              border:
-                                "1px solid rgba(34,197,94,0.6)",
-                              background: "rgba(220,252,231,0.95)",
-                              fontSize: "0.75rem",
-                              color: "#15803d",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Mock me from this topic ⚡
+                            Teach this topic
                           </button>
 
                           <button
@@ -1006,40 +973,99 @@ const TrendsPage: React.FC = () => {
                               cursor: "pointer",
                             }}
                           >
-                            Practice from this topic 🎯
+                            Practice this topic
                           </button>
 
-                          {/* Explain topic button */}
-                          <button
-                            onClick={() => handleExplainTopic(topicName)}
-                            style={{
-                              borderRadius: 999,
-                              padding: "5px 11px",
-                              border: "1px solid rgba(59,130,246,0.6)",
-                              background: "rgba(219,234,254,0.95)",
-                              fontSize: "0.75rem",
-                              color: "#1d4ed8",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Explain topic 🧑‍🏫
-                          </button>
-
-                          {/* Score 95+ exam tips button */}
-                          <button
-                            onClick={() => handleExamTips(topicName)}
-                            style={{
-                              borderRadius: 999,
-                              padding: "5px 11px",
-                              border: "1px solid rgba(234,88,12,0.6)",
-                              background: "rgba(255,237,213,0.95)",
-                              fontSize: "0.75rem",
-                              color: "#c2410c",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Score 95+ tips 🏆
-                          </button>
+                          <details style={{ position: "relative" }}>
+                            <summary
+                              style={{
+                                borderRadius: 999,
+                                padding: "5px 11px",
+                                border: "1px solid rgba(148,163,184,0.6)",
+                                background: "rgba(248,250,252,0.95)",
+                                fontSize: "0.75rem",
+                                color: "#475569",
+                                cursor: "pointer",
+                                listStyle: "none",
+                              }}
+                            >
+                              More
+                            </summary>
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "grid",
+                                gap: 6,
+                                minWidth: 190,
+                                padding: 8,
+                                borderRadius: 12,
+                                border: "1px solid rgba(148,163,184,0.45)",
+                                background: "rgba(255,255,255,0.98)",
+                                boxShadow: "0 10px 26px rgba(15,23,42,0.16)",
+                              }}
+                            >
+                              <button
+                                onClick={() => handleSampleQuestion(topicName)}
+                                style={{
+                                  borderRadius: 10,
+                                  padding: "6px 10px",
+                                  border: "1px solid rgba(37,99,235,0.4)",
+                                  background: "rgba(239,246,255,0.9)",
+                                  fontSize: "0.74rem",
+                                  color: "#1d4ed8",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                }}
+                              >
+                                Open HPQ for topic
+                              </button>
+                              <button
+                                onClick={() => handleQuickTopicMock(topicName)}
+                                style={{
+                                  borderRadius: 10,
+                                  padding: "6px 10px",
+                                  border: "1px solid rgba(34,197,94,0.6)",
+                                  background: "rgba(220,252,231,0.95)",
+                                  fontSize: "0.74rem",
+                                  color: "#15803d",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                }}
+                              >
+                                Build topic mock
+                              </button>
+                              <button
+                                onClick={() => handleExamTips(topicName)}
+                                style={{
+                                  borderRadius: 10,
+                                  padding: "6px 10px",
+                                  border: "1px solid rgba(234,88,12,0.6)",
+                                  background: "rgba(255,237,213,0.95)",
+                                  fontSize: "0.74rem",
+                                  color: "#c2410c",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                }}
+                              >
+                                Ask exam tips
+                              </button>
+                              <button
+                                onClick={() => handleGoToTopicHub(topicName)}
+                                style={{
+                                  borderRadius: 10,
+                                  padding: "6px 10px",
+                                  border: "1px solid rgba(148,163,184,0.6)",
+                                  background: "rgba(248,250,252,0.95)",
+                                  fontSize: "0.74rem",
+                                  color: "#475569",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                }}
+                              >
+                                Open topic in Tutor
+                              </button>
+                            </div>
+                          </details>
                         </div>
                       </div>
 
@@ -1108,8 +1134,17 @@ const TrendsPage: React.FC = () => {
           )}
         </section>
 
-        {/* Step 2 / Step 3 CTA */}
+        {/* Two learner journeys */}
         <section style={{ marginTop: 26 }}>
+          <div
+            style={{
+              marginBottom: 8,
+              fontSize: "0.8rem",
+              color: "#475569",
+            }}
+          >
+            Pick your mode:
+          </div>
           <div
             style={{
               display: "grid",
@@ -1118,8 +1153,16 @@ const TrendsPage: React.FC = () => {
               gap: 12,
             }}
           >
-            <button
+            <div
+              role="button"
+              tabIndex={0}
               onClick={goToHPQ}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  goToHPQ();
+                }
+              }}
               style={{
                 borderRadius: 24,
                 padding: "14px 18px",
@@ -1140,7 +1183,7 @@ const TrendsPage: React.FC = () => {
                   marginBottom: 4,
                 }}
               >
-                Step 2 • Practice
+                Step 2 - Practice
               </div>
               <div
                 style={{
@@ -1158,21 +1201,67 @@ const TrendsPage: React.FC = () => {
                   color: "#4b5563",
                 }}
               >
-                Jump to your curated HPQ bank, sorted by topic and difficulty.
+                Jump to your curated HPQ bank, then build a full mock when exam date is near.
               </p>
-            </button>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToHPQ();
+                  }}
+                  style={{
+                    borderRadius: 999,
+                    padding: "5px 11px",
+                    border: "1px solid rgba(59,130,246,0.6)",
+                    background: "#ffffff",
+                    color: "#1d4ed8",
+                    fontSize: "0.74rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Open HPQ bank
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToMockBuilder();
+                  }}
+                  style={{
+                    borderRadius: 999,
+                    padding: "5px 11px",
+                    border: "1px solid rgba(59,130,246,0.6)",
+                    background: "#ffffff",
+                    color: "#1d4ed8",
+                    fontSize: "0.74rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Build full mock
+                </button>
+              </div>
+            </div>
 
-            <button
-              onClick={goToMockBuilder}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={goToMasteryCompanion}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  goToMasteryCompanion();
+                }
+              }}
               style={{
                 borderRadius: 24,
                 padding: "14px 18px",
-                border: "1px solid rgba(56,189,248,0.6)",
+                border: "1px solid rgba(34,197,94,0.6)",
                 background:
-                  "linear-gradient(135deg, rgba(224,242,254,0.96), rgba(191,219,254,0.96))",
+                  "linear-gradient(135deg, rgba(236,253,245,0.96), rgba(209,250,229,0.96))",
                 textAlign: "left",
                 cursor: "pointer",
-                boxShadow: "0 12px 26px rgba(59,130,246,0.45)",
+                boxShadow: "0 12px 26px rgba(16,185,129,0.35)",
               }}
             >
               <div
@@ -1184,7 +1273,7 @@ const TrendsPage: React.FC = () => {
                   marginBottom: 4,
                 }}
               >
-                Step 3 • Full paper
+                Mastery companion
               </div>
               <div
                 style={{
@@ -1194,7 +1283,7 @@ const TrendsPage: React.FC = () => {
                   marginBottom: 4,
                 }}
               >
-                Auto-build an 80-mark mock paper
+                Start guided learning from your current weak chapter
               </div>
               <p
                 style={{
@@ -1202,9 +1291,9 @@ const TrendsPage: React.FC = () => {
                   color: "#4b5563",
                 }}
               >
-                Use the HPQ bank + trends engine to generate a board-style mock.
+                Use Teach + Practice loop through TopicHub for daily progression through the year.
               </p>
-            </button>
+            </div>
           </div>
         </section>
       </div>
