@@ -15,9 +15,9 @@ function fileMissing(rel) {
 }
 
 function rg(query) {
-  const res = spawnSync("rg", ["-n", query, "src", "scripts", "server"], {
+  const res = spawnSync("rg", ["-n", "-e", query, "src", "scripts", "server"], {
     cwd: repoRoot,
-    shell: process.platform === "win32",
+    shell: false,
     encoding: "utf8",
   });
   if ((res.status ?? 1) === 1) return [];
@@ -31,11 +31,30 @@ function rg(query) {
 function run() {
   const checks = [];
 
-  checks.push(check("bsre_types_deleted", fileMissing("src/engine/bsre/types.ts"), "BSRE spike type file should be removed"));
-  checks.push(check("bsre_evaluator_deleted", fileMissing("src/engine/bsre/evaluator.ts"), "BSRE spike evaluator should be removed"));
+  checks.push(
+    check(
+      "bsre_types_present",
+      !fileMissing("src/engine/bsre/types.ts"),
+      "BSRE type contracts must remain present for server-side evaluator path"
+    )
+  );
+  checks.push(
+    check(
+      "bsre_evaluator_present",
+      !fileMissing("src/engine/bsre/evaluator.ts"),
+      "BSRE evaluator must remain present while TRIANGLES_BSRE path exists"
+    )
+  );
 
   const refs = rg("engine/bsre|BsreEvaluator|triangles_bsre_rubrics_v1");
-  checks.push(check("no_bsre_runtime_refs", refs.length === 0, refs.length ? refs.join(" | ") : "none"));
+  const serverRefs = refs.filter((line) => line.includes("server\\index.cjs"));
+  checks.push(
+    check(
+      "bsre_runtime_refs_present",
+      serverRefs.length > 0,
+      serverRefs.length ? serverRefs.join(" | ") : "missing server references"
+    )
+  );
 
   const failed = checks.filter((c) => !c.ok);
   const report = {

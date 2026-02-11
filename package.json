@@ -81,7 +81,9 @@
     "test:trig:retire": "node scripts/ops/trig_legacy_retire_acceptance.mjs",
     "test:llm:path-audit": "node scripts/ops/llm_path_audit_acceptance.mjs",
     "test:bsre:retire": "node scripts/ops/bsre_spike_acceptance.mjs",
-    "test:matrix:all": "npm run test:prediction:bank-health && npm run test:practice:weightage-mix && npm run test:canonical:generator && npm run test:trig:retire && npm run test:llm:path-audit && npm run test:bsre:retire",
+    "test:bsre:path": "node scripts/ops/bsre_spike_acceptance.mjs",
+    "test:matrix:all": "npm run test:prediction:bank-health && npm run test:practice:weightage-mix && npm run test:canonical:generator && npm run test:trig:retire && npm run test:llm:path-audit && npm run test:bsre:path",
+    "test:matrix:execution": "node scripts/ops/matrix_execution_acceptance.mjs",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"

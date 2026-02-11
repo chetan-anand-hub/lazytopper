@@ -15,9 +15,9 @@ function fileMissing(rel) {
 }
 
 function rg(query) {
-  const res = spawnSync("rg", ["-n", query, "src", "scripts", "server"], {
+  const res = spawnSync("rg", ["-n", "-e", query, "src", "scripts", "server"], {
     cwd: repoRoot,
-    shell: process.platform === "win32",
+    shell: false,
     encoding: "utf8",
   });
   if ((res.status ?? 1) === 1) return [];

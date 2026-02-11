@@ -17,7 +17,6 @@ $filesToCopy = @(
   "src/data/promptDPracticePacks.ts",
   "src/data/class10ContentConfig.ts",
   "src/data/topicHubV2Full.ts",
-  "src/data/trigQuestions.ts",
   "src/data/predictedQuestions.ts",
   "src/data/predictedQuestionsAdditions.ts",
   "src/data/predictedQuestionsScience.ts"
@@ -50,7 +49,7 @@ $reportLines = @(
   '- AI top-up is handled by `generateMoreLikeThis` (`src/ai/aiClient.ts`), which POSTs `{ subject, topicKey, seedQuestion, numVariants }` to `/api/more-like-this` and appends the response variants when the bank set is short.',
   '',
   '3. **Practice decision logic**',
-  '- Topic selection resolves via `resolvePracticePackKey`: canonical topic slugs → practice pack keys defined in `src/data/promptDPracticePacks.ts`. Fallbacks cross-reference canonical topic metadata under `src/data/class10ContentConfig.ts`, `src/data/topicHubV2Full.ts`, and `src/data/trigQuestions.ts`.',
+  '- Topic selection resolves via `resolvePracticePackKey`: canonical topic slugs to practice pack keys defined in `src/data/promptDPracticePacks.ts`. Fallbacks cross-reference canonical topic metadata under `src/data/class10ContentConfig.ts` and `src/data/topicHubV2Full.ts`.',
   '- Difficulty respects the dropdown state (`All/Easy/Medium/Hard`) and can be pre-seeded (`difficultyPreset`).',
   '- Section/type filters come from query params (`section`, `pattern`, `type`) or nav `sectionFilter`, and the UI enforces uppercase A-E or ALL.",
   '- `practiceFilters.focusBankIds` and `subtopicHint` influence ordering by promoting focused bank questions sourced from `src/data/predictedQuestions*.ts` through the unified `questionGenerator`.',

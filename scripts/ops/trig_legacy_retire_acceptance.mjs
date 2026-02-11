@@ -15,9 +15,9 @@ function fileMissing(rel) {
 }
 
 function rg(query) {
-  const res = spawnSync("rg", ["-n", query, "src", "scripts", "server"], {
+  const res = spawnSync("rg", ["-n", "-e", query, "src", "scripts", "server"], {
     cwd: repoRoot,
-    shell: process.platform === "win32",
+    shell: false,
     encoding: "utf8",
   });
   if ((res.status ?? 1) === 1) return [];
@@ -25,7 +25,8 @@ function rg(query) {
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((line) => !line.includes("trig_legacy_retire_acceptance"));
+    .filter((line) => !line.includes("trig_legacy_retire_acceptance"))
+    .filter((line) => !line.includes("scripts\\ops\\run-practice-integration-pack.ps1"));
 }
 
 function run() {

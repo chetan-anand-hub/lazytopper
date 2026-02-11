@@ -23,7 +23,7 @@ const defaultRequiredScripts = [
   "test:canonical:generator",
   "test:trig:retire",
   "test:llm:path-audit",
-  "test:bsre:retire"
+  "test:bsre:path"
 ];
 
 const requiredScripts = scriptListArg
