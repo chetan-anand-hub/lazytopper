@@ -7,6 +7,7 @@ import {
   class10MathTopicTrends,
   type Class10MathTopicTrendsData,
 } from "../data/class10MathTopicTrends";
+import { class10TopicByName } from "../data/class10MathTopicWeights";
 import {
   class10ScienceTopicTrends,
   type Class10ScienceTopicKey,
@@ -114,7 +115,8 @@ function normaliseMathDataset(
       topicName,
       {
         tier: meta.tier as TierKey,
-        weightagePercent: meta.weightagePercent,
+        weightagePercent:
+          meta.weightagePercent ?? class10TopicByName[topicName]?.weightagePercent,
         summary: (meta as { summary?: string }).summary,
         conceptWeightage: meta.conceptWeightage,
       },

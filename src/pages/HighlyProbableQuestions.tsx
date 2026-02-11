@@ -43,6 +43,8 @@ import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 // return type for each AI-generated question variant.  We also pull in
 // generateMoreLikeThis so that the HPQ page can request variants on-demand.
 import { generateMoreLikeThis, type MoreLikeThisVariant } from "../ai/aiClient";
+import { buildBankHealthReport } from "../prediction/bankHealth";
+import { buildTopicKeySources } from "../prediction/buildTopicKeySources";
 import JourneyStrip from "../components/ux/JourneyStrip";
 import ReturnContextBar from "../components/ux/ReturnContextBar";
 import { trackUxEvent } from "../services/uxTelemetry";
@@ -111,6 +113,14 @@ function normaliseSubject(raw: string | null | undefined): HPQSubject {
   const val = (raw || "").toLowerCase();
   if (val === "science" || val === "sci") return "Science";
   return "Maths";
+}
+
+function normaliseTopicKey(raw: string | null | undefined): string {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 /**
@@ -252,6 +262,27 @@ const HighlyProbableQuestions: React.FC = () => {
       ),
     [subjectKey]
   );
+
+  const bankHealthSummaryForSubject = useMemo(() => {
+    const topicKeySources = buildTopicKeySources().filter(
+      (entry) => normaliseSubject(String(entry.subject)) === subjectKey
+    );
+
+    const canonicalQuestions = subjectBuckets.flatMap((bucket) => {
+      const bucketTopicKey = (bucket as any).topicKey || normaliseTopicKey(bucket.topic);
+      const bucketSubject = bucket.subject ?? subjectKey;
+      return bucket.questions.map((question) => ({
+        ...question,
+        subject: bucketSubject,
+        topicKey: (question as any).topicKey || bucketTopicKey,
+      }));
+    });
+
+    return buildBankHealthReport({
+      questions: canonicalQuestions as any,
+      topicKeySources: topicKeySources as any,
+    }).summary;
+  }, [subjectBuckets, subjectKey]);
 
   // Topic options for dropdown (for current subject)
   const topicOptions = useMemo(
@@ -1310,6 +1341,26 @@ const HighlyProbableQuestions: React.FC = () => {
                       )}
                   </div>
                 )}
+
+              <div
+                style={{
+                  marginTop: 8,
+                  borderRadius: 14,
+                  padding: "8px 12px",
+                  background: "rgba(15,23,42,0.08)",
+                  color: "#334155",
+                  fontSize: "0.78rem",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Bank health:</span>
+                <span>{bankHealthSummaryForSubject.okCoverageCount} topics covered</span>
+                <span>{bankHealthSummaryForSubject.lowCoverageCount} low coverage</span>
+                <span>{bankHealthSummaryForSubject.zeroCoverageCount} missing</span>
+              </div>
             </div>
 
             <div style={{ minWidth: 260 }}>
