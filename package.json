@@ -60,6 +60,10 @@
     "test:ux:p2": "node scripts/ops/ux_priority_step_acceptance.mjs p2",
     "test:ux:p3": "node scripts/ops/ux_priority_step_acceptance.mjs p3",
     "test:ux:all-priorities": "node scripts/ops/ux_priority_step_acceptance.mjs all",
+    "test:styles:graph": "node scripts/ops/styles_connectivity_graph.mjs",
+    "test:styles:connectivity": "node scripts/ops/styles_connectivity_acceptance.mjs",
+    "test:styles:trim-candidates": "node scripts/ops/styles_trim_candidates.mjs",
+    "test:styles:trim-acceptance": "node scripts/ops/styles_trim_acceptance.mjs",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"
