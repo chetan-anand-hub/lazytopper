@@ -407,7 +407,7 @@ export default function Dashboard() {
                 navigate(`/daily-mix/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(weakestTopicKey)}`)
               }
             >
-              Play Today&apos;s Mix
+              Play Mix
             </button>
           </p>
         ) : null}

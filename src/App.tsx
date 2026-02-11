@@ -270,7 +270,7 @@ export default function App() {
           <Route path="/topic-hub/:grade/:subject/:topicKey" element={<RequireAuth><TopicHub /></RequireAuth>} />
 
           {/* TopicHub launcher page */}
-          <Route path="/topic-hub" element={<RequireAuth><TopicHubHome /></RequireAuth>} />
+          <Route path="/topic-hub" element={<TopicHubHome />} />
 
       
 

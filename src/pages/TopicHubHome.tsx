@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { RequireAuth } from "../components/auth/RequireAuth";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterMeta } from "../engine/smartLearningTypes";
@@ -127,7 +128,7 @@ function readRecentTopics(subject: SubjectTitle): RecentTopicRecord[] {
   }
 }
 
-export default function TopicHubHome() {
+function TopicHubHomeContent() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
   const { getMatchScoreForChapter } = useSmartLearning();
@@ -524,5 +525,13 @@ export default function TopicHubHome() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TopicHubHome() {
+  return (
+    <RequireAuth>
+      <TopicHubHomeContent />
+    </RequireAuth>
   );
 }
