@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
 const outDir = path.join(repoRoot, ".project_memory", "ops", "out");
 const outPath = path.join(outDir, "dependency_risk_classification.json");
+const RUNTIME_EDGE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
 function runMadgeGraph() {
   const res = spawnSync(
@@ -29,9 +30,103 @@ function runMadgeGraph() {
   return JSON.parse(String(res.stdout || "{}"));
 }
 
+function normalizePath(input) {
+  return String(input || "")
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "")
+    .replace(/\/{2,}/g, "/")
+    .trim();
+}
+
+function normalizeGraph(rawGraph) {
+  const merged = new Map();
+  const ensureNode = (name) => {
+    if (!merged.has(name)) merged.set(name, new Set());
+  };
+
+  for (const [rawNode, rawDeps] of Object.entries(rawGraph || {})) {
+    const node = normalizePath(rawNode);
+    if (!node) continue;
+    ensureNode(node);
+
+    const deps = Array.isArray(rawDeps) ? rawDeps : [];
+    for (const rawDep of deps) {
+      const dep = normalizePath(rawDep);
+      if (!dep) continue;
+      ensureNode(dep);
+      merged.get(node).add(dep);
+    }
+  }
+
+  const normalized = {};
+  for (const [node, depSet] of [...merged.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    normalized[node] = [...depSet].sort();
+  }
+  return normalized;
+}
+
+function upsertEdge(graph, fromRaw, toRaw) {
+  const from = normalizePath(fromRaw);
+  const to = normalizePath(toRaw);
+  if (!from || !to) return;
+  if (!graph[from]) graph[from] = [];
+  if (!graph[to]) graph[to] = [];
+  if (!graph[from].includes(to)) graph[from].push(to);
+}
+
+async function extractSupplementalServerRuntimeEdges() {
+  const serverEntryPath = path.join(repoRoot, "server", "index.cjs");
+  const from = "server/index.cjs";
+
+  let source = "";
+  try {
+    source = await fs.readFile(serverEntryPath, "utf8");
+  } catch {
+    return {
+      from,
+      targets: [],
+      patterns: { directRequire: 0, pathJoin: 0 },
+    };
+  }
+
+  const relMatches = new Set();
+  let directRequire = 0;
+  let pathJoin = 0;
+  const directRequireRe = /require\(\s*['"](\.\.\/src\/[^'"]+)['"]\s*\)/g;
+  const pathJoinRe = /path\.join\(\s*__dirname\s*,\s*['"](\.\.\/src\/[^'"]+)['"]\s*\)/g;
+
+  let m;
+  while ((m = directRequireRe.exec(source))) {
+    relMatches.add(m[1]);
+    directRequire += 1;
+  }
+  while ((m = pathJoinRe.exec(source))) {
+    relMatches.add(m[1]);
+    pathJoin += 1;
+  }
+
+  const targets = [];
+  for (const relRef of relMatches) {
+    const abs = path.resolve(path.dirname(serverEntryPath), relRef);
+    const rel = normalizePath(path.relative(repoRoot, abs));
+    if (!rel.startsWith("src/")) continue;
+    if (!RUNTIME_EDGE_EXTENSIONS.has(path.extname(rel))) continue;
+    targets.push(rel);
+  }
+
+  return {
+    from,
+    targets: [...new Set(targets)].sort(),
+    patterns: {
+      directRequire,
+      pathJoin,
+    },
+  };
+}
+
 function dfs(graph, start) {
   const seen = new Set();
-  const stack = [start];
+  const stack = [normalizePath(start)];
   while (stack.length) {
     const node = stack.pop();
     if (!node || seen.has(node) || !graph[node]) continue;
@@ -63,7 +158,15 @@ function rankByRisk(kind) {
 }
 
 async function run() {
-  const graph = runMadgeGraph();
+  const madgeGraph = runMadgeGraph();
+  let graph = normalizeGraph(madgeGraph);
+  const supplementalRuntime = await extractSupplementalServerRuntimeEdges();
+
+  for (const target of supplementalRuntime.targets) {
+    upsertEdge(graph, supplementalRuntime.from, target);
+  }
+  graph = normalizeGraph(graph);
+
   const files = Object.keys(graph).sort();
   const reverse = Object.fromEntries(files.map((f) => [f, []]));
   for (const [from, deps] of Object.entries(graph)) {
@@ -168,6 +271,12 @@ async function run() {
       edges: Object.values(graph).reduce((acc, deps) => acc + (deps?.length || 0), 0),
       reachable_from_main: reachableMain.size,
       reachable_from_server: reachableServer.size,
+    },
+    supplemental_runtime_edges: {
+      from: supplementalRuntime.from,
+      count: supplementalRuntime.targets.length,
+      targets: supplementalRuntime.targets,
+      patterns: supplementalRuntime.patterns,
     },
     classifications: classified,
   };

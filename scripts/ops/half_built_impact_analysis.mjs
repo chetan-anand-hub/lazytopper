@@ -11,10 +11,16 @@ const out = resolve(repoRoot, ".project_memory/ops/out/half_built_impact_analysi
 const runtimeKeep = new Set([
   "server/telemetry.cjs",
   "server/tutorOrchestrator.cjs",
+  "src/engine/bsre/evaluator.ts",
+  "src/engine/bsre/types.ts",
   "src/prompts/grind/trianglesGrindContract.ts",
   "src/tutor/retrieval/trianglesRetriever.ts",
   "src/data/_finalGenerated/triangles.mentor.ts",
 ]);
+
+function normalizePath(value) {
+  return String(value || "").replaceAll("\\", "/");
+}
 
 function rgRefs(pattern) {
   const result = spawnSync("rg", ["-n", "--fixed-strings", pattern, "src", "server", "scripts"], {
@@ -29,12 +35,15 @@ function rgRefs(pattern) {
   const lines = String(result.stdout || "")
     .split(/\r?\n/)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((line) => normalizePath(line));
   return lines;
 }
 
 function decide(row, refs) {
-  if (runtimeKeep.has(row.file)) {
+  const file = normalizePath(row.file);
+
+  if (runtimeKeep.has(file)) {
     return {
       decision: "keep_runtime_critical",
       reason: "Referenced by runtime server contracts or essential tutor/grind loaders.",
