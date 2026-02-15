@@ -947,7 +947,7 @@ const packTopicKey = useMemo(() => {
             <button
               key={count}
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: "4px 10px", fontSize: "0.74rem" }}
               onClick={() => setQuestionCount(Math.max(MIN_QUESTION_COUNT, Math.min(MAX_QUESTION_COUNT, count)))}
             >

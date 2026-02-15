@@ -238,7 +238,22 @@ function collectUsageFromContent(fileRel, text, usageMap) {
     }
   }
 
-  const cxRe = /\b(?:cx|clsx)\s*\(([\s\S]*?)\)/g;
+  // Capture string literals inside className expression values:
+  // className={cond ? "a b" : "c"} / className={["a", active && "b"].join(" ")}
+  const classExprRe = /className\s*=\s*{([\s\S]*?)}/g;
+  let classExpr;
+  while ((classExpr = classExprRe.exec(text))) {
+    const expr = classExpr[1] || "";
+    const strRe = /["'`]([^"'`]+)["'`]/g;
+    let s;
+    while ((s = strRe.exec(expr))) {
+      for (const token of extractTokensFromClassValue(s[1])) {
+        addUsage(usageMap, token, fileRel, "className_expression_strings");
+      }
+    }
+  }
+
+  const cxRe = /\b(?:cx|clsx|classNames|cn)\s*\(([\s\S]*?)\)/g;
   let cx;
   while ((cx = cxRe.exec(text))) {
     const args = cx[1];

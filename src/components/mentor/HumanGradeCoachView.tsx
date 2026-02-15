@@ -131,7 +131,7 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
             {hintText && onNextHint ? (
               <button
                 type="button"
-                className={compact ? "mentor-panel__mode-chip" : "pill"}
+                className={compact ? "mentor-panel__mode-chip" : "lt-pill"}
                 style={{ marginTop: 6 }}
                 onClick={onNextHint}
                 disabled={hintBusy || !canAdvance}

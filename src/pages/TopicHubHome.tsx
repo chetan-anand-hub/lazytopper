@@ -7,6 +7,7 @@ import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterMeta } from "../engine/smartLearningTypes";
+import { startSession } from "../services/sessionApi";
 import { loadTopicMasterySnapshot } from "../services/topicHubMastery";
 import { normalizeTopicKey, resolveRuntimeTopicKey } from "../utils/topicHubV2Store";
 
@@ -154,6 +155,7 @@ function TopicHubHomeContent() {
   );
   const [query, setQuery] = useState<string>("");
   const [recentTopics, setRecentTopics] = useState<RecentTopicRecord[]>([]);
+  const [sessionBusy, setSessionBusy] = useState(false);
 
   const topicOptions = useMemo(() => buildTopicOptions(subject), [subject]);
 
@@ -265,6 +267,24 @@ function TopicHubHomeContent() {
     navigate(target);
   };
 
+  const playSelectedTopic = async () => {
+    if (!selectedTopicKey || sessionBusy) return;
+    setSessionBusy(true);
+    try {
+      const started = await startSession({
+        kind: "chapter",
+        subjectId: subject === "Science" ? "science" : "maths",
+        chapterId: selectedTopicKey,
+        vibe: "high",
+      });
+      navigate(`/play/${encodeURIComponent(started.sessionId)}`);
+    } catch {
+      goToSelectedTopic();
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
   const goToLastRoute = () => {
     if (!lastRoute?.path) return;
     navigate(lastRoute.path);
@@ -273,7 +293,7 @@ function TopicHubHomeContent() {
   const selectedTier = selectedTopic?.tier || "topic";
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px 32px" }}>
         <div
           style={{
@@ -328,7 +348,7 @@ function TopicHubHomeContent() {
             <div style={{ marginTop: 10 }}>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={goToLastRoute}
                 data-ux-above-fold-cta="topichub"
               >
@@ -354,7 +374,7 @@ function TopicHubHomeContent() {
                 <button
                   key={`${topic.grade}:${topic.subject}:${topic.topicKey}`}
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   style={{ padding: "7px 10px", fontSize: 13 }}
                   onClick={() => navigate(topic.path)}
                 >
@@ -401,7 +421,7 @@ function TopicHubHomeContent() {
                     <button
                       key={value}
                       type="button"
-                      className="pill"
+                      className="lt-pill"
                       style={{
                         padding: "8px 12px",
                         background: active ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
@@ -515,7 +535,7 @@ function TopicHubHomeContent() {
           <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: "10px 14px" }}
               data-ux-above-fold-cta="topichub"
               onClick={goToSelectedTopic}
@@ -525,7 +545,17 @@ function TopicHubHomeContent() {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
+              style={{ padding: "10px 14px" }}
+              data-ux-above-fold-cta="topichub"
+              onClick={() => void playSelectedTopic()}
+              disabled={!selectedTopicKey || sessionBusy}
+            >
+              {sessionBusy ? "Starting..." : "Play this chapter"}
+            </button>
+            <button
+              type="button"
+              className="lt-pill"
               style={{ padding: "10px 14px" }}
               data-ux-above-fold-cta="topichub"
               onClick={() => navigate(`/trends/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}`)}

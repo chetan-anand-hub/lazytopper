@@ -1,17 +1,35 @@
+import { canonicalChapters, getCanonicalChapterBySlug } from "../data/syllabus/cbse10Canonical";
+import {
+  getChapterScopePolicy,
+  getScopeBullets,
+  getScopeGuardLine,
+  violatesAssessedScope,
+} from "../data/syllabus/scopePolicy";
 import { resolveCanonicalTopicKey } from "../data/syllabus/topicAliasMap";
 import { resolveTopicDisplayName } from "../utils/topicResolver";
 
 export interface TopicTeachContract {
   canonicalTopicKey: string;
   subject: "Maths" | "Science";
+  contractSource: "topic" | "generic";
   goalLine: string;
   keyIdeas: [string, string, string, string];
   checkpointQuestion: string;
   checkpointAnswer: string;
   commonMistake: string;
+  scopeGuardLine?: string;
+  assessedScopeBullets?: string[];
+  enrichmentScopeBullets?: string[];
 }
 
-type TeachContractSeed = Omit<TopicTeachContract, "canonicalTopicKey">;
+type TeachContractSeed = {
+  subject: "Maths" | "Science";
+  goalLine: string;
+  keyIdeas: [string, string, string, string];
+  checkpointQuestion: string;
+  checkpointAnswer: string;
+  commonMistake: string;
+};
 
 const mathsGeneric: TeachContractSeed = {
   subject: "Maths",
@@ -80,6 +98,22 @@ const topicSpecificSeeds: Record<string, TeachContractSeed> = {
     commonMistake:
       "Common mistake: selecting the wrong ratio or identity for the given angle setup. This can lose marks in CBSE board checking.",
   },
+  "maths-applications-trigonometry": {
+    ...mathsGeneric,
+    goalLine: "Learn {topic} with angle-based application setup in CBSE board-writing format.",
+    keyIdeas: [
+      "identify the angle of elevation/depression and sketch the relation.",
+      "state the exact formula or trigonometric relation before substitution.",
+      "map distances/heights to the selected ratio with clear correspondence.",
+      "end with the final numerical result and therefore/hence line.",
+    ],
+    checkpointQuestion:
+      "Board checkpoint: For this {topic} item, write Given data, To Find, formula used, and final Therefore/Hence result.",
+    checkpointAnswer:
+      "Expected answer: Given: [angle and distance data]. To Find: [height/distance result]. Criterion/Theorem/Formula: [chosen trigonometric formula]. Therefore/Hence: [final computed result].",
+    commonMistake:
+      "Common mistake: choosing the wrong angle or formula in height-distance applications. This can lose marks in CBSE board checking.",
+  },
   "coordinate-geometry": {
     ...mathsGeneric,
     goalLine: "Learn {topic} with formula setup and coordinate substitution in CBSE board-writing format.",
@@ -134,7 +168,7 @@ const topicSpecificSeeds: Record<string, TeachContractSeed> = {
     keyIdeas: [
       "define the biological process and key term first.",
       "name the governing concept/process relation explicitly.",
-      "explain the sequence with cause-effect logic and labels.",
+      "explain the sequence with cause-effect logic, body system context, and labels.",
       "conclude with the asked function/result in crisp exam language.",
     ],
     checkpointQuestion:
@@ -150,14 +184,50 @@ function applyTopic(seed: string, topic: string): string {
   return String(seed || "").replace(/\{topic\}/g, topic);
 }
 
+function sanitizeScopeLine(canonicalTopicKey: string, value: string, fallback: string): string {
+  const line = String(value || "").trim();
+  if (!line) return fallback;
+  if (violatesAssessedScope(canonicalTopicKey, line)) return fallback;
+  return line;
+}
+
+function buildGeneratedSeed(
+  canonicalTopicKey: string,
+  subject: "Maths" | "Science"
+): TeachContractSeed {
+  const base = subject === "Science" ? scienceGeneric : mathsGeneric;
+  const scope = getScopeBullets(canonicalTopicKey, "assessed");
+  const scope1 = scope[0] || base.keyIdeas[0];
+  const scope2 = scope[1] || base.keyIdeas[1];
+  const scope3 = scope[2] || base.keyIdeas[2];
+  const guard = getScopeGuardLine(canonicalTopicKey);
+
+  return {
+    ...base,
+    goalLine: `${base.goalLine} Stay within assessed chapter scope.`,
+    keyIdeas: [
+      sanitizeScopeLine(canonicalTopicKey, `state this assessed scope anchor: ${scope1}`, base.keyIdeas[0]),
+      sanitizeScopeLine(canonicalTopicKey, `name the exact board anchor before solving: ${scope2}`, base.keyIdeas[1]),
+      sanitizeScopeLine(canonicalTopicKey, `show one reasoning link from assessed scope: ${scope3}`, base.keyIdeas[2]),
+      base.keyIdeas[3],
+    ],
+    commonMistake: guard
+      ? `${base.commonMistake} ${guard}`
+      : base.commonMistake,
+  };
+}
+
 function buildContract(
   canonicalTopicKey: string,
   seed: TeachContractSeed,
-  topicLabel: string
+  topicLabel: string,
+  contractSource: "topic" | "generic"
 ): TopicTeachContract {
+  const policy = getChapterScopePolicy(canonicalTopicKey);
   return {
     canonicalTopicKey,
     subject: seed.subject,
+    contractSource,
     goalLine: applyTopic(seed.goalLine, topicLabel),
     keyIdeas: [
       applyTopic(seed.keyIdeas[0], topicLabel),
@@ -168,6 +238,9 @@ function buildContract(
     checkpointQuestion: applyTopic(seed.checkpointQuestion, topicLabel),
     checkpointAnswer: applyTopic(seed.checkpointAnswer, topicLabel),
     commonMistake: applyTopic(seed.commonMistake, topicLabel),
+    scopeGuardLine: getScopeGuardLine(canonicalTopicKey) || undefined,
+    assessedScopeBullets: policy?.assessedScopeBullets || undefined,
+    enrichmentScopeBullets: policy?.enrichmentScopeBullets || undefined,
   };
 }
 
@@ -177,18 +250,62 @@ export function resolveTopicTeachContract(input: {
   nodeTitle?: string;
 }): TopicTeachContract | null {
   const topicRaw = String(input.topicKey || "").trim();
-  const canonical = resolveCanonicalTopicKey(topicRaw);
+  const canonicalInput = resolveCanonicalTopicKey(topicRaw);
   const subject = String(input.subject || "").toLowerCase().includes("science")
     ? "Science"
     : "Maths";
+  const canonicalChapter = getCanonicalChapterBySlug(canonicalInput || topicRaw);
+  const canonicalTopicKey =
+    canonicalChapter?.canonicalSlug || canonicalInput || resolveCanonicalTopicKey(String(input.nodeTitle || ""));
   const topicLabel =
     String(input.nodeTitle || "").trim() ||
-    resolveTopicDisplayName(subject, canonical || topicRaw) ||
+    resolveTopicDisplayName(subject, canonicalTopicKey || topicRaw) ||
     "this concept";
 
-  if (canonical && topicSpecificSeeds[canonical]) {
-    return buildContract(canonical, topicSpecificSeeds[canonical], topicLabel);
+  if (canonicalChapter && canonicalTopicKey) {
+    const seed =
+      topicSpecificSeeds[canonicalTopicKey] || buildGeneratedSeed(canonicalTopicKey, subject);
+    return buildContract(canonicalTopicKey, seed, topicLabel, "topic");
   }
-  const seed = subject === "Science" ? scienceGeneric : mathsGeneric;
-  return buildContract(canonical || resolveCanonicalTopicKey(topicLabel), seed, topicLabel);
+
+  if (canonicalTopicKey && topicSpecificSeeds[canonicalTopicKey]) {
+    return buildContract(canonicalTopicKey, topicSpecificSeeds[canonicalTopicKey], topicLabel, "topic");
+  }
+
+  const genericSeed = subject === "Science" ? scienceGeneric : mathsGeneric;
+  const fallbackKey = canonicalTopicKey || resolveCanonicalTopicKey(topicLabel) || "generic-topic";
+  return buildContract(fallbackKey, genericSeed, topicLabel, "generic");
+}
+
+export function getTopicTeachContractCoverage(): {
+  totalCanonical: number;
+  topicContracts: number;
+  genericFallback: number;
+  missingCanonical: string[];
+} {
+  const missingCanonical: string[] = [];
+  let topicContracts = 0;
+  let genericFallback = 0;
+
+  for (const chapter of canonicalChapters) {
+    const subject = chapter.subjectId === "science" ? "Science" : "Maths";
+    const contract = resolveTopicTeachContract({
+      topicKey: chapter.canonicalSlug,
+      subject,
+      nodeTitle: chapter.title,
+    });
+    if (!contract || contract.contractSource !== "topic") {
+      missingCanonical.push(chapter.canonicalSlug);
+      continue;
+    }
+    topicContracts += 1;
+  }
+
+  genericFallback = Math.max(0, canonicalChapters.length - topicContracts);
+  return {
+    totalCanonical: canonicalChapters.length,
+    topicContracts,
+    genericFallback,
+    missingCanonical,
+  };
 }

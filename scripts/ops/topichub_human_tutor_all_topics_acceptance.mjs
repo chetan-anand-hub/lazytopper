@@ -257,7 +257,7 @@ async function run() {
       ]
         .join(" ")
         .toLowerCase();
-      const requiredTokenHit = c.requiredTokens.some((token) =>
+      const requiredTokenHit = c.requiredTokens.every((token) =>
         semanticBlob.includes(String(token || "").toLowerCase())
       );
       const forbiddenTokenHit = c.forbiddenTokens.some((token) =>

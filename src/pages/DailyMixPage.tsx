@@ -70,7 +70,7 @@ export default function DailyMixPage() {
   const intensity = mode === "zombie" ? "light" : "hard";
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <DailyMixWidget
         grade={safeGrade}
         subject={safeSubject}
@@ -81,7 +81,7 @@ export default function DailyMixPage() {
       />
 
       <div style={{ marginTop: 12 }}>
-        <button type="button" className="pill" onClick={() => navigate("/dashboard")}>
+        <button type="button" className="lt-pill" onClick={() => navigate("/dashboard")}>
           Back to Dashboard
         </button>
       </div>

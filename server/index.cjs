@@ -70,6 +70,11 @@ const { resolveTopicTeachContract } = require(
   path.join(__dirname, '../src/tutor/topicTeachContracts.ts')
 );
 const { orchestrateTutorResponse } = require('./tutorOrchestrator.cjs');
+const {
+  startSessionHandler,
+  getSessionHandler,
+  submitSessionHandler,
+} = require("./sessionHandlers.cjs");
 
 function loadDotEnvIfPresent() {
   // Load ONLY server/.env by default, without external dependencies.
@@ -2643,6 +2648,8 @@ function ensureTeachContractShape(raw, payload) {
     subject: payload?.subject || payload?.subjectTitle || payload?.subjectKey,
     nodeTitle,
   });
+  const contractSource =
+    topicContract && topicContract.contractSource === "topic" ? "topic" : "generic";
   const teach = raw.teach && typeof raw.teach === 'object' ? { ...raw.teach } : {};
   const goal = enforceTeacherGoal(
     String(teach.goal || raw.goalLine || teach.headline || teach.oneLiner || '').trim(),
@@ -2685,7 +2692,14 @@ function ensureTeachContractShape(raw, payload) {
     diagram,
     checkpoint: { question: checkpointQuestion, answer: checkpointAnswer },
     commonMistake,
-    contract_source: topicContract ? "topic" : "generic",
+    contract_source: contractSource,
+    scope_guard_line: topicContract?.scopeGuardLine || "",
+    assessed_scope_bullets: Array.isArray(topicContract?.assessedScopeBullets)
+      ? topicContract.assessedScopeBullets
+      : [],
+    enrichment_scope_bullets: Array.isArray(topicContract?.enrichmentScopeBullets)
+      ? topicContract.enrichmentScopeBullets
+      : [],
   };
   const next = {
     ...raw,
@@ -2697,7 +2711,11 @@ function ensureTeachContractShape(raw, payload) {
     commonMistakeWarning: raw.commonMistakeWarning ?? commonMistake,
     checkpointQ: raw.checkpointQ ?? checkpointQuestion,
     checkpointA: raw.checkpointA ?? checkpointAnswer,
-    contract_source: raw.contract_source || (topicContract ? "topic" : "generic"),
+    contract_source:
+      contractSource === "topic"
+        ? "topic"
+        : raw.contract_source || contractSource,
+    scope_guard_line: raw.scope_guard_line || topicContract?.scopeGuardLine || "",
   };
   if (diagram.required && !next.diagramRequired) next.diagramRequired = diagram.required;
   if (!next.diagramType) next.diagramType = diagram.type;
@@ -4322,15 +4340,25 @@ function normalizeMentorRequest(reqJson) {
  * @param {import('http').ServerResponse} res
  */
 async function handleRequest(req, res) {
+  const reqUrlRaw = String(req.url || "");
+  const reqPath = reqUrlRaw.split("?")[0];
+
   // CORS preflight
   if (
     req.method === 'OPTIONS' &&
-    (req.url === '/api/mentor' || req.url === '/api/more-like-this' || req.url === '/api/tutor-feedback')
+    (
+      reqPath === '/api/mentor' ||
+      reqPath === '/api/more-like-this' ||
+      reqPath === '/api/tutor-feedback' ||
+      reqPath === '/api/session/start' ||
+      /^\/api\/session\/[^/]+$/.test(reqPath) ||
+      /^\/api\/session\/[^/]+\/submit$/.test(reqPath)
+    )
   ) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': CORS_ORIGIN,
       'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Lazytopper-Uid',
       'Access-Control-Max-Age': '86400',
     });
     return res.end();
@@ -4364,6 +4392,35 @@ async function handleRequest(req, res) {
         details: err?.message || String(err),
       });
     }
+  }
+
+  if (req.method === "POST" && reqPath === "/api/session/start") {
+    let reqJson;
+    try {
+      reqJson = await readJson(req);
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, error: "Invalid JSON" });
+    }
+    const result = startSessionHandler(req, reqJson || {});
+    return sendJson(res, result.status, result.body);
+  }
+
+  if (req.method === "GET" && /^\/api\/session\/[^/]+$/.test(reqPath)) {
+    const sessionId = decodeURIComponent(reqPath.split("/")[3] || "");
+    const result = getSessionHandler(req, sessionId);
+    return sendJson(res, result.status, result.body);
+  }
+
+  if (req.method === "POST" && /^\/api\/session\/[^/]+\/submit$/.test(reqPath)) {
+    let reqJson;
+    try {
+      reqJson = await readJson(req);
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, error: "Invalid JSON" });
+    }
+    const sessionId = decodeURIComponent(reqPath.split("/")[3] || "");
+    const result = submitSessionHandler(req, sessionId, reqJson || {});
+    return sendJson(res, result.status, result.body);
   }
 
   // Tutor feedback endpoint

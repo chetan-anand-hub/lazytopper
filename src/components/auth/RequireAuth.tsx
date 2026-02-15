@@ -8,7 +8,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="page">
+      <div className="lt-page">
         <div className="card">
           <h3>Checking your session...</h3>
           <p>Please wait.</p>

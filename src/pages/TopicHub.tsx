@@ -1864,7 +1864,7 @@ const showInZombie = (sectionId: string) => {
 
   if (!v2) {
     return (
-      <div className="page" style={{
+      <div className="lt-page" style={{
       background:
         mode === "beast"
           ? "linear-gradient(180deg, #f5f8ff 0%, #eef2ff 50%, #f7f7ff 100%)"
@@ -1903,7 +1903,7 @@ const showInZombie = (sectionId: string) => {
   }
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <div style={{ maxWidth: 1120, margin: "0 auto", padding: "18px 14px 40px" }}>
         <ReturnContextBar
           backTo={backTo}
@@ -1930,7 +1930,7 @@ const showInZombie = (sectionId: string) => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Link className="pill" to={`/trends/${grade}/${subject}`}>
+            <Link className="lt-pill" to={`/trends/${grade}/${subject}`}>
               Open trends
             </Link>
 
@@ -2032,7 +2032,7 @@ const showInZombie = (sectionId: string) => {
                   <button
                     key={item.key}
                     type="button"
-                    className="pill"
+                    className="lt-pill"
                     onClick={item.onClick}
                     style={{
                       padding: "6px 10px",
@@ -2101,14 +2101,14 @@ const showInZombie = (sectionId: string) => {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => openTutorDrawer({ tab: "teach" })}
                 >
                   Teach this topic
                 </button>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => {
                     setActiveTab("grind");
                     if (hasGrindContractFlow) openGrindDrawer();
@@ -2148,7 +2148,7 @@ const showInZombie = (sectionId: string) => {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => {
                     if (hasGrindContractFlow) {
                       openGrindDrawer({ nodeId: defaultGrindNodeId });
@@ -2161,7 +2161,7 @@ const showInZombie = (sectionId: string) => {
                 </button>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => {
                     setActiveTab("learn");
                     openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
@@ -2200,7 +2200,7 @@ const showInZombie = (sectionId: string) => {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
                 >
                   Open Tutor
@@ -2276,7 +2276,7 @@ const showInZombie = (sectionId: string) => {
                       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button
                           type="button"
-                          className="pill"
+                          className="lt-pill"
                           style={{ padding: "7px 10px", fontSize: 13 }}
                           onClick={() => openTutorDrawer({ tab: "teach", nodeId: mapProofFocusToNodeId(t.focus) })}
                           title="Open Tutor in teaching mode"
@@ -2285,7 +2285,7 @@ const showInZombie = (sectionId: string) => {
                         </button>
                         <button
                           type="button"
-                          className="pill"
+                          className="lt-pill"
                           style={{ padding: "7px 10px", fontSize: 13 }}
                           onClick={() => openTutorDrawer({ tab: "examples", nodeId: mapProofFocusToNodeId(t.focus) })}
                           title="See board-style examples"
@@ -2308,7 +2308,7 @@ const showInZombie = (sectionId: string) => {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
                 >
                   Open Tutor
@@ -2359,7 +2359,7 @@ const showInZombie = (sectionId: string) => {
               <div style={{ marginTop: 10 }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   style={{ padding: "7px 10px", fontSize: 13 }}
                   onClick={() => {
                     openTutorDrawer({ tab: "examples", nodeId: guidedOrder[0] });
@@ -2402,7 +2402,7 @@ const showInZombie = (sectionId: string) => {
               <button
                 key={sec}
                 type="button"
-                className={sec === exampleSection ? "pill pill--on" : "pill"}
+                className={sec === exampleSection ? "lt-pill pill--on" : "lt-pill"}
                 onClick={() => setExampleSection(sec)}
               >
                 Pattern {sec}
@@ -2440,7 +2440,7 @@ const showInZombie = (sectionId: string) => {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() =>
                   openPracticeFromTopicHub({
                     tab: "learn",
@@ -2455,7 +2455,7 @@ const showInZombie = (sectionId: string) => {
 
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() =>
                   openMentorDrawer({
                     title: `Pattern ${exampleSection} • ${title}`,
@@ -2554,7 +2554,7 @@ const showInZombie = (sectionId: string) => {
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <button
                         type="button"
-                        className="pill"
+                        className="lt-pill"
                         style={{ padding: "7px 10px", fontSize: 13 }}
                         onClick={() => {
                           if (!list.length) return;
@@ -2610,7 +2610,7 @@ const showInZombie = (sectionId: string) => {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() =>
                     openMentorDrawer({
                       title: `${title} • Lab / activities`,
@@ -2717,7 +2717,7 @@ const showInZombie = (sectionId: string) => {
                             <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <button
                                 type="button"
-                                className="pill"
+                                className="lt-pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => openTutorDrawer({ tab: "teach", nodeId: item.id })}
                               >
@@ -2725,7 +2725,7 @@ const showInZombie = (sectionId: string) => {
                               </button>
                               <button
                                 type="button"
-                                className="pill"
+                                className="lt-pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
                                   setActiveTab("grind");
@@ -2744,7 +2744,7 @@ const showInZombie = (sectionId: string) => {
                               </button>
                               <button
                                 type="button"
-                                className="pill"
+                                className="lt-pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() =>
                                   openPracticeFromTopicHub({
@@ -2812,7 +2812,7 @@ const showInZombie = (sectionId: string) => {
                           <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <button
                               type="button"
-                              className="pill"
+                              className="lt-pill"
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() => openTutorDrawer({ tab: "teach", nodeId })}
                             >
@@ -2821,7 +2821,7 @@ const showInZombie = (sectionId: string) => {
                             {slot.action !== "teach" ? (
                               <button
                                 type="button"
-                                className="pill"
+                                className="lt-pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() => {
                                   setActiveTab("grind");
@@ -2841,7 +2841,7 @@ const showInZombie = (sectionId: string) => {
                             {slot.action === "practice" ? (
                               <button
                                 type="button"
-                                className="pill"
+                                className="lt-pill"
                                 style={{ padding: "7px 10px", fontSize: 13 }}
                                 onClick={() =>
                                   openPracticeFromTopicHub({
@@ -2912,14 +2912,14 @@ const showInZombie = (sectionId: string) => {
                     <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         type="button"
-                        className="pill"
+                        className="lt-pill"
                         onClick={() => openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId })}
                       >
                         Human tutor quick drill
                       </button>
                       <button
                         type="button"
-                        className="pill"
+                        className="lt-pill"
                         onClick={() => {
                           setActiveTab("grind");
                           if (hasGrindContractFlow) {
@@ -2952,7 +2952,7 @@ const showInZombie = (sectionId: string) => {
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <button
                     type="button"
-                    className="pill"
+                    className="lt-pill"
                     onClick={() => {
                       setActiveTab("learn");
                       openTutorDrawer({ tab: "teach", nodeId: weakestTutorNodeId });
@@ -2962,7 +2962,7 @@ const showInZombie = (sectionId: string) => {
                   </button>
                   <button
                     type="button"
-                    className="pill"
+                    className="lt-pill"
                     onClick={() =>
                       openMentorDrawer({
                         title: `${title} • Resources`,
@@ -3032,7 +3032,7 @@ const showInZombie = (sectionId: string) => {
                           <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <button
                               type="button"
-                              className="pill"
+                              className="lt-pill"
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
@@ -3047,7 +3047,7 @@ const showInZombie = (sectionId: string) => {
 
                             {url ? (
                               <a
-                                className="pill"
+                                className="lt-pill"
                                 style={{
                                   padding: "7px 10px",
                                   fontSize: 13,
@@ -3100,7 +3100,7 @@ const showInZombie = (sectionId: string) => {
                           <div style={{ marginTop: 10 }}>
                             <button
                               type="button"
-                              className="pill"
+                              className="lt-pill"
                               style={{ padding: "7px 10px", fontSize: 13 }}
                               onClick={() =>
                                 openMentorDrawer({
@@ -3787,7 +3787,7 @@ export function TutorDrawerV2(props: {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={handleNextConcept}
             disabled={nodeIndex >= order.length - 1 || actionsDisabled}
           >
@@ -3795,7 +3795,7 @@ export function TutorDrawerV2(props: {
           </button>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => doubtInputRef.current?.focus()}
             disabled={actionsDisabled}
           >
@@ -3803,7 +3803,7 @@ export function TutorDrawerV2(props: {
           </button>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => handleTabChange("examples")}
             disabled={actionsDisabled}
           >
@@ -3899,7 +3899,7 @@ export function TutorDrawerV2(props: {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => handleTabChange("teach")}
             disabled={actionsDisabled}
           >
@@ -3966,7 +3966,7 @@ export function TutorDrawerV2(props: {
           {isRecoverableError ? (
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ marginTop: 10 }}
               onClick={handleRetry}
               disabled={actionsDisabled}
@@ -4026,7 +4026,7 @@ export function TutorDrawerV2(props: {
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => handleTabChange("teach")}
               style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white" }}
               disabled={actionsDisabled}
@@ -4035,7 +4035,7 @@ export function TutorDrawerV2(props: {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => handleTabChange("examples")}
               style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white" }}
               disabled={actionsDisabled}
@@ -4044,7 +4044,7 @@ export function TutorDrawerV2(props: {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={handleClose}
               title="Close"
               style={{ background: "white" }}
@@ -4060,7 +4060,7 @@ export function TutorDrawerV2(props: {
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => goToNodeIndex(0)}
             disabled={nodeIndex === 0 || actionsDisabled}
           >
@@ -4068,7 +4068,7 @@ export function TutorDrawerV2(props: {
           </button>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={handleNextConcept}
             disabled={nodeIndex >= order.length - 1 || actionsDisabled}
           >
@@ -4112,12 +4112,12 @@ export function TutorDrawerV2(props: {
           <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: "rgba(0,0,0,0.04)" }}>
             <div style={{ whiteSpace: "pre-wrap" }}>{doubtAnswer}</div>
             <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="pill" onClick={() => setDoubtAnswer(null)}>
+              <button type="button" className="lt-pill" onClick={() => setDoubtAnswer(null)}>
                 Resume
               </button>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() => sendDoubt("Explain this in simpler words, shorter and clearer.")}
                 disabled={doubtLoading}
               >
@@ -4125,7 +4125,7 @@ export function TutorDrawerV2(props: {
               </button>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() => {
                   setDoubtAnswer(null);
                   handleTabChange("examples");
@@ -4165,7 +4165,7 @@ export function TutorDrawerV2(props: {
           />
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => sendDoubt(doubtInput)}
             disabled={doubtLoading || !doubtInput.trim()}
           >
@@ -5534,7 +5534,7 @@ function MindMapCanvas(props: {
                 <div style={{ marginTop: 10 }}>
                   <button
                     type="button"
-                    className="pill"
+                    className="lt-pill"
                     style={{ padding: '7px 10px', fontSize: 13 }}
                     onClick={() => askAboutNode(n.id)}
                   >
@@ -5635,7 +5635,7 @@ function GuidedMindmapPanel(props: {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         <button
           type="button"
-          className={viewMode === "beginner" ? "pill pill--on" : "pill"}
+          className={viewMode === "beginner" ? "lt-pill pill--on" : "lt-pill"}
           style={{ fontSize: 12 }}
           onClick={() => setViewMode("beginner")}
         >
@@ -5643,7 +5643,7 @@ function GuidedMindmapPanel(props: {
         </button>
         <button
           type="button"
-          className={viewMode === "exam" ? "pill pill--on" : "pill"}
+          className={viewMode === "exam" ? "lt-pill pill--on" : "lt-pill"}
           style={{ fontSize: 12 }}
           onClick={() => setViewMode("exam")}
         >
@@ -5651,7 +5651,7 @@ function GuidedMindmapPanel(props: {
         </button>
         <button
           type="button"
-          className="pill"
+          className="lt-pill"
           style={{ fontSize: 12 }}
           onClick={() => {
             setSearchText("");
@@ -5724,7 +5724,7 @@ function GuidedMindmapPanel(props: {
               key={n.id}
               type="button"
               onClick={() => setSelectedId(n.id)}
-              className={isActive ? "pill pill--on" : "pill"}
+              className={isActive ? "lt-pill pill--on" : "lt-pill"}
               style={{
                 fontSize: 12,
                 borderColor: isGuided && viewMode === "beginner" ? "rgba(46, 213, 115, 0.45)" : undefined,
@@ -5821,7 +5821,7 @@ function GuidedMindmapPanel(props: {
           <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: "7px 10px", fontSize: 13 }}
               disabled={!onAskMentor}
               onClick={() => {
@@ -5839,7 +5839,7 @@ function GuidedMindmapPanel(props: {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: "7px 10px", fontSize: 13 }}
               disabled={!onPracticeNode}
               onClick={() => onPracticeNode?.(String(selected.id))}
@@ -6139,7 +6139,7 @@ function GrindDrawerV1(props: {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: '8px 12px' }}
               onClick={() => { stop(); onClose(); }}
             >
@@ -6250,7 +6250,7 @@ function GrindDrawerV1(props: {
                     <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         type="button"
-                        className="pill"
+                        className="lt-pill"
                         style={{ padding: "7px 10px", fontSize: 13 }}
                         onClick={() => onPracticeNode?.(String(nodeId))}
                         disabled={!onPracticeNode}
@@ -6259,7 +6259,7 @@ function GrindDrawerV1(props: {
                       </button>
                       <button
                         type="button"
-                        className="pill"
+                        className="lt-pill"
                         style={{ padding: "7px 10px", fontSize: 13 }}
                         onClick={() => onOpenTutorNode?.(String(nodeId))}
                         disabled={!onOpenTutorNode}
@@ -6360,11 +6360,11 @@ function GrindDrawerV1(props: {
                           outline: 'none',
                         }}
                       />
-                      <button type="button" className="pill" onClick={submitDoubt} disabled={doubtLoading || !String(doubtInput).trim()}>
+                      <button type="button" className="lt-pill" onClick={submitDoubt} disabled={doubtLoading || !String(doubtInput).trim()}>
                         {doubtLoading ? 'Thinking...' : 'Send'}
                       </button>
                       {doubtLoading ? (
-                        <button type="button" className="pill" onClick={stop} style={{ opacity: 0.8 }}>
+                        <button type="button" className="lt-pill" onClick={stop} style={{ opacity: 0.8 }}>
                           Stop
                         </button>
                       ) : null}
@@ -6378,7 +6378,7 @@ function GrindDrawerV1(props: {
                         <button
                           key={prompt}
                           type="button"
-                          className="pill"
+                          className="lt-pill"
                           style={{ padding: '6px 10px', fontSize: 12 }}
                           onClick={() => setDoubtInput(prompt)}
                           disabled={doubtLoading}
@@ -6517,7 +6517,7 @@ function GrindDrawerV1(props: {
                                         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                                           <button
                                             type="button"
-                                            className="pill"
+                                            className="lt-pill"
                                             style={{ padding: "7px 10px", fontSize: 13 }}
                                             disabled={!hasRecommendedNode}
                                             onClick={() => {
@@ -6529,7 +6529,7 @@ function GrindDrawerV1(props: {
                                           </button>
                                           <button
                                             type="button"
-                                            className="pill"
+                                            className="lt-pill"
                                             style={{ padding: "7px 10px", fontSize: 13 }}
                                             disabled={!hasRecommendedNode || !onOpenTutorNode}
                                             onClick={() => {

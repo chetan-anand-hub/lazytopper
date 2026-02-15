@@ -6,6 +6,15 @@ import type { TopicHubMasterySnapshot } from "./topicHubMastery";
 
 type ProgressScope = "smartLearning" | "practiceInsights" | "topicHubMastery";
 
+// Canonical product-level segment names used by acceptance and analytics layers.
+export const PROGRESS_SEGMENT_ALIASES = {
+  topic_mastery: "topicMasteryByTopic",
+  attempt_stats: "attempts",
+  accuracy: "statsByChapter",
+  streak: "streak",
+  recent_activity: "recentActivity",
+} as const;
+
 const ACTIVE_UID_KEY = "lazytopper.progress.active_uid.v1";
 const SNAPSHOT_KEY_PREFIX = "lazytopper.progress.snapshot.v1";
 const SCOPE_KEY_PREFIX = "lazytopper.progress.scope.v1";

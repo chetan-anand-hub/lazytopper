@@ -19,8 +19,6 @@ export default function Onboarding() {
   const { profile, loadingProfile, setProfileAndCompute } = useProfile();
 
   const [learningSupportMode, setLearningSupportMode] = useState<"guided" | "standard">("guided");
-  const [studentClassInput, setStudentClassInput] = useState<"" | "10" | "12">("");
-  const [assessmentMode, setAssessmentMode] = useState<"diagnostic" | "marks">("marks");
 
   const [examDate, setExamDate] = useState("");
   const [examDateSource, setExamDateSource] = useState<"official" | "predicted">("predicted");
@@ -33,11 +31,10 @@ export default function Onboarding() {
   const [mark1, setMark1] = useState("");
   const [mark2, setMark2] = useState("");
   const [mark3, setMark3] = useState("");
-  const studentClass: "10" | "12" = studentClassInput || profile?.studentClass || "10";
+  const studentClass = "10" as const;
 
   const applyGuidedDefaults = () => {
     setLearningSupportMode("guided");
-    setAssessmentMode("marks");
     setTarget((prev) => prev || "75");
     setHours((prev) => prev || "1.5");
     setMark1((prev) => prev || "55");
@@ -55,7 +52,7 @@ export default function Onboarding() {
     let cancelled = false;
     void (async () => {
       const staticDate =
-        studentClass === "10" ? String(cbseDates.class10?.boardExam || "") : String(cbseDates.class12?.boardExam || "");
+        String(cbseDates.class10?.boardExam || "");
       const result = await fetchCbseExamDate(studentClass);
       if (cancelled) return;
       setExamDate(result.examDate || staticDate);
@@ -83,17 +80,14 @@ export default function Onboarding() {
       return;
     }
 
-    let currentPercent: number | undefined;
-    if (assessmentMode === "marks") {
-      const m1 = Number(mark1);
-      const m2 = Number(mark2);
-      const m3 = Number(mark3);
-      if (!m1 || !m2 || !m3) {
-        alert("Please enter your last three test percentages.");
-        return;
-      }
-      currentPercent = (m1 + m2 + m3) / 3;
+    const m1 = Number(mark1);
+    const m2 = Number(mark2);
+    const m3 = Number(mark3);
+    if (!m1 || !m2 || !m3) {
+      alert("Please enter your last three test percentages.");
+      return;
     }
+    const currentPercent = (m1 + m2 + m3) / 3;
 
     const nextProfile = {
       studentClass,
@@ -108,7 +102,7 @@ export default function Onboarding() {
 
   if (loadingProfile) {
     return (
-      <div className="page">
+      <div className="lt-page">
         <div className="card">
           <h3>Preparing your onboarding...</h3>
         </div>
@@ -117,7 +111,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <h2 className="title center">Tell us about you</h2>
 
       <div className="card" data-testid="onboarding-support-cues">
@@ -150,12 +144,8 @@ export default function Onboarding() {
 
       <div className="card">
         <label>Class</label>
-        <select
-          value={studentClass}
-          onChange={(e) => setStudentClassInput(e.target.value as "10" | "12")}
-        >
+        <select value={studentClass} disabled>
           <option value="10">Class 10 (CBSE)</option>
-          <option value="12">Class 12 (CBSE)</option>
         </select>
 
         <p className="subtitle" style={{ marginTop: 12 }}>
@@ -185,40 +175,17 @@ export default function Onboarding() {
       <div className="card">
         <h3 style={{ marginBottom: 8 }}>How should we estimate your level?</h3>
         <p className="subtitle" style={{ marginBottom: 12 }}>
-          Choose one method.
+          We currently use board marks mode.
         </p>
-
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <button
-            className="pill-btn"
-            style={{ background: assessmentMode === "diagnostic" ? "#3467d6" : "#2e2e2e" }}
-            onClick={() => setAssessmentMode("diagnostic")}
-          >
-            A. Quick Diagnostic Test
-          </button>
-          <button
-            className="pill-btn"
-            style={{ background: assessmentMode === "marks" ? "#3467d6" : "#2e2e2e" }}
-            onClick={() => setAssessmentMode("marks")}
-          >
-            B. Use Last 3 Test Marks
-          </button>
-        </div>
-
-        {assessmentMode === "diagnostic" ? (
-          <p className="subtitle" style={{ marginTop: 4 }}>
-            Diagnostic test integration can be plugged in here. For now, we use target + hours/day.
-          </p>
-        ) : (
-          <>
-            <label>Last test / pre-board % (latest)</label>
-            <input type="number" value={mark1 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark1(e.target.value)} placeholder="e.g., 72" />
-            <label>Second last test %</label>
-            <input type="number" value={mark2 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark2(e.target.value)} placeholder="e.g., 68" />
-            <label>Third last test %</label>
-            <input type="number" value={mark3 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark3(e.target.value)} placeholder="e.g., 65" />
-          </>
-        )}
+        <p className="subtitle" style={{ marginTop: 4 }}>
+          Diagnostic onboarding will be re-enabled after its full scoring flow lands.
+        </p>
+        <label>Last test / pre-board % (latest)</label>
+        <input type="number" value={mark1 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark1(e.target.value)} placeholder="e.g., 72" />
+        <label>Second last test %</label>
+        <input type="number" value={mark2 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark2(e.target.value)} placeholder="e.g., 68" />
+        <label>Third last test %</label>
+        <input type="number" value={mark3 || String(Math.round(Number(profile?.currentPercent || 0)) || "")} onChange={(e) => setMark3(e.target.value)} placeholder="e.g., 65" />
       </div>
 
       <div className="card">

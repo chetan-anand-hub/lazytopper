@@ -51,7 +51,7 @@ export default function WeeklyWrappedPage() {
   };
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <h2 className="title">Weekly Wrapped</h2>
 
       {summary.totalAttempts === 0 ? (

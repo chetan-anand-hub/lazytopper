@@ -25,14 +25,26 @@
 
   --radius: 22px;
   --shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  --lt-page-padding: 24px 16px 40px;
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Poppins", system-ui, sans-serif;
+  --lt-ux-return-back-padding: 6px 12px;
+  --lt-ux-return-back-font-size: 0.84rem;
+  --lt-ux-chip-padding: 4px 10px;
+  --lt-ux-chip-font-size: 0.78rem;
+  --lt-ux-journey-chip-padding: 5px 10px;
+  --lt-ux-journey-chip-font-size: 0.78rem;
+  --lt-ux-journey-position: static;
+  --lt-ux-journey-top: auto;
+  --lt-ux-journey-z: auto;
+  --lt-ux-journey-backdrop: none;
 }
 
 /* Body & navbar */
 body {
   background: radial-gradient(circle at top, #e5f0ff 0, #ecf0f3 50%, #dbeafe 100%);
   color: var(--text);
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-body);
 }
 
 .navbar {
@@ -48,16 +60,17 @@ body {
   backdrop-filter: blur(18px);
 }
 
-/* Page wrapper */
+/* Page wrapper (legacy `.page` + preferred `.lt-page`) */
+.lt-page,
 .page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: var(--lt-page-padding);
 }
 
 @media (min-width: 768px) {
-  .page {
-    padding: 32px 0 48px;
+  :root {
+    --lt-page-padding: 32px 0 48px;
   }
 }
 
@@ -83,7 +96,7 @@ body {
 
 /* Titles */
 .title {
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 1.9rem;
   font-weight: 700;
   margin-bottom: 10px;
@@ -153,7 +166,7 @@ select:focus {
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   box-shadow: 0 18px 40px rgba(37, 99, 235, 0.6);
   transition: transform 0.16s ease-out, box-shadow 0.16s ease-out,
     filter 0.1s ease-out;
@@ -190,14 +203,14 @@ select:focus {
  */
 .focus-card {
   /* Additional vertical padding to separate it from the next card */
+  margin-top: 12px;
   margin-bottom: 16px;
 }
 
 .mix-list {
   list-style: disc;
-  padding-left: 1.5rem;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  padding: 0;
+  margin: 10px 0 0 18px;
   line-height: 1.4;
 }
 
@@ -205,13 +218,14 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .cta-btn.small {
   margin-top: 0;
-  padding: 8px 14px;
-  font-size: 0.85rem;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  border-radius: 999px;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
   display: inline-flex;
   align-items: center;
@@ -342,7 +356,7 @@ select:focus {
 .flashcard h3 {
   margin-top: 0;
   margin-bottom: 8px;
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 1rem;
 }
 
@@ -535,7 +549,7 @@ select:focus {
 }
 
 .chapter-title {
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 1.9rem;
   font-weight: 700;
   margin-bottom: 8px;
@@ -565,7 +579,7 @@ select:focus {
   cursor: pointer;
   background: linear-gradient(135deg, #ff7b39, #ffb347);
   color: #0b0b0f;
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   box-shadow: 0 18px 40px rgba(255, 123, 57, 0.55);
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
   width: 100%;
@@ -612,7 +626,7 @@ select:focus {
 }
 
 .chapter-hero-anim-card h2 {
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 1.3rem;
   margin-bottom: 8px;
 }
@@ -656,7 +670,7 @@ select:focus {
 }
 
 .chapter-study-plan-header h2 {
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: 1.3rem;
   margin-bottom: 6px;
 }
@@ -680,7 +694,7 @@ select:focus {
   color: var(--text);
   font-weight: 500;
   cursor: pointer;
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.18);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
@@ -716,7 +730,7 @@ select:focus {
 .chapter-topic-card h3 {
   font-size: 1rem;
   margin-bottom: 4px;
-  font-family: "Poppins", system-ui, sans-serif;
+  font-family: var(--font-display);
 }
 
 .chapter-topic-card p {
@@ -1403,10 +1417,14 @@ select:focus {
   margin-bottom: 2rem;
 }
 
+/* Shared chip primitive (legacy `.pill` + preferred `.lt-pill`) */
+.lt-pill,
 .pill {
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
   font-size: 0.85rem;
+  font-weight: 500;
+  background: #f3f4ff;
 }
 
 .pillActive {
@@ -1445,111 +1463,22 @@ select:focus {
   gap: 0.75rem;
 }
 
-.topic-card {
-  border-radius: 14px;
-  background: #ffffff;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-}
-
-.topic-card-open {
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
-}
-
-.topic-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: none;
-  background: transparent;
-  padding: 0.75rem 0.9rem;
-  cursor: pointer;
-}
-
-.topic-header-main {
-  text-align: left;
-}
-
-.topic-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.topic-weight {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
-
-.topic-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.topic-tier-pill {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.topic-chevron {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.topic-body {
-  padding: 0.4rem 0.9rem 0.8rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.topic-body-caption {
-  font-size: 0.8rem;
-  color: #6b7280;
-  margin-bottom: 0.25rem;
-}
-
-/* Subtopic list */
-
-.concept-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.concept-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8rem;
-  padding: 0.35rem 0.45rem;
-  border-radius: 10px;
-}
 
 
-.concept-item-clickable:hover {
-  background: #f3f4ff;
-}
 
-.concept-name {
-  font-weight: 500;
-}
 
-.concept-share {
-  color: #6b7280;
-  margin-left: 0.5rem;
-}
 
-.concept-link-hint {
-  margin-left: 0.75rem;
-  font-size: 0.75rem;
-  color: #4f46e5;
-}
+
+
+
+
+
+
+
+
+
+
+
 
 /* Difficulty strip */
 
@@ -1780,93 +1709,19 @@ select:focus {
   gap: 0.6rem;
 }
 
-.topic-card {
-  border-radius: 0.9rem;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  overflow: hidden;
-}
 
-.topic-card.open {
-  border-color: #6366f1;
-  background: #ffffff;
-}
 
-.topic-header {
-  width: 100%;
-  border: none;
-  background: transparent;
-  display: flex;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  cursor: pointer;
-}
 
-.topic-main h3 {
-  font-size: 1rem;
-  margin: 0;
-}
 
-.topic-main .topic-weight {
-  font-size: 0.85rem;
-  color: #6b7280;
-}
 
-.topic-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 
-.tier-pill {
-  border-radius: 999px;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.8rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
 
-.tier-pill .emoji {
-  font-size: 0.95rem;
-}
 
-.tier-pill.tier-must-crack {
-  background: #fef3c7;
-  color: #b45309;
-}
 
-.tier-pill.tier-high-roi {
-  background: #dcfce7;
-  color: #166534;
-}
 
-.tier-pill.tier-good-to-do {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
 
-.topic-right .caret {
-  font-size: 0.95rem;
-  color: #6b7280;
-}
 
-.topic-body {
-  padding: 0.5rem 1rem 0.9rem;
-  border-top: 1px dashed #e5e7eb;
-}
 
-.topic-body-title {
-  font-size: 0.85rem;
-  color: #6b7280;
-  margin-bottom: 0.35rem;
-}
-
-.concept-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
 
 .concept-row {
   display: flex;
@@ -1875,9 +1730,6 @@ select:focus {
   padding: 0.25rem 0;
 }
 
-.concept-name {
-  max-width: 70%;
-}
 
 .concept-weight {
   color: #6b7280;
@@ -1887,14 +1739,6 @@ select:focus {
   gap: 0.75rem;
   margin: 0.75rem 0 1rem;
   flex-wrap: wrap;
-}
-
-.pill {
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  background: #f3f4ff;
 }
 
 .pill-must { background: #ffe6e6; }
@@ -1958,18 +1802,10 @@ select:focus {
   gap: 0.5rem;
 }
 
-.tier-emoji {
-  font-size: 1.1rem;
-}
-
 .tier-title {
   font-weight: 600;
 }
 
-.tier-count {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
 
 .tier-topics {
   margin-top: 0.4rem;
@@ -1986,16 +1822,6 @@ select:focus {
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
 
-.topic-main {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.75rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
 
 .topic-main-left {
   display: flex;
@@ -2008,15 +1834,7 @@ select:focus {
   font-size: 0.95rem;
 }
 
-.topic-weightage {
-  font-size: 0.8rem;
-  color: #6b7280;
-  margin-top: 0.1rem;
-}
 
-.topic-toggle {
-  font-size: 1.1rem;
-}
 
 .topic-subtopics {
   border-top: 1px solid #eef1fb;
@@ -2119,13 +1937,6 @@ select:focus {
   font-size: 14px;
 }
 
-.difficulty-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
 .difficulty-chip {
   display: inline-flex;
   align-items: center;
@@ -2166,27 +1977,27 @@ select:focus {
 }
 
 /* Section titles */
-.section-title {
+.page-container .section-title {
   font-size: 20px;
   font-weight: 700;
   margin-bottom: 4px;
 }
 
-.section-subtitle {
+.page-container .section-subtitle {
   font-size: 13px;
   color: #6b7280;
   margin-bottom: 12px;
 }
 
 /* Tier pills */
-.tier-filter-row {
+.chapter-trends-card .tier-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 12px 0 16px;
 }
 
-.tier-pill {
+.chapter-trends-card .tier-pill {
   border-radius: 999px;
   border: 1px solid #e5e7eb;
   padding: 6px 12px;
@@ -2198,39 +2009,11 @@ select:focus {
   gap: 6px;
 }
 
-.tier-pill--active {
-  background: linear-gradient(135deg, #f97316, #ef4444);
-  color: white;
-  border-color: transparent;
-}
-
-.tier-count {
-  font-size: 12px;
-  opacity: 0.9;
-}
-
-/* Tier accordion + topics */
-.tier-accordion details {
-  margin-bottom: 10px;
-  border-radius: 16px;
-  background: #f9fafb;
-  padding: 10px 12px 6px;
-}
-
-.tier-summary {
-  list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-}
 
 
-.tier-summary-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+
+
+
 
 .tier-summary-title {
   font-weight: 600;
@@ -2241,90 +2024,17 @@ select:focus {
   color: #6b7280;
 }
 
-.topic-list {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 
-.topic-card {
-  border-radius: 14px;
-  background: white;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-}
 
-.topic-header {
-  width: 100%;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  cursor: pointer;
-}
 
-.topic-main {
-  text-align: left;
-}
 
-.topic-title {
-  font-size: 14px;
-  font-weight: 600;
-}
 
-.topic-weightage {
-  font-size: 12px;
-  color: #6b7280;
-}
 
-.topic-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.topic-tier-pill {
-  font-size: 11px;
-  border-radius: 999px;
-  padding: 3px 8px;
-  background: #fee2e2;
-  color: #b91c1c;
-}
 
-.topic-body {
-  border-top: 1px solid #f3f4f6;
-  padding: 8px 12px 10px;
-}
 
-.topic-body-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 4px;
-}
 
-.concept-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
 
-.concept-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 2px 0;
-}
-
-.concept-name {
-  font-weight: 500;
-}
-
-.concept-share {
-  color: #6b7280;
-}
 
 /* Blueprint preview */
 .blueprint-preview {
@@ -2635,8 +2345,7 @@ select:focus {
   max-width: 1120px;
   margin: 0 auto;
   padding: 24px 16px 96px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-body);
   color: #0f172a;
 }
 
@@ -3583,8 +3292,7 @@ select:focus {
   min-height: 100vh;
   padding: 24px 16px 96px;
   background: radial-gradient(circle at top left, #dbeafe, #f9fafb 55%, #e5e7eb);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
-    system-ui, sans-serif;
+  font-family: var(--font-body);
   color: #0f172a;
 }
 
@@ -3714,31 +3422,22 @@ select:focus {
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.14);
 }
 
-.section-title {
-  margin: 0 0 4px;
-  font-size: 1.1rem;
-}
-
-.section-subtitle {
+.chapter-trends-card .section-subtitle {
   margin: 0 0 8px;
   font-size: 0.85rem;
   color: #6b7280;
 }
 
-.section-subtitle.tiny {
-  font-size: 0.8rem;
-}
-
 /* --------- Tier filter pills ---------- */
 
-.tier-filter-row {
+.chapter-trends-card .tier-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 8px 0 10px;
 }
 
-.tier-pill {
+.chapter-trends-card .tier-pill {
   border-radius: 999px;
   border: 1px solid #e5e7eb;
   padding: 6px 12px;
@@ -3751,42 +3450,14 @@ select:focus {
   color: #111827;
 }
 
-.tier-pill--active {
-  background: #111827;
-  color: #f9fafb;
-}
 
-/* --------- Tier accordion ---------- */
 
-.tier-accordion details {
-  border-radius: 20px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  margin-top: 10px;
-}
-
-.tier-summary {
-  list-style: none;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-}
 
 .tier-summary::-webkit-details-marker {
   display: none;
 }
 
-.tier-summary-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
-.tier-emoji {
-  font-size: 1.1rem;
-}
 
 .tier-summary-title {
   font-weight: 600;
@@ -3798,138 +3469,27 @@ select:focus {
   color: #6b7280;
 }
 
-.topic-list {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 
-/* --------- Topic cards ---------- */
 
-.topic-card {
-  border-radius: 18px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  overflow: hidden;
-}
 
-.topic-header {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 10px 14px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-}
 
-.topic-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
-.topic-title {
-  font-size: 0.98rem;
-  font-weight: 600;
-}
 
-.topic-weightage {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
 
-.topic-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.topic-tier-pill {
-  border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
-  padding: 3px 9px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
 
-.topic-toggle {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
 
-/* CTA row with "Quick revision / Open topic hub" */
 
-.topic-cta-row {
-  padding: 0 14px 8px;
-}
 
-.topic-quick-revise-btn {
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #f3f4f6;
-  padding: 5px 12px;
-  font-size: 0.8rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
 
-.topic-quick-revise-btn:hover {
-  background: #e5e7eb;
-}
-
-/* Body inside expanded topic */
-
-.topic-body {
-  padding: 0 14px 12px 14px;
-  border-top: 1px dashed #e5e7eb;
-}
-
-.topic-body-label {
-  font-size: 0.8rem;
-  color: #6b7280;
-  margin: 8px 0 4px;
-}
-
-.concept-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.concept-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 0;
-  font-size: 0.86rem;
-}
 
 .concept-item + .concept-item {
   border-top: 1px dashed #e5e7eb;
 }
 
 
-.concept-name {
-  flex: 1;
-}
 
-.concept-link-hint {
-  font-size: 0.75rem;
-  color: #9ca3af;
-}
 
-.concept-share {
-  font-size: 0.8rem;
-  color: #4b5563;
-}
 
 /* --------- Bottom "Next step" card ---------- */
 
@@ -4077,34 +3637,13 @@ select:focus {
   letter-spacing: 0.01em;
 }
 
-/* --- Tier filter chips --- */
 
-.tier-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0 8px;
-}
 
-.tier-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(248, 250, 252, 0.85);
-  color: #0f172a;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
-}
-
-.tier-pill span:first-child {
+.chapter-trends-card .tier-pill span:first-child {
   font-size: 1rem;
 }
 
-.tier-pill--active {
+.chapter-trends-card .tier-pill--active {
   background: linear-gradient(135deg, #0f172a, #111827);
   color: #f9fafb;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.35);
@@ -4113,7 +3652,7 @@ select:focus {
 
 /* --- Tier accordion headers --- */
 
-.tier-summary {
+.chapter-trends-card .tier-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4123,26 +3662,26 @@ select:focus {
   cursor: pointer;
 }
 
-.tier-summary-left {
+.chapter-trends-card .tier-summary-left {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-.tier-emoji {
+.chapter-trends-card .tier-emoji {
   font-size: 1.3rem;
 }
 
 /* --- Topic cards --- */
 
-.topic-list {
+.chapter-trends-card .topic-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-top: 14px;
 }
 
-.topic-card {
+.chapter-trends-card .topic-card {
   border-radius: 20px;
   padding: 14px 16px 16px;
   background: #ffffff;
@@ -4151,7 +3690,7 @@ select:focus {
   transition: box-shadow 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
 }
 
-.topic-card:hover {
+.chapter-trends-card .topic-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
   border-color: rgba(129, 140, 248, 0.9);
@@ -4159,7 +3698,7 @@ select:focus {
 
 /* Topic header row (title + badge) */
 
-.topic-header {
+.chapter-trends-card .topic-header {
   display: flex;
   width: 100%;
   border: none;
@@ -4171,28 +3710,28 @@ select:focus {
   justify-content: space-between;
 }
 
-.topic-main {
+.chapter-trends-card .topic-main {
   text-align: left;
 }
 
-.topic-title {
+.chapter-trends-card .topic-title {
   font-size: 1.05rem;
   font-weight: 700;
 }
 
-.topic-weightage {
+.chapter-trends-card .topic-weightage {
   font-size: 0.82rem;
   color: #6b7280;
   margin-top: 2px;
 }
 
-.topic-meta {
+.chapter-trends-card .topic-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.topic-tier-pill {
+.chapter-trends-card .topic-tier-pill {
   font-size: 0.75rem;
   padding: 4px 10px;
   border-radius: 999px;
@@ -4201,19 +3740,19 @@ select:focus {
   font-weight: 600;
 }
 
-.topic-toggle {
+.chapter-trends-card .topic-toggle {
   font-size: 0.8rem;
   color: #6b7280;
 }
 
 /* Quick revision CTA row */
 
-.topic-cta-row {
+.chapter-trends-card .topic-cta-row {
   margin-top: 4px;
   margin-bottom: 8px;
 }
 
-.topic-quick-revise-btn {
+.chapter-trends-card .topic-quick-revise-btn {
   border-radius: 999px;
   padding: 6px 14px;
   font-size: 0.8rem;
@@ -4228,19 +3767,19 @@ select:focus {
 
 /* Concept list inside each topic */
 
-.topic-body {
+.chapter-trends-card .topic-body {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed rgba(209, 213, 219, 0.9);
 }
 
-.topic-body-label {
+.chapter-trends-card .topic-body-label {
   font-size: 0.78rem;
   color: #6b7280;
   margin-bottom: 6px;
 }
 
-.concept-list {
+.chapter-trends-card .concept-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -4249,7 +3788,7 @@ select:focus {
   gap: 6px;
 }
 
-.concept-item {
+.chapter-trends-card .concept-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4260,32 +3799,32 @@ select:focus {
   font-size: 0.78rem;
 }
 
-.concept-item-clickable {
+.chapter-trends-card .concept-item-clickable {
   cursor: pointer;
 }
 
-.concept-item-clickable:hover {
+.chapter-trends-card .concept-item-clickable:hover {
   background: #e0e7ff;
 }
 
-.concept-name {
+.chapter-trends-card .concept-name {
   white-space: nowrap;
 }
 
-.concept-link-hint {
+.chapter-trends-card .concept-link-hint {
   color: #6b7280;
   font-style: italic;
   font-size: 0.72rem;
 }
 
-.concept-share {
+.chapter-trends-card .concept-share {
   font-weight: 600;
   color: #4b5563;
 }
 
 /* --- Bottom CTAs: mock + highly probable --- */
 
-.blueprint-preview {
+.chapter-trends-card .blueprint-preview {
   margin-top: 28px;
   padding: 18px 20px 22px;
   border-radius: 24px;
@@ -4293,7 +3832,7 @@ select:focus {
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
-.chapter-secondary-cta {
+.chapter-trends-card .chapter-secondary-cta {
   border-radius: 999px;
   border: none;
   padding: 10px 18px;
@@ -4310,12 +3849,12 @@ select:focus {
   transition: transform 0.12s ease, box-shadow 0.18s ease;
 }
 
-.chapter-secondary-cta:hover {
+.chapter-trends-card .chapter-secondary-cta:hover {
   transform: translateY(-1px);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.7);
 }
 
-.section-subtitle.tiny {
+.chapter-trends-card .section-subtitle.tiny {
   font-size: 0.78rem;
 }
 .exam-stack-btn-primary {
@@ -4396,13 +3935,6 @@ select:focus {
   color: #111827;
 }
 
-/* Make "Open topic hub" button feel clickable but light */
-.topic-quick-revise-btn {
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
 /* ========== TopicHub Gen-Z layout ========== */
 
 .topic-hub-page {
@@ -4457,11 +3989,6 @@ select:focus {
   background: rgba(15, 23, 42, 0.35);
 }
 
-.topic-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 4px 0 6px;
-}
 
 .topic-hero-tagline {
   font-size: 0.98rem;
@@ -4476,13 +4003,6 @@ select:focus {
   margin-bottom: 14px;
 }
 
-.topic-card {
-  background: rgba(255, 255, 255, 0.97);
-  border-radius: 20px;
-  padding: 14px 18px;
-  margin-bottom: 18px;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
-}
 
 .topic-card-exam-link {
   background: rgba(255, 255, 255, 0.16);
@@ -4510,9 +4030,6 @@ select:focus {
   font-size: 1.1rem;
 }
 
-.topic-body {
-  font-size: 0.95rem;
-}
 
 .topic-exam-chip-row {
   display: flex;
@@ -4558,11 +4075,6 @@ select:focus {
   gap: 20px;
 }
 
-.topic-list {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.95rem;
-}
 
 .topic-list.numbered {
   list-style-type: decimal;
@@ -4921,65 +4433,8 @@ select:focus {
 .mentor-panel {
   width: 100%;
   max-width: 260px;
-  border-radius: 24px;
-  padding: 18px;
-  background: radial-gradient(circle at 0 0, #22c55e, #4f46e5);
   position: relative;
   overflow: hidden;
-  color: #f9fafb;
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.7);
-}
-
-/* --- Mentor Panel container --- */
-.mentor-panel {
-  position: relative;
-  padding: 1.4rem 1.2rem;
-  border-radius: 24px;
-  background: linear-gradient(145deg, #32b980, #3467d6);
-  color: #ffffff;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-height: 360px;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* --- Mentor Panel container --- */
-.mentor-panel {
-  position: relative;
   padding: 1.4rem 1.2rem;
   border-radius: 24px;
   background: linear-gradient(145deg, #32b980, #3467d6);
@@ -5380,14 +4835,6 @@ select:focus {
   margin-right: 4px;
 }
 
-.tier-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-}
 
 .tier-pill--must {
   background: #fee2e2;
@@ -5443,7 +4890,7 @@ select:focus {
   max-width: 1120px;
   margin: 0 auto;
   padding: 24px 16px 56px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
 }
 
 /* little top pills */
@@ -5984,7 +5431,7 @@ select:focus {
 .home-page {
   min-height: 100vh;
   background: radial-gradient(circle at top, #e0f2ff 0, #dde7ff 30%, #e5edff 60%, #f5f7fb 100%);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
 }
 
 .home-container {
@@ -6393,14 +5840,14 @@ select:focus {
   padding: 18px 16px 20px;
 }
 
-.section-title {
+.how-section .section-title {
   font-size: 1.2rem;
   font-weight: 600;
   color: #020617;
   margin-bottom: 4px;
 }
 
-.section-subtitle {
+.how-section .section-subtitle {
   font-size: 0.86rem;
   color: #64748b;
   margin-bottom: 12px;
@@ -6970,15 +6417,6 @@ select:focus {
   color: var(--text-muted);
   font-size: 0.9rem;
 }
-
-
-
-/* --- Dashboard Daily Focus Mix --- */
-.focus-card{margin-top:12px}
-.mix-list{margin:10px 0 0 18px;padding:0}
-.focus-cta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.cta-btn.small{padding:8px 10px;font-size:.9rem;border-radius:999px}
-
 /* --- Shared UX strips (P2 + P3) --- */
 .ux-return-bar {
   display: flex;
@@ -6992,9 +6430,9 @@ select:focus {
   border: 1px solid rgba(148, 163, 184, 0.8);
   background: rgba(255, 255, 255, 0.9);
   color: #334155;
-  font-size: 0.84rem;
+  font-size: var(--lt-ux-return-back-font-size);
   font-weight: 700;
-  padding: 6px 12px;
+  padding: var(--lt-ux-return-back-padding);
   cursor: pointer;
 }
 .ux-return-bar__chips {
@@ -7007,8 +6445,8 @@ select:focus {
   border: 1px solid rgba(148, 163, 184, 0.7);
   background: rgba(255, 255, 255, 0.82);
   color: #475569;
-  font-size: 0.78rem;
-  padding: 4px 10px;
+  font-size: var(--lt-ux-chip-font-size);
+  padding: var(--lt-ux-chip-padding);
   cursor: pointer;
 }
 .ux-return-bar__back:focus-visible,
@@ -7024,6 +6462,10 @@ select:focus {
   background: rgba(255, 255, 255, 0.75);
   padding: 10px 12px;
   margin-bottom: 12px;
+  position: var(--lt-ux-journey-position);
+  top: var(--lt-ux-journey-top);
+  z-index: var(--lt-ux-journey-z);
+  backdrop-filter: var(--lt-ux-journey-backdrop);
 }
 .ux-journey-strip__title {
   font-size: 0.74rem;
@@ -7043,9 +6485,9 @@ select:focus {
   border: 1px solid rgba(148, 163, 184, 0.75);
   background: rgba(255, 255, 255, 0.9);
   color: #334155;
-  font-size: 0.78rem;
+  font-size: var(--lt-ux-journey-chip-font-size);
   font-weight: 800;
-  padding: 5px 10px;
+  padding: var(--lt-ux-journey-chip-padding);
   cursor: pointer;
 }
 .ux-journey-strip__chip[data-active="true"] {
@@ -7055,19 +6497,27 @@ select:focus {
 }
 
 @media (max-width: 768px) {
-  .ux-return-bar__back {
-    padding: 8px 12px;
-    font-size: 0.82rem;
+  :root {
+    --lt-ux-return-back-padding: 8px 12px;
+    --lt-ux-return-back-font-size: 0.82rem;
+    --lt-ux-chip-padding: 7px 11px;
+    --lt-ux-chip-font-size: 0.76rem;
+    --lt-ux-journey-chip-padding: 7px 11px;
+    --lt-ux-journey-chip-font-size: 0.76rem;
+    --lt-ux-journey-position: sticky;
+    --lt-ux-journey-top: 54px;
+    --lt-ux-journey-z: 8;
+    --lt-ux-journey-backdrop: blur(6px);
   }
-  .ux-return-bar__chip,
-  .ux-journey-strip__chip {
-    padding: 7px 11px;
-    font-size: 0.76rem;
-  }
-  .ux-journey-strip {
-    position: sticky;
-    top: 54px;
-    z-index: 8;
-    backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

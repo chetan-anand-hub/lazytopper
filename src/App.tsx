@@ -3,31 +3,47 @@ import { Routes, Route, useLocation, useNavigate, Navigate } from "react-router-
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import TrendsPage from "./pages/TrendsPage";
-import MockPaper from "./pages/MockPaper";
-import HighlyProbableQuestions from "./pages/HighlyProbableQuestions";
-import PredictivePapersPage from "./pages/PredictivePapers";
-import TopicHub from "./pages/TopicHub";
 import TopicHubHome from "./pages/TopicHubHome";
-import MockBuilder from "./pages/MockBuilder";
-import AiMentorPage from "./pages/AiMentorPage";
-import StudyPlanPage from "./pages/StudyPlanPage";
 import { StudyPlannerView } from "./components/planner/StudyPlannerView";
-import PracticePage from "./pages/PracticePage";
 
 
 // Import the new Vibe toggle and command palette components.
 import { VibeToggle } from './ui/components/VibeToggle';
 import { CommandPalette } from './ui/components/CommandPalette';
-import { useState, useEffect } from 'react';
-import DailyMixPage from './pages/DailyMixPage';
-import WeeklyWrappedPage from './pages/WeeklyWrappedPage';
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useVibeMode } from './context/vibeModeContext';
 import { parseCommandIntent } from "./services/commandIntent";
 import { normalizeTopicKey } from "./utils/topicResolver";
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { useAuth } from "./context/AuthContext";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const TrendsPage = lazy(() => import("./pages/TrendsPage"));
+const MockPaper = lazy(() => import("./pages/MockPaper"));
+const HighlyProbableQuestions = lazy(() => import("./pages/HighlyProbableQuestions"));
+const PredictivePapersPage = lazy(() => import("./pages/PredictivePapers"));
+const TopicHub = lazy(() => import("./pages/TopicHub"));
+const MockBuilder = lazy(() => import("./pages/MockBuilder"));
+const AiMentorPage = lazy(() => import("./pages/AiMentorPage"));
+const StudyPlanPage = lazy(() => import("./pages/StudyPlanPage"));
+const PracticePage = lazy(() => import("./pages/PracticePage"));
+const DailyMixPage = lazy(() => import("./pages/DailyMixPage"));
+const WeeklyWrappedPage = lazy(() => import("./pages/WeeklyWrappedPage"));
+const SessionPlayPage = lazy(() => import("./pages/SessionPlayPage"));
+
+function RouteFallback() {
+  return (
+    <div className="lt-page">
+      <div className="card">
+        <h3>Loading...</h3>
+      </div>
+    </div>
+  );
+}
+
+function withRouteSuspense(node: React.ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{node}</Suspense>;
+}
 
 /**
  * BottomNav component renders a simple bottom navigation bar for the mobile view.
@@ -254,7 +270,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
-          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth>{withRouteSuspense(<Dashboard />)}</RequireAuth>} />
 
           {/* New Smart Study Planner (grade + subject aware) */}
           <Route path="/planner/:grade/:subject" element={<RequireAuth><StudyPlannerView /></RequireAuth>} />
@@ -263,11 +279,11 @@ export default function App() {
 
 
           {/* Legacy Topic content hub – maths topics via :topicKey param */}
-          <Route path="/topics/:topicKey" element={<RequireAuth><TopicHub /></RequireAuth>} />
+          <Route path="/topics/:topicKey" element={<RequireAuth>{withRouteSuspense(<TopicHub />)}</RequireAuth>} />
 
           {/* Preferred Topic Hub entry with grade & subject in path */}
-          <Route path="/topic-hub/:grade/:subject" element={<RequireAuth><TopicHub /></RequireAuth>} />
-          <Route path="/topic-hub/:grade/:subject/:topicKey" element={<RequireAuth><TopicHub /></RequireAuth>} />
+          <Route path="/topic-hub/:grade/:subject" element={<RequireAuth>{withRouteSuspense(<TopicHub />)}</RequireAuth>} />
+          <Route path="/topic-hub/:grade/:subject/:topicKey" element={<RequireAuth>{withRouteSuspense(<TopicHub />)}</RequireAuth>} />
 
           {/* TopicHub launcher page */}
           <Route path="/topic-hub" element={<TopicHubHome />} />
@@ -275,57 +291,63 @@ export default function App() {
       
 
           {/* Dynamic Trends Page (Maths + Science with toggle) */}
-          <Route path="/trends/:grade/:subject" element={<TrendsPage />} />
+          <Route path="/trends/:grade/:subject" element={withRouteSuspense(<TrendsPage />)} />
 
           {/* Auto-mock paper view (legacy + predictive) */}
-          <Route path="/mock-paper/:slug" element={<MockPaper />} />
+          <Route path="/mock-paper/:slug" element={withRouteSuspense(<MockPaper />)} />
 
           {/* New Mock Builder v1 with mandatory grade & subject */}
-          <Route path="/mock-builder/:grade/:subject" element={<MockBuilder />} />
+          <Route path="/mock-builder/:grade/:subject" element={withRouteSuspense(<MockBuilder />)} />
           {/* Legacy Mock Builder route (no params) */}
-          <Route path="/mock-builder" element={<MockBuilder />} />
+          <Route path="/mock-builder" element={withRouteSuspense(<MockBuilder />)} />
 
           {/* Highly Probable Questions with mandatory grade & subject */}
           <Route
             path="/highly-probable/:grade/:subject"
-            element={<HighlyProbableQuestions />}
+            element={withRouteSuspense(<HighlyProbableQuestions />)}
           />
           {/* Legacy HPQ route */}
           <Route
             path="/highly-probable"
-            element={<HighlyProbableQuestions />}
+            element={withRouteSuspense(<HighlyProbableQuestions />)}
           />
 
           {/* Predictive papers hub */}
           <Route
             path="/predictive-papers"
-            element={<PredictivePapersPage />}
+            element={withRouteSuspense(<PredictivePapersPage />)}
           />
 
-          <Route path="/practice/:grade/:subject" element={<PracticePage />} />
+          <Route path="/practice/:grade/:subject" element={withRouteSuspense(<PracticePage />)} />
 
           {/* Study Plan with mandatory grade & subject */}
-          <Route path="/study-plan/:grade/:subject" element={<RequireAuth><StudyPlanPage /></RequireAuth>} />
+          <Route path="/study-plan/:grade/:subject" element={<RequireAuth>{withRouteSuspense(<StudyPlanPage />)}</RequireAuth>} />
           {/* Legacy Study Plan route */}
-          <Route path="/study-plan" element={<RequireAuth><StudyPlanPage /></RequireAuth>} />
+          <Route path="/study-plan" element={<RequireAuth>{withRouteSuspense(<StudyPlanPage />)}</RequireAuth>} />
 
           {/* AI Mentor / Planner routes with mandatory grade & subject */}
-          <Route path="/ai-mentor/:grade/:subject" element={<AiMentorPage />} />
-          <Route path="/ai-mentor" element={<AiMentorPage />} />
+          <Route path="/ai-mentor/:grade/:subject" element={withRouteSuspense(<AiMentorPage />)} />
+          <Route path="/ai-mentor" element={withRouteSuspense(<AiMentorPage />)} />
           {/* Provide both /mentor and /ai-mentor so links remain backwards compatible */}
-          <Route path="/mentor/:grade/:subject" element={<AiMentorPage />} />
-          <Route path="/mentor" element={<AiMentorPage />} />
+          <Route path="/mentor/:grade/:subject" element={withRouteSuspense(<AiMentorPage />)} />
+          <Route path="/mentor" element={withRouteSuspense(<AiMentorPage />)} />
 
           {/* Daily Mix route for personalised study mixes */}
           <Route
             path="/daily-mix/:grade/:subject"
-            element={<RequireAuth><DailyMixPage /></RequireAuth>}
+            element={<RequireAuth>{withRouteSuspense(<DailyMixPage />)}</RequireAuth>}
+          />
+
+          {/* Unified session player route */}
+          <Route
+            path="/play/:sessionId"
+            element={<RequireAuth>{withRouteSuspense(<SessionPlayPage />)}</RequireAuth>}
           />
 
           {/* Weekly Wrapped recap route */}
           <Route
             path="/weekly-wrapped"
-            element={<RequireAuth><WeeklyWrappedPage /></RequireAuth>}
+            element={<RequireAuth>{withRouteSuspense(<WeeklyWrappedPage />)}</RequireAuth>}
           />
 
 

@@ -19,6 +19,7 @@ import {
   setCbseExamDateAdminOverride,
 } from "../services/cbseExamDate";
 import { loadDashboardPrefs, saveDashboardPrefs } from "../services/studentCloudStore";
+import { startSession } from "../services/sessionApi";
 
 type SubjectTitle = "Maths" | "Science";
 
@@ -254,7 +255,7 @@ export default function Dashboard() {
 
   if (loadingProfile) {
     return (
-      <div className="page">
+      <div className="lt-page">
         <div className="card">
           <h3>Loading your dashboard...</h3>
         </div>
@@ -264,7 +265,7 @@ export default function Dashboard() {
 
   if (!profile || !strategy) {
     return (
-      <div className="page">
+      <div className="lt-page">
         <h2 className="title">Your Personal Dashboard</h2>
         <div className="card">
           <p>We need your study details to create a plan.</p>
@@ -368,8 +369,22 @@ export default function Dashboard() {
     setPlannerMessage("Admin override cleared.");
   };
 
+  const openDailyMixSession = async (subject: SubjectTitle, chapterId: string) => {
+    try {
+      const started = await startSession({
+        kind: "daily_mix",
+        subjectId: subject === "Science" ? "science" : "maths",
+        chapterId,
+        vibe: mode === "zombie" ? "low" : "high",
+      });
+      navigate(`/play/${encodeURIComponent(started.sessionId)}`);
+    } catch {
+      navigate(`/daily-mix/${gradeNum}/${subject}?topic=${encodeURIComponent(chapterId)}`);
+    }
+  };
+
   return (
-    <div className="page">
+    <div className="lt-page">
       <h2 className="title">Your Personal Dashboard</h2>
 
       <div className="card" data-ux-priority-block="dashboard-next-best-actions" data-testid="dashboard-priority-block">
@@ -403,9 +418,7 @@ export default function Dashboard() {
             <button
               type="button"
               className="pill-btn"
-              onClick={() =>
-                navigate(`/daily-mix/${gradeNum}/${subjectForQuickActions}?topic=${encodeURIComponent(weakestTopicKey)}`)
-              }
+              onClick={() => void openDailyMixSession(subjectForQuickActions, weakestTopicKey)}
             >
               Play Mix
             </button>
@@ -528,7 +541,7 @@ export default function Dashboard() {
             <span style={{ fontWeight: 700 }}>Energy Level:</span>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => setMode("zombie")}
               style={{ background: mode === "zombie" ? "rgba(30,41,59,0.92)" : undefined, color: mode === "zombie" ? "#fff" : undefined }}
             >
@@ -536,7 +549,7 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => setMode("beast")}
               style={{ background: mode === "beast" ? "rgba(30,41,59,0.92)" : undefined, color: mode === "beast" ? "#fff" : undefined }}
             >
@@ -550,7 +563,7 @@ export default function Dashboard() {
             <button
               className="cta-btn"
               style={{ fontWeight: 800, minWidth: 220 }}
-              onClick={() => navigate(`/daily-mix/${gradeNum}/${planRecord.subject}?topic=${encodeURIComponent(weakestTopicKey)}`)}
+              onClick={() => void openDailyMixSession(planRecord.subject, weakestTopicKey)}
             >
               Play {mixTitle}
             </button>

@@ -916,7 +916,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         {hintRecord?.next_hint_available ? (
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             style={{ marginTop: 8 }}
             onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
           >
@@ -1293,7 +1293,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               style={{ padding: "6px 10px", fontSize: 12 }}
               onClick={() => setShowLessonPack((prev) => !prev)}
             >
@@ -1427,7 +1427,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </div>
         ) : null}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" className="pill" onClick={() => handleTabChange("teach")}>
+          <button type="button" className="lt-pill" onClick={() => handleTabChange("teach")}>
             Back to teaching (Resume Step {nodeIndex + 1})
           </button>
         </div>
@@ -1442,7 +1442,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           <div>{cleanDisplayText(currentError)}</div>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             style={{ marginTop: 10 }}
             onClick={() => requestTutor(tab, { force: true })}
           >
@@ -1568,7 +1568,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => handleTabChange("teach")}
               style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white" }}
             >
@@ -1576,7 +1576,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => handleTabChange("examples")}
               style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white" }}
             >
@@ -1584,7 +1584,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={onClose}
               title="Close"
               style={{ background: "white" }}
@@ -1657,7 +1657,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() => {
                   setDoubtInput("Checkpoint attempt: ");
                   doubtInputRef.current?.focus();
@@ -1667,14 +1667,14 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               </button>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
               >
                 Next hint
               </button>
               <button
                 type="button"
-                className="pill"
+                className="lt-pill"
                 onClick={() => {
                   if (!nodeId || !onPracticeThisNode) return;
                   onPracticeThisNode(nodeId);
@@ -1683,7 +1683,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               >
                 Practice this node
               </button>
-              <button type="button" className="pill" onClick={() => handleNextConcept(true)}>
+              <button type="button" className="lt-pill" onClick={() => handleNextConcept(true)}>
                 Continue anyway
               </button>
             </div>
@@ -1693,7 +1693,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => goToNodeIndex(0)}
             disabled={nodeIndex === 0}
           >
@@ -1701,7 +1701,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </button>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => handleNextConcept()}
             disabled={nodeIndex >= order.length - 1}
           >
@@ -1751,7 +1751,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             style={{
               padding: "9px 14px",
               fontWeight: 900,
@@ -1766,7 +1766,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </button>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             style={{ padding: "8px 10px", fontSize: 12 }}
             onClick={() => setShowMoreActions((prev) => !prev)}
           >
@@ -1779,7 +1779,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
               disabled={doubtLoading}
             >
@@ -1787,7 +1787,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => {
                 setDoubtInput("Checkpoint attempt: ");
                 doubtInputRef.current?.focus();
@@ -1798,7 +1798,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => {
                 if (!nodeId || !onPracticeThisNode) return;
                 onPracticeThisNode(nodeId);
@@ -1809,7 +1809,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             </button>
             <button
               type="button"
-              className="pill"
+              className="lt-pill"
               onClick={() => handleTabChange(tab === "teach" ? "examples" : "teach")}
               disabled={doubtLoading}
             >
@@ -1843,7 +1843,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           />
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => sendDoubt(doubtInput)}
             disabled={doubtLoading || !doubtInput.trim()}
           >
@@ -1856,7 +1856,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               <button
                 key={prompt}
                 type="button"
-                className="pill"
+                className="lt-pill"
                 style={{ padding: "6px 10px", fontSize: 12 }}
                 onClick={() => {
                   setDoubtInput(prompt);
@@ -1873,7 +1873,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
           <button
             type="button"
-            className="pill"
+            className="lt-pill"
             onClick={() => setShowFeedbackPanel((prev) => !prev)}
             style={{ padding: "6px 10px", fontSize: 13, background: "white" }}
           >
@@ -1884,7 +1884,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => setFeedbackChoice("yes")}
                   style={{ background: feedbackChoice === "yes" ? "rgba(34,197,94,0.15)" : "white" }}
                 >
@@ -1892,7 +1892,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                 </button>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   onClick={() => setFeedbackChoice("no")}
                   style={{ background: feedbackChoice === "no" ? "rgba(239,68,68,0.15)" : "white" }}
                 >
@@ -1918,7 +1918,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  className="pill"
+                  className="lt-pill"
                   disabled={!feedbackChoice || feedbackStatus === "sending"}
                   onClick={async () => {
                     if (!feedbackChoice) return;

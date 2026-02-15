@@ -6,7 +6,8 @@
     "generated_on": "2026-02-15",
     "notes": [
       "Unit marks and topic scope are sourced from CBSE Secondary curriculum PDFs for 2025-26.",
-      "This registry is designed as a seed file for LazyTopper syllabus + content tracking tables."
+      "This registry is designed as a seed file for LazyTopper syllabus + content tracking tables.",
+      "v2 fix: Class X Maths 'Triangles' scope updated to match CBSE 2025-26 curriculum PDF; removed 'areas of similar triangles' and 'Pythagoras theorem' from assessed scope."
     ],
     "sources": [
       {
@@ -145,10 +146,9 @@
           "unit_id": "M10_U4",
           "title": "Triangles",
           "cbse_scope_bullets": [
-            "Similar triangles: definitions, examples/counterexamples.",
-            "Basic Proportionality Theorem (proof) and converse (statement).",
-            "Similarity criteria (AAA/AA, SSS, SAS) as stated in curriculum; applications.",
-            "Areas of similar triangles; Pythagoras theorem is not explicitly listed in the 2025-26 math curriculum scope table, so include only if your curriculum mapping confirms it for your board route."
+            "Similar triangles: definitions, examples and counterexamples.",
+            "Basic Proportionality Theorem (BPT): proof; and its converse (statement).",
+            "Similarity criteria statements (as per CBSE curriculum): (i) corresponding angles equal ⇒ sides proportional ⇒ triangles similar; (ii) corresponding sides proportional ⇒ corresponding angles equal ⇒ triangles similar; (iii) one angle equal and including sides proportional ⇒ triangles similar; and applications in problem solving."
           ],
           "recommended_concept_packs": 14,
           "visual_min": 5

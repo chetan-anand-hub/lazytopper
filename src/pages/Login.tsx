@@ -124,7 +124,7 @@ export default function Login() {
   };
 
   return (
-    <div className="page">
+    <div className="lt-page">
       <h2 className="title center">Student Sign In</h2>
       <div className="card">
         <p className="subtitle">Use Gmail or phone OTP to create your personal dashboard.</p>
