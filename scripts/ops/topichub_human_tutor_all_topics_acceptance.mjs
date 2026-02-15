@@ -156,13 +156,62 @@ async function run() {
   serverProc.stderr.on("data", (chunk) => logs.push(String(chunk || "")));
 
   const cases = [
-    { id: "triangles", subject: "Maths", topicKey: "triangles", expectedTypeContains: "triangle" },
-    { id: "trigonometry", subject: "Maths", topicKey: "trigonometry", expectedTypeContains: "trigonometric_triangle" },
-    { id: "heights_distances", subject: "Maths", topicKey: "maths-applications-trigonometry", expectedTypeContains: "trigonometric_triangle" },
-    { id: "coordinate_geometry", subject: "Maths", topicKey: "coordinate-geometry", expectedTypeContains: "coordinate_plane" },
-    { id: "electricity", subject: "Science", topicKey: "electricity", expectedTypeContains: "circuit" },
-    { id: "light", subject: "Science", topicKey: "light-reflection-refraction", expectedTypeContains: "ray_diagram" },
-    { id: "life_processes", subject: "Science", topicKey: "life-processes", expectedTypeContains: "biology_process" },
+    {
+      id: "triangles",
+      subject: "Maths",
+      topicKey: "triangles",
+      expectedTypeContains: "triangle",
+      requiredTokens: ["similar", "criterion", "correspond"],
+      forbiddenTokens: [],
+    },
+    {
+      id: "trigonometry",
+      subject: "Maths",
+      topicKey: "trigonometry",
+      expectedTypeContains: "trigonometric_triangle",
+      requiredTokens: ["ratio", "identity", "angle"],
+      forbiddenTokens: [],
+    },
+    {
+      id: "heights_distances",
+      subject: "Maths",
+      topicKey: "maths-applications-trigonometry",
+      expectedTypeContains: "trigonometric_triangle",
+      requiredTokens: ["angle", "formula", "result"],
+      forbiddenTokens: [],
+    },
+    {
+      id: "coordinate_geometry",
+      subject: "Maths",
+      topicKey: "coordinate-geometry",
+      expectedTypeContains: "coordinate_plane",
+      requiredTokens: ["coordinate", "distance", "section"],
+      forbiddenTokens: [],
+    },
+    {
+      id: "electricity",
+      subject: "Science",
+      topicKey: "electricity",
+      expectedTypeContains: "circuit",
+      requiredTokens: ["ohm", "current", "voltage", "resistance"],
+      forbiddenTokens: ["aa", "sas", "sss", "cpst", "similar triangles"],
+    },
+    {
+      id: "light",
+      subject: "Science",
+      topicKey: "light-reflection-refraction",
+      expectedTypeContains: "ray_diagram",
+      requiredTokens: ["ray", "reflection", "refraction", "image"],
+      forbiddenTokens: ["aa", "sas", "sss", "cpst", "similar triangles"],
+    },
+    {
+      id: "life_processes",
+      subject: "Science",
+      topicKey: "life-processes",
+      expectedTypeContains: "biology_process",
+      requiredTokens: ["process", "function", "biolog", "system"],
+      forbiddenTokens: ["aa", "sas", "sss", "cpst", "similar triangles"],
+    },
   ];
 
   try {
@@ -199,6 +248,21 @@ async function run() {
       const keyIdeas = Array.isArray(structured?.teach?.keyIdeas) ? structured.teach.keyIdeas : [];
       const checkpoint = structured?.checkpoint || {};
       const diagram = extractDiagramData(structured);
+      const semanticBlob = [
+        String(structured?.teach?.goal || ""),
+        ...keyIdeas.map((line) => String(line || "")),
+        String(checkpoint.question || ""),
+        String(checkpoint.answer || ""),
+        String(structured?.commonMistake || ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      const requiredTokenHit = c.requiredTokens.some((token) =>
+        semanticBlob.includes(String(token || "").toLowerCase())
+      );
+      const forbiddenTokenHit = c.forbiddenTokens.some((token) =>
+        semanticBlob.includes(String(token || "").toLowerCase())
+      );
 
       addCheck(checks, `${c.id}_teach_status_ok`, teachReq.status === 200, `status=${teachReq.status}`);
       addCheck(
@@ -206,6 +270,12 @@ async function run() {
         `${c.id}_kind_learn_teach`,
         structured.kind === "learn_teach",
         String(structured.kind || "")
+      );
+      addCheck(
+        checks,
+        `${c.id}_contract_source_topic`,
+        String(structured?.contract_source || structured?.teach?.contract_source || "").toLowerCase() === "topic",
+        String(structured?.contract_source || structured?.teach?.contract_source || "")
       );
       addCheck(
         checks,
@@ -225,6 +295,18 @@ async function run() {
       );
       addCheck(
         checks,
+        `${c.id}_semantic_required_token`,
+        requiredTokenHit,
+        JSON.stringify({ required: c.requiredTokens, semanticBlob })
+      );
+      addCheck(
+        checks,
+        `${c.id}_semantic_forbidden_token_absent`,
+        !forbiddenTokenHit,
+        JSON.stringify({ forbidden: c.forbiddenTokens, semanticBlob })
+      );
+      addCheck(
+        checks,
         `${c.id}_checkpoint_question_board_style`,
         /\bboard\b|\bcbse\b/i.test(String(checkpoint.question || "")) &&
           /\bgiven\b/i.test(String(checkpoint.question || "")) &&
@@ -236,8 +318,8 @@ async function run() {
         `${c.id}_checkpoint_answer_exam_format`,
         /^Expected answer:/i.test(String(checkpoint.answer || "")) &&
           /\bgiven\b\s*:/i.test(String(checkpoint.answer || "")) &&
-          /\bto prove\b\s*:|\bto find\b\s*:/i.test(String(checkpoint.answer || "")) &&
-          /\bcriterion\b|\btheorem\b|\bformula\b/i.test(String(checkpoint.answer || "")) &&
+          /(\bto prove\b(?:\/find)?\s*:)|(\bto find\b\s*:)/i.test(String(checkpoint.answer || "")) &&
+          /\bcriterion\b|\btheorem\b|\bformula\b|\bprinciple\b|\blaw\b/i.test(String(checkpoint.answer || "")) &&
           /\btherefore\b|\bhence\b/i.test(String(checkpoint.answer || "")),
         String(checkpoint.answer || "")
       );
@@ -291,10 +373,16 @@ async function run() {
           attemptStructured?.hint_ladder?.next_action ||
           ""
       ).trim();
+      const attemptStatus =
+        String(attemptLoop?.diagnosis?.status || "").trim() ||
+        tutorDiagnosisStatus;
+      const attemptAction =
+        String(attemptLoop?.next_action?.prompt || "").trim() ||
+        tutorNextPrompt;
       addCheck(
         checks,
         `${c.id}_attempt_feedback_present`,
-        Boolean((attemptLoop && typeof attemptLoop === "object") || tutorNextPrompt),
+        Boolean((attemptLoop && typeof attemptLoop === "object") || attemptAction),
         JSON.stringify({
           attemptLoop: attemptLoop || null,
           tutorDiagnosisStatus,
@@ -305,14 +393,12 @@ async function run() {
         checks,
         `${c.id}_attempt_feedback_has_next_action`,
         Boolean(
-          (attemptLoop &&
-            String(attemptLoop?.diagnosis?.status || "").trim() &&
-            String(attemptLoop?.next_action?.prompt || "").trim()) ||
-            tutorNextPrompt
+          attemptAction &&
+            (attemptStatus || /\bhint\b|\bretry\b|\bnext\b|\bstep\b/i.test(attemptAction))
         ),
         JSON.stringify({
-          status: attemptLoop?.diagnosis?.status,
-          prompt: attemptLoop?.next_action?.prompt,
+          status: attemptStatus,
+          prompt: attemptAction,
           tutorDiagnosisStatus,
           tutorNextPrompt,
         })

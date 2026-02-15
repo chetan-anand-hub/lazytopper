@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { RequireAuth } from "../components/auth/RequireAuth";
+import { getCanonicalChapters, toCanonicalSubjectId } from "../data/syllabus/cbse10Canonical";
+import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterMeta } from "../engine/smartLearningTypes";
 import { loadTopicMasterySnapshot } from "../services/topicHubMastery";
-import { normalizeTopicKey } from "../utils/topicHubV2Store";
+import { normalizeTopicKey, resolveRuntimeTopicKey } from "../utils/topicHubV2Store";
 
 type SubjectTitle = "Maths" | "Science";
 type TierLabel = "must-crack" | "high-roi" | "good-to-do" | "topic";
@@ -59,15 +61,24 @@ function tierRank(tier: TierLabel): number {
 
 function buildTopicOptions(subject: SubjectTitle): TopicOption[] {
   const out: TopicOption[] = [];
-  for (const key of Object.keys(topicHubV2Content || {})) {
-    const recRaw = (topicHubV2Content as Record<string, unknown>)[key];
-    if (!recRaw || typeof recRaw !== "object") continue;
-    const rec = recRaw as Record<string, unknown>;
-    const recSubject = toSubjectTitle(rec.subject);
-    if (recSubject !== subject) continue;
+  const canonicalSubject = toCanonicalSubjectId(subject);
+  const runtimeKeys = Object.keys(topicHubV2Content || {});
+  const seen = new Set<string>();
+
+  for (const chapter of getCanonicalChapters(canonicalSubject)) {
+    const canonicalKey = normalizeTopicKey(chapter.canonicalSlug);
+    if (!canonicalKey || isSupplementalTopicKey(canonicalKey) || seen.has(canonicalKey)) continue;
+    seen.add(canonicalKey);
+
+    const runtimeKey = resolveRuntimeTopicKey(canonicalKey, runtimeKeys);
+    const recRaw =
+      (topicHubV2Content as Record<string, unknown>)[runtimeKey] ??
+      (topicHubV2Content as Record<string, unknown>)[canonicalKey];
+    const rec = recRaw && typeof recRaw === "object" ? (recRaw as Record<string, unknown>) : {};
+
     out.push({
-      key: String(rec.topicKey || key),
-      name: String(rec.topicName || key),
+      key: canonicalKey,
+      name: String(rec.topicName || chapter.title || canonicalKey),
       tier: toTierLabel(rec.tier),
     });
   }
@@ -198,12 +209,12 @@ function TopicHubHomeContent() {
   );
 
   const maxBoardWeightageForSubject = useMemo(() => {
+    const runtimeKeys = Object.keys(topicHubV2Content || {});
     const values = topicOptions
       .map((item) => {
-        const rec = (topicHubV2Content as Record<string, unknown>)[item.key] as Record<
-          string,
-          unknown
-        >;
+        const runtimeKey = resolveRuntimeTopicKey(item.key, runtimeKeys);
+        const rec = ((topicHubV2Content as Record<string, unknown>)[runtimeKey] ||
+          {}) as Record<string, unknown>;
         return Number(rec?.weightagePercent ?? rec?.approxWeightage ?? 0);
       })
       .filter((v) => Number.isFinite(v) && v > 0);
@@ -211,12 +222,12 @@ function TopicHubHomeContent() {
   }, [topicOptions]);
 
   const matchScoreByTopic = useMemo(() => {
+    const runtimeKeys = Object.keys(topicHubV2Content || {});
     const out: Record<string, number> = {};
     for (const item of topicOptions) {
-      const rec = (topicHubV2Content as Record<string, unknown>)[item.key] as Record<
-        string,
-        unknown
-      >;
+      const runtimeKey = resolveRuntimeTopicKey(item.key, runtimeKeys);
+      const rec = ((topicHubV2Content as Record<string, unknown>)[runtimeKey] ||
+        {}) as Record<string, unknown>;
       const chapterMeta: ChapterMeta = {
         id: `${grade}-${subject}-${item.key}`,
         grade: String(grade || "10"),

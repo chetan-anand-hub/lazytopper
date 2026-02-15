@@ -1,3 +1,9 @@
+import {
+  buildProgressScopeKey,
+  getActiveProgressUser,
+  saveLearnerProgressSegment,
+} from "./studentProgressStore";
+
 export type TopicHubNodeMasteryState =
   | "unseen"
   | "learning"
@@ -30,7 +36,6 @@ export interface TopicHubNodeProgressInput {
 }
 
 const STORAGE_KEY = "lazytopper.topicHub.triangles.mastery.v1";
-const STORAGE_PREFIX = "lazytopper.topicHub";
 const STORAGE_VERSION = 1;
 
 const stateRank: Record<TopicHubNodeMasteryState, number> = {
@@ -102,7 +107,11 @@ function normalizeTopicKeyForStorage(topicKey: string | null | undefined): strin
 
 function getStorageKeyForTopic(topicKey: string): string {
   const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey);
-  return `${STORAGE_PREFIX}.${normalizedTopicKey}.mastery.v${STORAGE_VERSION}`;
+  return buildProgressScopeKey(
+    "topicHubMastery",
+    getActiveProgressUser(),
+    normalizedTopicKey
+  );
 }
 
 export function ensureTopicMasterySnapshot(
@@ -142,7 +151,9 @@ export function loadTopicMasterySnapshot(topicKey: string): TopicHubMasterySnaps
   if (typeof window === "undefined") return createEmptyTopicMastery(normalizedTopicKey);
   const storageKey = getStorageKeyForTopic(normalizedTopicKey);
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw =
+      window.localStorage.getItem(storageKey) ||
+      (normalizedTopicKey === "triangles" ? window.localStorage.getItem(STORAGE_KEY) : null);
     if (!raw) return createEmptyTopicMastery(normalizedTopicKey);
     const parsed = JSON.parse(raw) as unknown;
     if (!isRecord(parsed)) return createEmptyTopicMastery(normalizedTopicKey);
@@ -169,13 +180,19 @@ export function saveTopicMasterySnapshot(
   const normalizedTopicKey = normalizeTopicKeyForStorage(topicKey || snapshot.topicKey);
   const storageKey = getStorageKeyForTopic(normalizedTopicKey);
   const ensured = ensureTopicMasterySnapshot(normalizedTopicKey, snapshot);
+  const uid = getActiveProgressUser();
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(ensured));
-    if (storageKey !== STORAGE_KEY && normalizedTopicKey === "triangles") {
+    if (!uid && storageKey !== STORAGE_KEY && normalizedTopicKey === "triangles") {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ensured));
     }
   } catch {
     // Ignore write errors to avoid breaking tutor flow.
+  }
+  if (uid) {
+    void saveLearnerProgressSegment(uid, "topicMasteryByTopic", {
+      [normalizedTopicKey]: ensured,
+    });
   }
 }
 

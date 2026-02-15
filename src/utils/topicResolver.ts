@@ -1,11 +1,17 @@
 // src/utils/topicResolver.ts
 //
-// Single source of truth for topic key normalization across LazyTopper.
-// Canonical topicKey format: **hyphen-slug** (e.g. "acids-bases-salts").
-// Some datasets (Prompt-D practice packs) use underscore_keys; use
-// `toPracticePackKey()` as a bridge when looking up those packs.
+// Canonical-first topic resolver with alias compatibility.
+// Canonical topic key format: hyphen-slug (e.g. "acids-bases-and-salts").
+// Runtime datasets can still use legacy/prefixed keys through alias mapping.
 
 export type SubjectKey = "Maths" | "Science";
+
+import { getCanonicalChapterBySlug } from "../data/syllabus/cbse10Canonical";
+import {
+  getRuntimeTopicCandidates,
+  normalizeTopicSlug,
+  resolveCanonicalTopicKey,
+} from "../data/syllabus/topicAliasMap";
 
 export interface ResolveTopicKeyArgs {
   subjectKey?: string; // often 'maths' | 'science' in older code paths
@@ -19,27 +25,10 @@ export function stripBom(input: string): string {
   return input?.startsWith("\ufeff") ? input.slice(1) : input;
 }
 
-/**
- * Canonical topic key normalization.
- * - lowercases
- * - converts spaces/underscores to hyphens
- * - replaces & with 'and'
- * - removes punctuation (keeps a-z, 0-9, hyphen)
- * - collapses repeated hyphens
- */
+/** Canonical topic key normalization + alias collapse. */
 export function normalizeTopicKey(raw: string): string {
-  const s = stripBom(String(raw ?? "")).trim().toLowerCase();
-  if (!s) return "";
-
-  const cleaned = s
-    .replace(/&/g, " and ")
-    .replace(/[\/\\]/g, " ")
-    .replace(/[_\s]+/g, "-")
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return cleaned;
+  const noBom = stripBom(String(raw ?? ""));
+  return resolveCanonicalTopicKey(noBom);
 }
 
 /**
@@ -47,7 +36,7 @@ export function normalizeTopicKey(raw: string): string {
  * Example: "acids-bases-salts" -> "acids_bases_salts"
  */
 export function toPracticePackKey(canonicalTopicKey: string): string {
-  return normalizeTopicKey(canonicalTopicKey).replace(/-/g, "_");
+  return normalizeTopicSlug(canonicalTopicKey).replace(/-/g, "_");
 }
 
 /**
@@ -55,11 +44,29 @@ export function toPracticePackKey(canonicalTopicKey: string): string {
  * Accepts either a slug or a display string.
  */
 export function resolveTopicKey(args: ResolveTopicKeyArgs): string {
-  // Prefer explicit topicKey if provided
   const explicit = args.topicKey ? String(args.topicKey) : "";
   if (explicit) return normalizeTopicKey(explicit);
-
   return normalizeTopicKey(args.topicParam);
+}
+
+/**
+ * Resolve the canonical topic key to a runtime dataset key using available keys.
+ * If no available set is provided, returns canonical topic key.
+ */
+export function resolveRuntimeTopicKey(
+  rawTopicKey: string,
+  availableTopicKeys?: Iterable<string>
+): string {
+  const candidates = getRuntimeTopicCandidates(rawTopicKey);
+  if (!availableTopicKeys) return candidates[0] || normalizeTopicKey(rawTopicKey);
+  const available = new Set<string>();
+  for (const key of availableTopicKeys) {
+    available.add(String(key));
+  }
+  for (const candidate of candidates) {
+    if (available.has(candidate)) return candidate;
+  }
+  return candidates[0] || normalizeTopicKey(rawTopicKey);
 }
 
 /**
@@ -67,7 +74,8 @@ export function resolveTopicKey(args: ResolveTopicKeyArgs): string {
  * Example: "pair-of-linear-equations" -> "Pair Of Linear Equations"
  */
 export function resolveTopicDisplayName(_subjectKey: string, topicKey: string): string {
-  const withSpaces = (topicKey || "").replace(/-+/g, " ");
+  const chapter = getCanonicalChapterBySlug(topicKey);
+  if (chapter?.title) return chapter.title;
+  const withSpaces = normalizeTopicSlug(topicKey).replace(/-+/g, " ");
   return withSpaces.replace(/\b\w/g, (char) => char.toUpperCase());
 }
-

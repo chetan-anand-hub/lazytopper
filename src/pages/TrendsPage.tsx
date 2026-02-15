@@ -22,7 +22,7 @@ import {
   buildMockBuilderUrl,
   buildAiMentorUrl,
 } from "../utils/buildUrl";
-import { normalizeTopicKey } from "../utils/topicResolver";
+import { normalizeTopicKey, resolveTopicKey as resolveCanonicalTopicKey } from "../utils/topicResolver";
 import JourneyStrip from "../components/ux/JourneyStrip";
 import ReturnContextBar from "../components/ux/ReturnContextBar";
 import { trackUxEvent } from "../services/uxTelemetry";
@@ -248,9 +248,13 @@ const TrendsPage: React.FC = () => {
 
   // UPDATED navigation handlers to use build functions and back-state
   const handleSampleQuestion = (topicName: string) => {
+    const canonicalTopicKey = resolveCanonicalTopicKey({
+      subjectKey,
+      topicParam: topicName,
+    });
     trackUxEvent("trends_topic_more_click", "trends", { action: "hpq", topicName, subject: subjectKey });
     navigate(
-      buildHPQUrl(grade, subjectKey, { topic: topicName }),
+      buildHPQUrl(grade, subjectKey, { topic: canonicalTopicKey || topicName }),
       {
         state: {
           back: currentURL,
@@ -261,8 +265,12 @@ const TrendsPage: React.FC = () => {
   };
 
   const handleGoToTopicHub = (topicName: string) => {
+    const canonicalTopicKey = resolveCanonicalTopicKey({
+      subjectKey,
+      topicParam: topicName,
+    });
     navigate(
-      buildTopicHubUrl(grade, subjectKey, topicName),
+      buildTopicHubUrl(grade, subjectKey, canonicalTopicKey || topicName),
       {
         state: {
           back: currentURL,
@@ -290,8 +298,14 @@ const TrendsPage: React.FC = () => {
   };
 
   const handlePracticeFromTopic = (topicName: string) => {
+    const canonicalTopicKey = resolveCanonicalTopicKey({
+      subjectKey,
+      topicParam: topicName,
+    });
     trackUxEvent("trends_topic_practice_click", "trends", { topicName, subject: subjectKey });
-    const url = `/practice/${grade}/${subjectKey}?topic=${encodeURIComponent(topicName)}`;
+    const url = `/practice/${grade}/${subjectKey}?topic=${encodeURIComponent(
+      canonicalTopicKey || topicName
+    )}`;
     navigate(url, {
       state: {
         back: currentURL,
@@ -301,8 +315,12 @@ const TrendsPage: React.FC = () => {
   };
 
   const handleExplainTopic = (topicName: string) => {
+    const canonicalTopicKey = resolveCanonicalTopicKey({
+      subjectKey,
+      topicParam: topicName,
+    });
     trackUxEvent("trends_topic_teach_click", "trends", { topicName, subject: subjectKey });
-    const topicHubUrl = buildTopicHubUrl(grade, subjectKey, topicName);
+    const topicHubUrl = buildTopicHubUrl(grade, subjectKey, canonicalTopicKey || topicName);
     const [pathOnly, query = ""] = topicHubUrl.split("?");
     const params = new URLSearchParams(query);
     params.set("tab", "learn");
@@ -321,14 +339,18 @@ const TrendsPage: React.FC = () => {
    * navigates to the AI mentor page using the `topic_exam_tips` mode.
    */
   const handleExamTips = (topicName: string) => {
+    const canonicalTopicKey = resolveCanonicalTopicKey({
+      subjectKey,
+      topicParam: topicName,
+    });
     trackUxEvent("trends_topic_more_click", "trends", { action: "exam_tips", topicName, subject: subjectKey });
     navigate(buildAiMentorUrl(grade, subjectKey), {
       state: {
         back: currentURL,
         backLabel: "Back to trends",
         payload: {
-          topic: topicName,
-          topicKey: topicName,
+          topic: canonicalTopicKey || topicName,
+          topicKey: canonicalTopicKey || topicName,
         },
         mode: "topic_exam_tips",
       },

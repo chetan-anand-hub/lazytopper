@@ -11,6 +11,10 @@ import {
 } from "firebase/auth";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { authClient, firebaseConfigured } from "../services/firebaseClient";
+import {
+  hydrateLocalProgressFromCloud,
+  setActiveProgressUser,
+} from "../services/studentProgressStore";
 
 export type AuthUser = {
   uid: string;
@@ -99,11 +103,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!firebaseConfigured || !authClient) return;
     const unsubscribe = onAuthStateChanged(authClient, (next) => {
-      setUser(next ? toAuthUser(next) : null);
+      const mapped = next ? toAuthUser(next) : null;
+      setUser(mapped);
       setLoading(false);
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const uid = user?.uid || null;
+    setActiveProgressUser(uid);
+    if (uid && !user?.isLocalSession) {
+      void hydrateLocalProgressFromCloud(uid);
+    }
+  }, [user?.uid, user?.isLocalSession]);
 
   const signInWithGoogleHandler = async () => {
     if (!firebaseConfigured || !authClient) {
@@ -175,16 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLocalSession: true,
     };
     setUser(localUser);
+    setActiveProgressUser(localUser.uid);
     writeLocalSession(localUser);
   };
 
   const logoutHandler = async () => {
     if (!firebaseConfigured || !authClient) {
       writeLocalSession(null);
+      setActiveProgressUser(null);
       setUser(null);
       return;
     }
     await signOut(authClient);
+    setActiveProgressUser(null);
   };
 
   const value: AuthContextType = {

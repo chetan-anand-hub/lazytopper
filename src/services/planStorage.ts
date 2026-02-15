@@ -12,9 +12,15 @@ import {
   loadStrategyPlanV1 as _loadStrategyPlan,
   saveStrategyPlanV1 as _saveStrategyPlan,
 } from "./strategyStorage";
+import { getActiveProgressUser, saveLearnerProgressSegment } from "./studentProgressStore";
 
-const STREAK_DATE_KEY = "lazytopper.streak.date";
-const STREAK_COUNT_KEY = "lazytopper.streak.count";
+function streakDateKey(): string {
+  return `lazytopper.streak.date:${getActiveProgressUser() || "anonymous"}`;
+}
+
+function streakCountKey(): string {
+  return `lazytopper.streak.count:${getActiveProgressUser() || "anonymous"}`;
+}
 
 /** Save the structured strategy plan to localStorage. */
 export function saveStrategyPlan(plan: StrategyPlan): void {
@@ -51,15 +57,19 @@ export function computeDailyMix(plan: StrategyPlan): string[] {
  */
 export function updateAndGetStreak(): number {
   try {
+    const dateKey = streakDateKey();
+    const countKey = streakCountKey();
     const today = new Date();
     const todayStr = today.toISOString().slice(0, 10);
 
-    const prevDateStr = localStorage.getItem(STREAK_DATE_KEY);
-    const prevCountStr = localStorage.getItem(STREAK_COUNT_KEY);
+    const prevDateStr = localStorage.getItem(dateKey);
+    const prevCountStr = localStorage.getItem(countKey);
 
     if (!prevDateStr || !prevCountStr) {
-      localStorage.setItem(STREAK_DATE_KEY, todayStr);
-      localStorage.setItem(STREAK_COUNT_KEY, "1");
+      localStorage.setItem(dateKey, todayStr);
+      localStorage.setItem(countKey, "1");
+      const uid = getActiveProgressUser();
+      if (uid) void saveLearnerProgressSegment(uid, "streak", 1);
       return 1;
     }
 
@@ -75,8 +85,10 @@ export function updateAndGetStreak(): number {
     let next = 1;
     if (diffDays === 1) next = (Number(prevCountStr) || 0) + 1;
 
-    localStorage.setItem(STREAK_DATE_KEY, todayStr);
-    localStorage.setItem(STREAK_COUNT_KEY, String(next));
+    localStorage.setItem(dateKey, todayStr);
+    localStorage.setItem(countKey, String(next));
+    const uid = getActiveProgressUser();
+    if (uid) void saveLearnerProgressSegment(uid, "streak", next);
     return next;
   } catch {
     return 0;

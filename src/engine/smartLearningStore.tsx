@@ -7,6 +7,12 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "../context/AuthContext";
+import {
+  buildProgressScopeKey,
+  hydrateLocalProgressFromCloud,
+  saveLearnerProgressSegment,
+} from "../services/studentProgressStore";
 
 import {
   type ChapterId,
@@ -47,12 +53,15 @@ const SmartLearningContext = createContext<SmartLearningState | undefined>(
   undefined
 );
 
-const SMART_LEARNING_STORAGE_KEY = "lazytopper.smartLearning.stats.v1";
+const LEGACY_SMART_LEARNING_STORAGE_KEY = "lazytopper.smartLearning.stats.v1";
 
-function loadPersistedStats(): Record<ChapterId, UserChapterStats> {
+function loadPersistedStats(uid?: string | null): Record<ChapterId, UserChapterStats> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(SMART_LEARNING_STORAGE_KEY);
+    const scopedKey = buildProgressScopeKey("smartLearning", uid || null);
+    const raw =
+      window.localStorage.getItem(scopedKey) ||
+      window.localStorage.getItem(LEGACY_SMART_LEARNING_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
@@ -74,9 +83,27 @@ interface ProviderProps {
 export const SmartLearningProvider: React.FC<ProviderProps> = ({
   children,
 }) => {
+  const { user } = useAuth();
+  const uid = user?.uid || null;
   const [statsByChapter, setStatsByChapter] = useState<
     Record<ChapterId, UserChapterStats>
-  >(() => loadPersistedStats());
+  >(() => loadPersistedStats(uid));
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      if (uid) {
+        await hydrateLocalProgressFromCloud(uid);
+      }
+      if (!cancelled) {
+        setStatsByChapter(loadPersistedStats(uid));
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
 
   const getStatsForChapter = (chapterId: ChapterId) => statsByChapter[chapterId];
 
@@ -106,14 +133,24 @@ export const SmartLearningProvider: React.FC<ProviderProps> = ({
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      const scopedKey = buildProgressScopeKey("smartLearning", uid);
       window.localStorage.setItem(
-        SMART_LEARNING_STORAGE_KEY,
+        scopedKey,
         JSON.stringify(statsByChapter)
       );
+      if (!uid) {
+        window.localStorage.setItem(
+          LEGACY_SMART_LEARNING_STORAGE_KEY,
+          JSON.stringify(statsByChapter)
+        );
+      }
     } catch {
       // Best effort persistence only.
     }
-  }, [statsByChapter]);
+    if (uid) {
+      void saveLearnerProgressSegment(uid, "statsByChapter", statsByChapter);
+    }
+  }, [statsByChapter, uid]);
 
   const value: SmartLearningState = {
     statsByChapter,

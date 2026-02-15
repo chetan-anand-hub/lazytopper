@@ -1,4 +1,5 @@
-﻿// NOTE: FinalEnrichment retired (Jan 2026). Use topicHubV2Enrichment as the single enrichment/override layer.\r\n// src/utils/topicHubV2Store.ts
+// NOTE: FinalEnrichment retired (Jan 2026). Use topicHubV2Enrichment as the single enrichment/override layer.
+// src/utils/topicHubV2Store.ts
 // Runtime accessor for baked TopicHubV2 content (main branch friendly).
 // Keeps src/utils/getTopicV2Content.ts as type/interface-only to avoid circular-import issues.
 
@@ -6,11 +7,32 @@ import { topicHubV2Content } from "../data/topicHubV2Full";
 import { topicHubV2Enrichment } from "../data/topicHubV2Enrichment";
 import type { TopicHubV2Content } from "./getTopicV2Content";
 
-import { normalizeTopicKey } from "./topicResolver";
-export { normalizeTopicKey };
+import { normalizeTopicKey, resolveRuntimeTopicKey } from "./topicResolver";
+export { normalizeTopicKey, resolveRuntimeTopicKey };
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
   return !!x && typeof x === "object" && !Array.isArray(x);
+}
+
+function deepMergeUnknown(base: unknown, enrich: unknown): unknown {
+  if (Array.isArray(base) && Array.isArray(enrich)) return enrich;
+  if (!isPlainObject(base) || !isPlainObject(enrich)) return enrich ?? base;
+
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, enrichValue] of Object.entries(enrich)) {
+    const baseValue = out[key];
+    if (enrichValue === undefined) continue;
+    if (Array.isArray(baseValue) && Array.isArray(enrichValue)) {
+      out[key] = enrichValue;
+      continue;
+    }
+    if (isPlainObject(baseValue) && isPlainObject(enrichValue)) {
+      out[key] = deepMergeUnknown(baseValue, enrichValue);
+      continue;
+    }
+    out[key] = enrichValue;
+  }
+  return out;
 }
 
 /**
@@ -20,47 +42,35 @@ function isPlainObject(x: unknown): x is Record<string, unknown> {
  * - primitives: enrichment overrides base
  */
 function deepMerge<T>(base: T, enrich: Partial<T>): T {
-  const b: any = base as any;
-  const e: any = enrich as any;
-
-  if (Array.isArray(b) && Array.isArray(e)) return e as any;
-  if (!isPlainObject(b) || !isPlainObject(e)) return (e ?? b) as any;
-
-  const out: Record<string, unknown> = { ...b };
-  for (const k of Object.keys(e)) {
-    const bv = (b as any)[k];
-    const ev = (e as any)[k];
-
-    if (ev === undefined) continue;
-    if (Array.isArray(bv) && Array.isArray(ev)) out[k] = ev;
-    else if (isPlainObject(bv) && isPlainObject(ev)) out[k] = deepMerge(bv, ev);
-    else out[k] = ev;
-  }
-  return out as T;
+  return deepMergeUnknown(base, enrich) as T;
 }
 
 /**
  * Returns baked TopicHubV2 content (base + optional enrichment), or null if not found.
  */
 export function getTopicV2Content(topicKey: string): TopicHubV2Content | null {
-  const key = normalizeTopicKey(topicKey);
+  const contentMap = topicHubV2Content as Record<string, TopicHubV2Content>;
+  const enrichmentMap = topicHubV2Enrichment as Record<string, Partial<TopicHubV2Content>>;
+
+  const canonicalKey = normalizeTopicKey(topicKey);
+  const runtimeKey = resolveRuntimeTopicKey(
+    canonicalKey || topicKey,
+    Object.keys(contentMap)
+  );
 
   const base =
-    (topicHubV2Content as any)[key] ??
-    (topicHubV2Content as any)[topicKey] ??
+    contentMap[runtimeKey] ??
+    contentMap[canonicalKey] ??
+    contentMap[topicKey] ??
     null;
 
   if (!base) return null;
 
   const enrich =
-  (topicHubV2Enrichment as any)[key] ??
-  (topicHubV2Enrichment as any)[topicKey] ??
-  {};
+    enrichmentMap[runtimeKey] ??
+    enrichmentMap[canonicalKey] ??
+    enrichmentMap[topicKey] ??
+    {};
 
-const overrides =
-  (topicHubV2Enrichment as any)[key] ??
-  (topicHubV2Enrichment as any)[topicKey] ??
-  {};
-return deepMerge(deepMerge(base as TopicHubV2Content, enrich as Partial<TopicHubV2Content>), overrides as Partial<TopicHubV2Content>);}
-
-
+  return deepMerge(base, enrich);
+}

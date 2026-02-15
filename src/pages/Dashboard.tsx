@@ -123,7 +123,7 @@ export default function Dashboard() {
   const [planRecord, setPlanRecord] = useState<StrategyPlan | null>(() => getStrategyPlan());
   const mixItems = useMemo<string[]>(() => (planRecord ? computeDailyMix(planRecord) : []), [planRecord]);
   const [streak] = useState<number>(() => updateAndGetStreak());
-  const attempts = useMemo(() => getAttempts(), []);
+  const attempts = getAttempts();
 
   useEffect(() => {
     const uid = user?.uid;

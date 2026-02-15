@@ -66,6 +66,9 @@ const { retrieveTrianglesSources } = require(
 const { getDiagramTemplate } = require(
   path.join(__dirname, '../src/tutor/diagram/diagramTemplates.ts')
 );
+const { resolveTopicTeachContract } = require(
+  path.join(__dirname, '../src/tutor/topicTeachContracts.ts')
+);
 const { orchestrateTutorResponse } = require('./tutorOrchestrator.cjs');
 
 function loadDotEnvIfPresent() {
@@ -2438,25 +2441,28 @@ function toSingleLine(text) {
   return String(text || '').replace(/\s+/g, ' ').trim();
 }
 
-function enforceTeacherGoal(goal, nodeTitle) {
+function enforceTeacherGoal(goal, nodeTitle, topicContract) {
   const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
   let out = toSingleLine(goal);
+  if (!out && topicContract?.goalLine) out = `Teacher goal: ${String(topicContract.goalLine).replace(/^teacher goal:\s*/i, '')}`;
   if (!out) out = `Teacher goal: Learn ${topic} in CBSE board-writing format.`;
   if (!/^teacher goal:/i.test(out)) out = `Teacher goal: ${out.replace(/^goal:\s*/i, '')}`;
   if (!/\bCBSE\b|\bboard\b/i.test(out)) out = `${out} (CBSE board-writing format).`;
   return out;
 }
 
-function normalizeTeachKeyIdeas(lines, nodeTitle) {
+function normalizeTeachKeyIdeas(lines, nodeTitle, topicContract) {
   const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
+  const seeded = Array.isArray(topicContract?.keyIdeas) ? topicContract.keyIdeas : [];
   const defaults = [
-    `Definition: state what ${topic} means in this question.`,
-    'Criterion: write the exact theorem/criterion name before using it.',
-    'Correspondence: keep matching vertices/sides in the same order.',
-    'Conclusion: end with Therefore/Hence and the required statement.',
+    seeded[0] || `Definition: state what ${topic} means in this question.`,
+    seeded[1] || 'Criterion: write the exact theorem/criterion name before using it.',
+    seeded[2] || 'Correspondence: keep matching vertices/sides in the same order.',
+    seeded[3] || 'Conclusion: end with Therefore/Hence and the required statement.',
   ];
   const prefixes = ['Definition', 'Criterion', 'Correspondence', 'Conclusion'];
-  const merged = ensureMinArray(toStringArray(lines), 4, (i) => defaults[i] || `Step ${i + 1}: ${topic}.`).slice(0, 4);
+  const sourceLines = seeded.length === 4 ? seeded : toStringArray(lines);
+  const merged = ensureMinArray(sourceLines, 4, (i) => defaults[i] || `Step ${i + 1}: ${topic}.`).slice(0, 4);
   return merged.map((line, idx) => {
     const cleaned = toSingleLine(String(line || '').replace(/^(definition|criterion|correspondence|conclusion)\s*[:\-]?\s*/i, ''));
     const fallback = defaults[idx].replace(/^(Definition|Criterion|Correspondence|Conclusion)\s*:\s*/i, '');
@@ -2464,9 +2470,17 @@ function normalizeTeachKeyIdeas(lines, nodeTitle) {
   });
 }
 
-function enforceCheckpointQuestion(question, nodeTitle) {
+function enforceCheckpointQuestion(question, nodeTitle, topicContract) {
   const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
   let out = toSingleLine(question);
+  if (!out && topicContract?.checkpointQuestion) out = toSingleLine(topicContract.checkpointQuestion);
+  if (
+    topicContract &&
+    String(topicContract.subject || "").toLowerCase() === "science" &&
+    /\bwhich\s+criterion\s+applies\s+here\b/i.test(out)
+  ) {
+    out = toSingleLine(topicContract.checkpointQuestion || out);
+  }
   if (!out) {
     out = `Board checkpoint: In 2-4 lines, write Given, To Prove, the criterion/theorem for ${topic}, and one Therefore/Hence line.`;
   }
@@ -2478,20 +2492,26 @@ function enforceCheckpointQuestion(question, nodeTitle) {
   return out;
 }
 
-function enforceCheckpointAnswer(answer, nodeTitle) {
+function enforceCheckpointAnswer(answer, nodeTitle, topicContract) {
   const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
   let out = String(answer || '').trim();
-  const boardTemplate = [
+  const genericBoardTemplate = [
     `Given: [state the given data for ${topic}].`,
     'To Prove: [write the required result].',
     'Criterion/Theorem: [write exact name such as AA/SAS/SSS if applicable].',
     'Therefore/Hence: [write the final conclusion line].',
   ].join(' ');
+  const boardTemplate =
+    toSingleLine(String(topicContract?.checkpointAnswer || '').replace(/^Expected answer:\s*/i, '')) ||
+    genericBoardTemplate;
+  if (!out && topicContract?.checkpointAnswer) {
+    out = String(topicContract.checkpointAnswer || '').trim();
+  }
   if (!out) out = boardTemplate;
   out = toSingleLine(out);
   const hasGiven = /\bgiven\b\s*:/i.test(out);
-  const hasToProve = /\bto prove\b\s*:/i.test(out);
-  const hasCriterion = /\bcriterion\b|\btheorem\b/i.test(out);
+  const hasToProve = /\bto prove\b\s*:|\bto find\b\s*:/i.test(out);
+  const hasCriterion = /\bcriterion\b|\btheorem\b|\bformula\b|\bprinciple\b|\blaw\b/i.test(out);
   const hasConclusion = /\btherefore\b|\bhence\b/i.test(out);
   if (!hasGiven || !hasToProve || !hasCriterion || !hasConclusion) {
     if (!out.includes('Given: [state the given data')) {
@@ -2506,9 +2526,17 @@ function enforceCheckpointAnswer(answer, nodeTitle) {
   return out;
 }
 
-function enforceCommonMistake(commonMistake, nodeTitle) {
+function enforceCommonMistake(commonMistake, nodeTitle, topicContract) {
   const topic = String(nodeTitle || 'this concept').trim() || 'this concept';
   let out = toSingleLine(commonMistake);
+  if (!out && topicContract?.commonMistake) out = toSingleLine(topicContract.commonMistake);
+  if (
+    topicContract &&
+    String(topicContract.subject || "").toLowerCase() === "science" &&
+    /\bsimilar\b|\bcorrespondence\b|\baa\b|\bsas\b|\bsss\b/i.test(out)
+  ) {
+    out = toSingleLine(topicContract.commonMistake || out);
+  }
   if (!out) {
     out = `Common mistake: skipping criterion/correspondence while writing ${topic}.`;
   }
@@ -2610,25 +2638,33 @@ function ensureTeachContractShape(raw, payload) {
     payload?.cardName ||
     payload?.itemTitle ||
     topic;
+  const topicContract = resolveTopicTeachContract({
+    topicKey: topic,
+    subject: payload?.subject || payload?.subjectTitle || payload?.subjectKey,
+    nodeTitle,
+  });
   const teach = raw.teach && typeof raw.teach === 'object' ? { ...raw.teach } : {};
   const goal = enforceTeacherGoal(
     String(teach.goal || raw.goalLine || teach.headline || teach.oneLiner || '').trim(),
-    nodeTitle
+    nodeTitle,
+    topicContract
   );
   let keyIdeas = toStringArray(teach.keyIdeas);
   if (!keyIdeas.length) keyIdeas = toStringArray(raw.keyIdeaBullets);
   if (!keyIdeas.length) keyIdeas = toStringArray(teach.conceptBullets);
   if (!keyIdeas.length) keyIdeas = toStringArray(teach.simpleExplanation);
-  keyIdeas = normalizeTeachKeyIdeas(keyIdeas, nodeTitle);
+  keyIdeas = normalizeTeachKeyIdeas(keyIdeas, nodeTitle, topicContract);
   const diagram = buildTeachDiagramObject(payload, teach.diagram || raw.diagram || {}, raw);
   const checkpointRaw = raw.checkpoint || teach.checkpoint || {};
   const checkpointQuestion = enforceCheckpointQuestion(
     String(checkpointRaw.question || raw.checkpointQ || raw.checkQuestion || '').trim(),
-    nodeTitle
+    nodeTitle,
+    topicContract
   );
   const checkpointAnswer = enforceCheckpointAnswer(
     String(checkpointRaw.answer || raw.checkpointA || '').trim(),
-    nodeTitle
+    nodeTitle,
+    topicContract
   );
   const commonMistake = enforceCommonMistake(
     String(
@@ -2638,7 +2674,8 @@ function ensureTeachContractShape(raw, payload) {
         raw.commonError ||
         (Array.isArray(raw.commonMistakes) ? raw.commonMistakes[0] : '')
     ).trim(),
-    nodeTitle
+    nodeTitle,
+    topicContract
   );
 
   const nextTeach = {
@@ -2648,6 +2685,7 @@ function ensureTeachContractShape(raw, payload) {
     diagram,
     checkpoint: { question: checkpointQuestion, answer: checkpointAnswer },
     commonMistake,
+    contract_source: topicContract ? "topic" : "generic",
   };
   const next = {
     ...raw,
@@ -2659,6 +2697,7 @@ function ensureTeachContractShape(raw, payload) {
     commonMistakeWarning: raw.commonMistakeWarning ?? commonMistake,
     checkpointQ: raw.checkpointQ ?? checkpointQuestion,
     checkpointA: raw.checkpointA ?? checkpointAnswer,
+    contract_source: raw.contract_source || (topicContract ? "topic" : "generic"),
   };
   if (diagram.required && !next.diagramRequired) next.diagramRequired = diagram.required;
   if (!next.diagramType) next.diagramType = diagram.type;

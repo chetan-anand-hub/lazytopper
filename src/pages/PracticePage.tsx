@@ -7,7 +7,11 @@ import { type PracticeQuestion } from "../data/predictionDataService";
 import { generatePracticeSet, inferBoardPatternFromQuestion, normalizeBoardPattern } from "../data/practiceSetGenerator";
 import { generateUnifiedPracticeQuestions } from "../data/questionGenerator";
 import { promptDPracticePacks } from "../data/promptDPracticePacks";
-import { resolveTopicKey as resolveCanonicalTopicKey, toPracticePackKey } from "../utils/topicResolver";
+import {
+  resolveTopicDisplayName,
+  resolveTopicKey as resolveCanonicalTopicKey,
+  toPracticePackKey,
+} from "../utils/topicResolver";
 import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
 import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
@@ -521,10 +525,6 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
 } | null>(null);
 
 
-  // Two topic identifiers are used:
-  // - topicLabel: display name used by the canonical bank (e.g., "Real Numbers")
-  // - packTopicKey: snake_case key used by Prompt-D packs (e.g., "real_numbers")
-  const topicLabel = topicParam;
   const canonicalTopicKey = useMemo(() => {
   const explicitFromState = (navState as any)?.topicKey as string | undefined;
   return resolveCanonicalTopicKey({
@@ -533,6 +533,14 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
     topicKey: topicKeyParam || explicitFromState || null,
   });
 }, [subjectKey, topicParam, topicKeyParam, navState]);
+
+  // Two topic identifiers are used:
+  // - topicLabel: display name used by the canonical bank (e.g., "Real Numbers")
+  // - packTopicKey: snake_case key used by Prompt-D packs (e.g., "real_numbers")
+  const topicLabel = useMemo(() => {
+    if (!topicParam || topicParam === "Generic") return topicParam;
+    return resolveTopicDisplayName(subjectKey, canonicalTopicKey || topicParam);
+  }, [subjectKey, canonicalTopicKey, topicParam]);
 
 const packTopicKey = useMemo(() => {
   const explicitFromState = (navState as any)?.topicKey as string | undefined;
@@ -663,8 +671,8 @@ const packTopicKey = useMemo(() => {
     if (!topicParam || topicParam === "Generic") {
       return `Practice - Class ${grade} ${subjectKey}`;
     }
-    return `Practice - ${topicParam}`;
-  }, [topicParam, grade, subjectKey]);
+    return `Practice - ${topicLabel}`;
+  }, [topicParam, topicLabel, grade, subjectKey]);
 
   return (
     <div
@@ -687,11 +695,28 @@ const packTopicKey = useMemo(() => {
           backLabel={backLabel}
           quickLinks={[
             { label: "Trends", to: `/trends/${grade}/${subjectKey}` },
-            { label: "TopicHub", to: `/topic-hub/${grade}/${subjectKey}${topicParam && topicParam !== "Generic" ? `/${encodeURIComponent(topicParam)}` : ""}` },
-            { label: "HPQ", to: `/highly-probable/${grade}/${subjectKey}${topicParam && topicParam !== "Generic" ? `?topic=${encodeURIComponent(topicParam)}` : ""}` },
+            {
+              label: "TopicHub",
+              to:
+                canonicalTopicKey && topicParam !== "Generic"
+                  ? `/topic-hub/${grade}/${subjectKey}/${encodeURIComponent(canonicalTopicKey)}`
+                  : `/topic-hub/${grade}/${subjectKey}`,
+            },
+            {
+              label: "HPQ",
+              to:
+                canonicalTopicKey && topicParam !== "Generic"
+                  ? `/highly-probable/${grade}/${subjectKey}?topic=${encodeURIComponent(canonicalTopicKey)}`
+                  : `/highly-probable/${grade}/${subjectKey}`,
+            },
           ]}
         />
-        <JourneyStrip current="practice" grade={grade} subject={subjectKey} topic={topicParam !== "Generic" ? topicParam : undefined} />
+        <JourneyStrip
+          current="practice"
+          grade={grade}
+          subject={subjectKey}
+          topic={topicParam !== "Generic" ? topicLabel : undefined}
+        />
 
         {/* Hero */}
         <section

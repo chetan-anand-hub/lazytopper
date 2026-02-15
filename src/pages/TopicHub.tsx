@@ -9,7 +9,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { getTopicV2Content, normalizeTopicKey } from "../utils/topicHubV2Store";
+import { getCanonicalChapters, toCanonicalSubjectId } from "../data/syllabus/cbse10Canonical";
+import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
+import { getTopicV2Content, normalizeTopicKey, resolveRuntimeTopicKey } from "../utils/topicHubV2Store";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import type { TopicHubV2Content, V2Definition, V2Example, Misconception, Competency, LabActivity, CaseStudy } from "../utils/getTopicV2Content";
 import { PredictionCore } from "../data/predictionCore";
@@ -418,15 +420,21 @@ type TopicOption = { key: string; name: string; tier: string };
 
 function buildTopicOptions(subject: SubjectKey): TopicOption[] {
   const out: TopicOption[] = [];
-  for (const k of Object.keys(topicHubV2Content || {})) {
-    const rec = (topicHubV2Content as any)[k] as Partial<TopicHubV2Content> | undefined;
-    if (!rec) continue;
-    const s = String(rec.subject || "").toLowerCase();
-    const isMatch = subject === "maths" ? s.includes("math") : s.includes("science");
-    if (!isMatch) continue;
+  const runtimeKeys = Object.keys(topicHubV2Content || {});
+  const canonicalSubject = toCanonicalSubjectId(subject);
+  const seen = new Set<string>();
+  for (const chapter of getCanonicalChapters(canonicalSubject)) {
+    const canonicalKey = normalizeTopicKey(chapter.canonicalSlug);
+    if (!canonicalKey || isSupplementalTopicKey(canonicalKey) || seen.has(canonicalKey)) continue;
+    seen.add(canonicalKey);
+
+    const runtimeKey = resolveRuntimeTopicKey(canonicalKey, runtimeKeys);
+    const rec = ((topicHubV2Content as any)[runtimeKey] ||
+      (topicHubV2Content as any)[canonicalKey] ||
+      {}) as Partial<TopicHubV2Content>;
     out.push({
-      key: String(rec.topicKey || k),
-      name: String(rec.topicName || k),
+      key: canonicalKey,
+      name: String(rec.topicName || chapter.title || canonicalKey),
       tier: String(rec.tier || ""),
     });
   }
