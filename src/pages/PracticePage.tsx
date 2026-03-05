@@ -12,11 +12,16 @@ import {
   resolveTopicKey as resolveCanonicalTopicKey,
   toPracticePackKey,
 } from "../utils/topicResolver";
-import { generateMoreLikeThis, MENTOR_ENDPOINT } from "../ai/aiClient";
+import { generateMoreLikeThis } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
 import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
 import JourneyStrip from "../components/ux/JourneyStrip";
 import ReturnContextBar from "../components/ux/ReturnContextBar";
+import {
+  canUseMentorServer,
+  isMentorNetworkFailure,
+  markMentorServerUnavailable,
+} from "../services/mentorServerGate";
 import { trackUxEvent } from "../services/uxTelemetry";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
@@ -1235,6 +1240,7 @@ const packTopicKey = useMemo(() => {
 };
 
 type MentorChatMsg = { role: "user" | "assistant" | "system"; content: string };
+const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
 
 function MentorSolveDrawer(props: {
   open: boolean;
@@ -1246,6 +1252,8 @@ function MentorSolveDrawer(props: {
   topicKey: string;
 }) {
   const { open, onClose, seed, solveStyle, grade, subjectTitle, topicKey } = props;
+  void grade;
+  void topicKey;
 
   const getOfflineBoardSteps = () => {
     const subj = String(subjectTitle || "").trim() as any;
@@ -1347,6 +1355,139 @@ function MentorSolveDrawer(props: {
     return lines.join("\n");
   };
 
+  const buildLocalMentorReply = useCallback(
+    (history: MentorChatMsg[]) => {
+      const lastUser = [...history].reverse().find((m) => m.role === "user");
+      const studentText = String(lastUser?.content || "").trim();
+
+      if (solveStyle === "board") {
+        const { tpl, section } = getOfflineBoardSteps();
+        const steps = Array.isArray(tpl?.steps)
+          ? tpl.steps.map((s: any) => ({
+              marks: Number(s?.marks || 1),
+              text: String(s?.title || "Board step"),
+              whyThisGetsMarks: Array.isArray(s?.whatToWrite)
+                ? String(s.whatToWrite[0] || "")
+                : "",
+            }))
+          : [
+              { marks: 1, text: "Write given data clearly." },
+              { marks: 1, text: "Apply the relevant criterion/theorem." },
+              { marks: 1, text: "Conclude with final board-format answer." },
+            ];
+
+        return JSON.stringify({
+          kind: "board_steps_ms",
+          totalMarks: Number(tpl?.marksTotal || seed?.marks || 3),
+          section,
+          steps,
+          finalAnswer: "Write one final answer line with labels/units.",
+        });
+      }
+
+      return JSON.stringify({
+        kind: "hint",
+        tutor: studentText
+          ? `Good attempt. Next move: connect your step to the core criterion in ${seed?.title || "this question"}.`
+          : `Let's start: what information is directly given in ${seed?.title || "this question"}?`,
+        answerFormat: "One short step + reason.",
+      });
+    },
+    [solveStyle, seed]
+  );
+
+  const requestMentorHybrid = useCallback(
+    async (history: MentorChatMsg[]) => {
+      if (!seed) return "";
+      if (!canUseMentorServer()) {
+        throw new Error("Mentor server temporarily unavailable.");
+      }
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, MENTOR_HYBRID_TIMEOUT_MS);
+      try {
+        const modeApi = solveStyle === "board" ? "board_steps_ms" : "solve_with_me";
+        const lastUser = [...history].reverse().find((m) => m.role === "user");
+        const body = {
+          mode: modeApi,
+          payload: {
+            subject: subjectTitle,
+            grade: Number(grade),
+            topicKey,
+            chapter: topicKey,
+            selectedMode: modeApi,
+            solveStyle,
+            questionText: String(seed.question || ""),
+            studentQuestion: String(lastUser?.content || "").trim(),
+            cardTitle: seed.title,
+            cardSection: seed.section,
+            marks: Number(seed.marks || 0) || undefined,
+          },
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+        };
+        let res: Response;
+        try {
+          res = await fetch("/api/mentor", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (isMentorNetworkFailure(error)) {
+            markMentorServerUnavailable();
+          }
+          throw error;
+        }
+        const raw = await res.text();
+        let payload: any = {};
+        try {
+          payload = raw ? JSON.parse(raw) : {};
+        } catch {
+          payload = {
+            data: { text: raw },
+            message: raw,
+          };
+        }
+        if (!res.ok) {
+          if (res.status >= 500) {
+            markMentorServerUnavailable();
+          }
+          const errMsg =
+            (typeof payload?.error === "string" && payload.error) ||
+            (typeof payload?.message === "string" && payload.message) ||
+            `Mentor request failed (${res.status}).`;
+          throw new Error(errMsg);
+        }
+        const data = payload?.data || {};
+        if (data && typeof data === "object") {
+          if (data.structured && typeof data.structured === "object") {
+            return JSON.stringify(data.structured);
+          }
+          if (typeof data.text === "string" && data.text.trim()) {
+            return data.text.trim();
+          }
+        }
+        if (typeof payload?.message === "string" && payload.message.trim()) {
+          return payload.message.trim();
+        }
+        throw new Error("Mentor response incomplete. Please retry.");
+      } catch (err) {
+        if (timedOut) {
+          markMentorServerUnavailable();
+          throw new Error("Mentor request timed out.");
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    [seed, solveStyle, subjectTitle, grade, topicKey]
+  );
+
   const kickoff = useCallback(async () => {
     if (!seed) return;
 
@@ -1362,36 +1503,20 @@ function MentorSolveDrawer(props: {
     setMessages([firstUser]);
 
     try {
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: solveStyle === "board" ? "board_steps_ms" : "solve_with_me",
-          payload: {
-            subject: subjectTitle,
-            grade,
-            topicKey,
-            questionText: seed.question,
-            marks: seed.marks,
-            section: seed.section,
-            solveStyle,
-            vibe: "zombie",
-          },
-          messages: [firstUser],
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Mentor error");
-
-      const assistantRaw = data?.text ? String(data.text) : "";
+      let assistantRaw = "";
+      try {
+        assistantRaw = await requestMentorHybrid([firstUser]);
+      } catch (serverErr: any) {
+        console.warn("Mentor server unavailable, using fallback", serverErr);
+        assistantRaw = buildLocalMentorReply([firstUser]);
+      }
       setMessages((prev) => [...prev, { role: "assistant", content: assistantRaw }]);
     } catch (e: any) {
       setErrorText(e?.message || "Failed to load mentor response.");
     } finally {
       setLoading(false);
     }
-  }, [seed, solveStyle, subjectTitle, grade, topicKey]);
+  }, [seed, buildLocalMentorReply, requestMentorHybrid]);
 
   useEffect(() => {
     if (open) kickoff();
@@ -1415,36 +1540,20 @@ function MentorSolveDrawer(props: {
 
     setLoading(true);
     try {
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "solve_with_me",
-          payload: {
-            subject: subjectTitle,
-            grade,
-            topicKey,
-            questionText: seed?.question,
-            marks: seed?.marks,
-            section: seed?.section,
-            solveStyle: "socratic",
-            vibe: "zombie",
-            studentAttempt: trimmed,
-            studentAnswer: trimmed,
-          },
-          messages: nextHistory,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Mentor error");
-      const assistantRaw = data?.text ? String(data.text) : "";
+      let assistantRaw = "";
+      try {
+        assistantRaw = await requestMentorHybrid(nextHistory);
+      } catch (serverErr: any) {
+        console.warn("Mentor server unavailable, using fallback", serverErr);
+        assistantRaw = buildLocalMentorReply(nextHistory);
+      }
       setMessages((prev) => [...prev, { role: "assistant", content: assistantRaw }]);
     } catch (e: any) {
       setErrorText(e?.message || "Failed to send.");
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, solveStyle, subjectTitle, grade, topicKey, seed]);
+  }, [input, loading, messages, solveStyle, buildLocalMentorReply, requestMentorHybrid]);
 
   if (!open || !seed) return null;
 

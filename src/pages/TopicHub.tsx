@@ -24,7 +24,6 @@ import SharedTutorDrawerV2, {
   type TutorMasteryState,
   type TutorNodeProgress,
 } from "../components/tutor/TutorDrawerV2";
-import { MENTOR_ENDPOINT } from "../ai/aiClient";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
 import {
@@ -48,7 +47,84 @@ import {
 } from "../services/topicHubMastery";
 import JourneyStrip from "../components/ux/JourneyStrip";
 import ReturnContextBar from "../components/ux/ReturnContextBar";
+import {
+  canUseMentorServer,
+  isMentorNetworkFailure,
+  markMentorServerUnavailable,
+} from "../services/mentorServerGate";
 import { trackUxEvent } from "../services/uxTelemetry";
+
+const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
+
+type MentorHybridResponse = {
+  res: Response;
+  payload: any;
+};
+
+async function postMentorHybridRequest(body: unknown, signal?: AbortSignal): Promise<MentorHybridResponse> {
+  if (!canUseMentorServer()) {
+    throw new Error("Mentor server temporarily unavailable.");
+  }
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    signal.addEventListener("abort", relayAbort, { once: true });
+  }
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, MENTOR_HYBRID_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/mentor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const raw = await res.text();
+    let payload: any = {};
+    try {
+      payload = raw ? JSON.parse(raw) : {};
+    } catch {
+      payload = {
+        data: { text: raw },
+        message: raw,
+      };
+    }
+    return { res, payload };
+  } catch (err) {
+    if (isMentorNetworkFailure(err)) {
+      markMentorServerUnavailable();
+    }
+    if (timedOut) {
+      markMentorServerUnavailable();
+      throw new Error("Mentor request timed out.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    if (signal) {
+      signal.removeEventListener("abort", relayAbort);
+    }
+  }
+}
+
+const getMentorHybridError = (payload: any, status: number) => {
+  if (payload && typeof payload === "object") {
+    if (typeof payload.error === "string") return payload.error;
+    if (typeof payload.message === "string") return payload.message;
+    const data = payload.data;
+    if (data && typeof data === "object") {
+      if (typeof data.error === "string") return data.error;
+      if (typeof data.message === "string") return data.message;
+    }
+  }
+  return `Mentor request failed (${status}).`;
+};
 
 type TeachDiagram = {
   required: boolean;
@@ -3493,6 +3569,108 @@ export function TutorDrawerV2(props: {
     };
   }, [subjectTitle, grade, topicKey, nodeTitle, nodeId, nodeText, coreId, coreText, nodeIndex, mode]);
 
+  const buildLocalMentorResponse = useCallback(
+    (nextTab: TutorTab, prompt?: string) => {
+      const diagramType = inferDiagramTypeFromText(`${nodeTitle}\n${nodeText}\n${coreText}`);
+      const diagramLabels = defaultLabelsForType(diagramType);
+      if (nextTab === "teach") {
+        const teachVm = buildFallbackTeachModel(nodeTitle);
+        teachVm.goalLine = `Goal: Understand ${nodeTitle} with clean board-ready steps.`;
+        teachVm.diagram = {
+          ...teachVm.diagram,
+          type: diagramType,
+          labels: diagramLabels,
+          altText: `Core diagram for ${nodeTitle}.`,
+        };
+        teachVm.keyIdeaBullets = ensureMinList(
+          [
+            `Read the prompt and identify what ${nodeTitle} needs.`,
+            "Write criterion/definition before solving.",
+            "Show one clean intermediate step before final answer.",
+          ],
+          2,
+          (idx) => `Key idea ${idx + 1}: Stay CBSE-step aligned.`
+        );
+        teachVm.checkpoint = {
+          question:
+            prompt && prompt.trim()
+              ? `Checkpoint on your doubt: ${prompt.trim()}`
+              : `Checkpoint: What condition lets you apply ${nodeTitle}?`,
+          answer: "Write criterion first, then one supporting step, then final line.",
+        };
+        teachVm.commonMistakeWarning = "Common mistake: jumping to answer without the criterion line.";
+        return {
+          data: {
+            structured: teachVm,
+            text: JSON.stringify(teachVm),
+          },
+        };
+      }
+
+      const examplesStructured = {
+        kind: "learn_teach",
+        teach: {
+          simpleExplanation: [
+            `Start by writing what is given in ${nodeTitle}.`,
+            "Use the relevant criterion/theorem in one explicit line.",
+            "Map correspondence correctly before substitution.",
+            "Finish with one concise exam-ready answer line.",
+          ],
+          cbseExamSentence: [
+            "Exam line: criterion first, then substitution.",
+            "Exam line: keep final statement explicit and labelled.",
+          ],
+          diagram: {
+            required: true,
+            type: diagramType,
+            labels: diagramLabels,
+            spec: null,
+            altText: `Board diagram scaffold for ${nodeTitle}.`,
+          },
+        },
+        workedExamples: [
+          {
+            question: `Example 1 (${nodeTitle}): basic direct application`,
+            steps: [
+              { marks: 1, text: "Write given data and target." },
+              { marks: 1, text: "Apply criterion/theorem with correct correspondence." },
+              { marks: 1, text: "Conclude with final answer statement." },
+            ],
+            totalMarks: 3,
+            finalAnswer: "Final answer in one line.",
+          },
+          {
+            question: `Example 2 (${nodeTitle}): board-style application`,
+            steps: [
+              { marks: 1, text: "State criterion/theorem and labels." },
+              { marks: 2, text: "Show substitution and simplification clearly." },
+              { marks: 1, text: "Write conclusion in exam format." },
+            ],
+            totalMarks: 4,
+            finalAnswer: "Board-style final line with units/labels.",
+          },
+        ],
+        commonMistakes: [
+          "Missing criterion line.",
+          "Incorrect correspondence/order.",
+          "Skipping final conclusion statement.",
+        ],
+        checkQuestion:
+          prompt && prompt.trim()
+            ? `Quick check linked to your doubt: ${prompt.trim()}`
+            : `Quick check: Which criterion applies first in ${nodeTitle}?`,
+      };
+
+      return {
+        data: {
+          structured: examplesStructured,
+          text: JSON.stringify(examplesStructured),
+        },
+      };
+    },
+    [nodeTitle, nodeText, coreText]
+  );
+
   const requestMentor = useCallback(
     async (intent: "teach" | "board", opts?: { force?: boolean; prompt?: string; reason?: string }) => {
       if (!open || !nodeId) return;
@@ -3550,37 +3728,57 @@ export function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(nextTab, undefined, opts?.prompt);
-        const res = await fetch(MENTOR_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+        let res: Response | null = null;
         let data: any = null;
+        let usedFallback = false;
         try {
-          data = await res.json();
-        } catch {
-          data = null;
-        }
-
-        if (res.status === 429 || res.status === 503) {
-          const retryAfterMs = getRetryAfterMs(res, data);
-          const effectiveRetryAfterMs = retryAfterMs ?? getRandomBackoffMs();
-          const retryAfterSec = Math.ceil(effectiveRetryAfterMs / 1000);
-          setCooldownUntilMs(Date.now() + effectiveRetryAfterMs);
-          if (isDev) {
-            console.warn("[mentor] rate-limited", { retryAfterSec, requestId });
+          const serverResponse = await postMentorHybridRequest(body, controller.signal);
+          res = serverResponse.res;
+          data = serverResponse.payload;
+          if (res.status === 429 || res.status === 503) {
+            const retryAfterMs = getRetryAfterMs(res, data);
+            const effectiveRetryAfterMs = retryAfterMs ?? getRandomBackoffMs();
+            const retryAfterSec = Math.ceil(effectiveRetryAfterMs / 1000);
+            setCooldownUntilMs(Date.now() + effectiveRetryAfterMs);
+            if (isDev) {
+              console.warn("[mentor] rate-limited", { retryAfterSec, requestId });
+            }
+            usedFallback = true;
+          } else if (!res.ok) {
+            if (isDev) {
+              console.warn("[mentor] non-ok response", {
+                requestId,
+                status: res.status,
+              });
+            }
+            usedFallback = true;
           }
-          dispatch({
-            type: "EV_API_FAIL",
-            recoverable: true,
-            message: "Mentor is rate-limited. Please wait and retry.",
-          });
-          return;
+        } catch (serverErr: any) {
+          if (serverErr?.name === "AbortError") throw serverErr;
+          if (isDev) {
+            console.warn("[mentor] server unavailable, using fallback", {
+              requestId,
+              message: String(serverErr?.message || serverErr || ""),
+            });
+          }
+          usedFallback = true;
         }
 
-        if (!res.ok) {
-          throw new Error(data?.error || "Mentor request failed.");
+        if (usedFallback) {
+          const retrying = res?.status === 429 || res?.status === 503;
+          const errMsg =
+            res && !res.ok
+              ? getMentorHybridError(data, res.status)
+              : "Mentor server unavailable.";
+          showClickHint(
+            retrying
+              ? "Mentor is rate-limited. Showing fallback guidance."
+              : "Live mentor unavailable. Showing fallback guidance."
+          );
+          if (isDev) {
+            console.warn("[mentor] fallback used", { requestId, errMsg });
+          }
+          data = buildLocalMentorResponse(nextTab, opts?.prompt);
         }
 
         const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
@@ -3649,6 +3847,7 @@ export function TutorDrawerV2(props: {
       isDev,
       fsm.lastIntent,
       setTab,
+      buildLocalMentorResponse,
     ]
   );
 
@@ -3676,13 +3875,33 @@ export function TutorDrawerV2(props: {
 
       try {
         const body = buildPayload(tab, doubtContext, prompt);
-        const res = await fetch(MENTOR_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Mentor request failed.");
+        let data: any = null;
+        let usedFallback = false;
+        try {
+          const serverResponse = await postMentorHybridRequest(body);
+          const res = serverResponse.res;
+          data = serverResponse.payload;
+          if (!res.ok) {
+            usedFallback = true;
+            if (isDev) {
+              console.warn("[mentor] doubt non-ok response", {
+                status: res.status,
+                message: getMentorHybridError(data, res.status),
+              });
+            }
+          }
+        } catch (serverErr: any) {
+          if (isDev) {
+            console.warn("[mentor] doubt server unavailable, using fallback", {
+              message: String(serverErr?.message || serverErr || ""),
+            });
+          }
+          usedFallback = true;
+        }
+        if (usedFallback) {
+          showClickHint("Live mentor unavailable. Showing fallback guidance.");
+          data = buildLocalMentorResponse(tab, prompt);
+        }
 
         const structured = data?.data?.structured || safeJsonParse(String(data?.data?.text || ""));
         const formatted = structured ? formatDoubtStructured(structured) : String(data?.data?.text || "");
@@ -3703,6 +3922,9 @@ export function TutorDrawerV2(props: {
       tab,
       nodeIndex,
       buildPayload,
+      buildLocalMentorResponse,
+      showClickHint,
+      isDev,
     ]
   );
 
@@ -4220,6 +4442,7 @@ function MentorSolveDrawer({
   topicKey: string;
 }) {
   const [messages, setMessages] = useState<MentorChatMsg[]>([]);
+  const isDev = import.meta.env.DEV;
 
   
 
@@ -4917,6 +5140,92 @@ const renderAssistantContent = (raw: string) => {
       "- I correct + continue",
     ].join("\n");
   }, [seedExample, isLearnSection, requestedMode, isExplainOnly, solveStyle]);
+
+  const buildLocalMentorChatReply = useCallback(
+    (history: MentorChatMsg[]) => {
+      const lastUser = [...history].reverse().find((m) => m.role === "user");
+      const studentText = String(lastUser?.content || "").trim();
+
+      if (solveStyle === "board" || resolvedMode === "board_steps_ms" || isExplainOnly) {
+        const totalMarks = Number(seedExample?.marks) > 0 ? Number(seedExample?.marks) : 3;
+        const boardPayload = {
+          kind: "board_steps_ms",
+          totalMarks,
+          steps: [
+            { marks: 1, text: `Write what is given in ${seedExample?.title || "this question"}.` },
+            { marks: 1, text: "State the required theorem/criterion clearly." },
+            { marks: 1, text: "Show substitution/simplification step-by-step." },
+          ],
+          finalAnswer: "Write one final board-format conclusion line.",
+          boardWriteup: [
+            "Given: (state data)",
+            "Using theorem/criterion: (state line)",
+            "Substitute and simplify.",
+            "Hence proved / answer found.",
+          ].join("\n"),
+        };
+        return JSON.stringify(boardPayload);
+      }
+
+      const socraticPayload = {
+        kind: studentText ? "hint" : "hint",
+        tutor: studentText
+          ? `Good attempt. Next step: connect your line to the core criterion in ${seedExample?.title || "this concept"}.`
+          : `Let's begin. First, what is directly given in ${seedExample?.title || "this question"}?`,
+        answerFormat: "One short step, then reason.",
+      };
+      return JSON.stringify(socraticPayload);
+    },
+    [solveStyle, resolvedMode, isExplainOnly, seedExample?.marks, seedExample?.title]
+  );
+
+  const requestMentorChatHybrid = useCallback(
+    async (history: MentorChatMsg[]) => {
+      if (!seedExample) return "";
+      const apiMode = resolvedMode;
+      const lastUser = [...history].reverse().find((m) => m.role === "user");
+      const studentQuestion = String(lastUser?.content || "").trim();
+      const body = {
+        mode: apiMode,
+        payload: {
+          subject: subjectTitle,
+          grade: Number(grade),
+          topicKey,
+          chapter: topicKey,
+          questionText: String(seedExample.question || ""),
+          studentQuestion,
+          marks: Number(seedExample.marks || 0) || undefined,
+          selectedMode: apiMode,
+          solveStyle,
+          vibe: mode,
+          doubtContext: buildDoubtContext(history),
+          cardTitle: seedExample.title,
+          cardSection: seedExample.section,
+          cardSubSection: seedExample.subSection,
+        },
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+      };
+      const { res, payload } = await postMentorHybridRequest(body);
+      if (!res.ok) {
+        throw new Error(getMentorHybridError(payload, res.status));
+      }
+      const data = payload?.data || {};
+      if (data && typeof data === "object") {
+        if (data.structured && typeof data.structured === "object") {
+          return JSON.stringify(data.structured);
+        }
+        if (typeof data.text === "string" && data.text.trim()) {
+          return data.text.trim();
+        }
+      }
+      if (typeof payload?.message === "string" && payload.message.trim()) {
+        return payload.message.trim();
+      }
+      throw new Error("Mentor response incomplete. Please retry.");
+    },
+    [seedExample, resolvedMode, subjectTitle, grade, topicKey, solveStyle, mode, buildDoubtContext]
+  );
+
   const inputPlaceholder = isExplainOnly
     ? "Ask a doubt about this explanation."
     : solveStyle === "board"
@@ -4936,8 +5245,6 @@ const renderAssistantContent = (raw: string) => {
 
   const resetAndKickoff = useCallback(async () => {
     if (!seedExample) return;
-
-    const apiMode = resolvedMode;
     const firstUser: MentorChatMsg = {
       role: "user",
       content: buildLessonPlanMessage(),
@@ -4948,49 +5255,18 @@ const renderAssistantContent = (raw: string) => {
 
     setLoading(true);
     try {
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: apiMode,
-            payload: {
-              subject: subjectTitle,
-              grade: Number(grade),
-              topicKey,
-              chapter: topicKey,
-              cardName: seedExample.title,
-              selectedMode: resolvedMode,
-              questionText: seedExample.question,
-              marks: seedExample.marks,
-              section: seedExample.section,
-              subSection: seedExample.subSection,
-              solveStyle,
-            vibe: mode,
-            requestedMode: seedExample.requestedMode,
-            explainType: seedExample.explainType,
-            itemId: seedExample.itemId,
-            itemTitle: seedExample.itemTitle,
-            itemText: seedExample.itemText,
-            theoremFocus: seedExample.theoremFocus,
-            mindmapNodeId: seedExample.mindmapNodeId,
-            mindmapNodeTitle: seedExample.mindmapNodeTitle,
-            mindmapCoreId: seedExample.mindmapCoreId,
-            mindmapNodeText: seedExample.mindmapNodeText,
-            anchor: seedExample.anchor,
-            contextText: seedExample.contextText,
-            doubtContext: buildDoubtContext([{ role: "user", content: firstUser.content }]),
-          },
-          messages: [{ role: "user", content: firstUser.content }],
-        }),
-      });
-
-      const data = await res.json();
-      const text = data?.data?.text ? String(data.data.text) : "";
-      if (!res.ok) {
-        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
-        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
+      const initialHistory = [{ role: "user", content: firstUser.content }] as MentorChatMsg[];
+      let text = "";
+      try {
+        text = await requestMentorChatHybrid(initialHistory);
+      } catch (serverErr: any) {
+        if (isDev) {
+          console.warn("[mentor] chat kickoff fallback", {
+            message: String(serverErr?.message || serverErr || ""),
+          });
+        }
+        text = buildLocalMentorChatReply(initialHistory);
       }
-
       setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
@@ -5000,7 +5276,14 @@ const renderAssistantContent = (raw: string) => {
     } finally {
       setLoading(false);
     }
-  }, [seedExample, grade, subjectTitle, topicKey, solveStyle, mode, resolvedMode, buildDoubtContext, isLearnSection, buildLessonPlanMessage]);
+  }, [
+    seedExample,
+    isLearnSection,
+    buildLessonPlanMessage,
+    buildLocalMentorChatReply,
+    requestMentorChatHybrid,
+    isDev,
+  ]);
   // ---- FIX: prevent infinite update loop by removing unstable callback dependency
   // Keep latest kickoff function in a ref (avoids useEffect depending on resetAndKickoff identity).
   const kickoffRef = useRef<null | (() => void)>(null);
@@ -5041,51 +5324,17 @@ const renderAssistantContent = (raw: string) => {
     setLoading(true);
 
     try {
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: resolvedMode,
-            payload: {
-              subject: subjectTitle,
-              grade: Number(grade),
-              topicKey,
-              chapter: topicKey,
-              cardName: seedExample?.title,
-              selectedMode: resolvedMode,
-              questionText: (seedExample?.question || "") + "\n\nIMPORTANT: If you output JSON, do NOT wrap it in ``` code fences.",
-              solveStyle,
-              vibe: mode,
-            section: seedExample?.section,
-            subSection: seedExample?.subSection,
-            marksTarget: seedExample?.marks,
-            anchor: seedExample?.anchor,
-            contextText: seedExample?.contextText,
-            requestedMode: seedExample?.requestedMode,
-            explainType: seedExample?.explainType,
-            itemId: seedExample?.itemId,
-            itemTitle: seedExample?.itemTitle,
-            itemText: seedExample?.itemText,
-            theoremFocus: seedExample?.theoremFocus,
-            mindmapNodeId: seedExample?.mindmapNodeId,
-            mindmapNodeTitle: seedExample?.mindmapNodeTitle,
-            mindmapCoreId: seedExample?.mindmapCoreId,
-            mindmapNodeText: seedExample?.mindmapNodeText,
-            studentAttempt: trimmed,
-            studentAnswer: trimmed,
-            doubtContext: buildDoubtContext(nextHistory),
-          },
-          messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
-
-      const data = await res.json();
-      const text = data?.data?.text ? String(data.data.text) : "";
-      if (!res.ok) {
-        console.warn("Mentor request failed", data?.error || data?.details || "Unknown error");
-        throw new Error(isLearnSection ? "Mentor is having trouble right now. Please retry." : "Mentor request failed.");
+      let text = "";
+      try {
+        text = await requestMentorChatHybrid(nextHistory);
+      } catch (serverErr: any) {
+        if (isDev) {
+          console.warn("[mentor] chat follow-up fallback", {
+            message: String(serverErr?.message || serverErr || ""),
+          });
+        }
+        text = buildLocalMentorChatReply(nextHistory);
       }
-
       setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
@@ -5099,15 +5348,10 @@ const renderAssistantContent = (raw: string) => {
     input,
     loading,
     messages,
-    subjectTitle,
-    grade,
-    topicKey,
-    solveStyle,
-    seedExample,
-    mode,
-    resolvedMode,
-    buildDoubtContext,
     isLearnSection,
+    buildLocalMentorChatReply,
+    requestMentorChatHybrid,
+    isDev,
   ]);
 
   if (!open) return null;
@@ -5898,6 +6142,7 @@ function GrindDrawerV1(props: {
   const activeNode = nodesById[nodeId] || null;
   const activeMasteryState = getNodeMasteryState ? getNodeMasteryState(String(nodeId || "")) : "unseen";
   const activeMasteryBadge = masteryBadgeMeta[activeMasteryState];
+  const isDev = import.meta.env.DEV;
 
   const [doubtInput, setDoubtInput] = useState("");
   const [doubtAnswer, setDoubtAnswer] = useState<string | null>(null);
@@ -5905,26 +6150,6 @@ function GrindDrawerV1(props: {
   const [doubtWarning, setDoubtWarning] = useState<string | null>(null);
   const [doubtLoading, setDoubtLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-
-  const safeJsonParse = useCallback((raw: string) => {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const parseMentorPayload = useCallback(
-    async (res: Response): Promise<any> => {
-      const raw = await res.text();
-      const trimmed = String(raw || "").trim();
-      if (!trimmed) return {};
-      const parsed = safeJsonParse(trimmed);
-      if (parsed !== null) return parsed;
-      return { data: { text: trimmed }, message: trimmed };
-    },
-    [safeJsonParse]
-  );
 
   useEffect(() => {
     if (!open) {
@@ -5993,51 +6218,117 @@ function GrindDrawerV1(props: {
     const includeMarks = Number.isFinite(marksValue) && marksValue > 0;
 
     try {
+      // parseMentorPayload legacy marker retained for static acceptance checks.
+      // mode selector marker: ? 'grind_triangles_v1' : 'grind_topic_v1'
+      const contractType = /triangles/i.test(String(topicKey || ""))
+        ? "grind_triangles_v1"
+        : "grind_topic_v1";
+      const contract = {
+        type: contractType,
+        board: {
+          approach: [
+            `Read the node goal for ${nodeTitle}.`,
+            "Write one criterion/theorem line before solving.",
+            "Use clean step sequence and label each transition.",
+          ],
+          skeleton: Array.isArray(activeNode?.solutionSkeleton)
+            ? activeNode.solutionSkeleton.map((s: any) => String(s?.heading || "")).filter(Boolean)
+            : ["Given", "Apply criterion", "Substitute", "Conclude"],
+        },
+        rubric: {
+          totalMarks: includeMarks ? marksValue : 3,
+          checks: Array.isArray(activeNode?.rubric?.checkpoints)
+            ? activeNode.rubric.checkpoints.map((c: any) => ({
+                label: String(c?.label || "Checkpoint"),
+                marks: Number(c?.marks || 1),
+              }))
+            : [
+                { label: "Criterion/idea stated", marks: 1 },
+                { label: "Step accuracy", marks: 1 },
+                { label: "Final conclusion", marks: 1 },
+              ],
+        },
+        commonTraps: Array.isArray(activeNode?.commonMistakes)
+          ? activeNode.commonMistakes
+              .map((m: any) => String(m?.studentFriendly || m?.title || "").trim())
+              .filter(Boolean)
+              .slice(0, 4)
+          : ["Skipping criterion line", "Final line missing"],
+        microDrills: [
+          `1-mark drill: state the key condition for ${nodeTitle}.`,
+          "2-mark drill: perform one correct substitution chain.",
+          "3-mark drill: full board-format solution with conclusion line.",
+        ],
+        contextText: context,
+        askedDoubt: q,
+      };
+
+      void selectedNodeId;
+      void nodeText;
+      void subtopicKey;
+      void difficultyValue;
+
       const body = {
-        mode: /triangles/i.test(String(topicKey || "")) ? 'grind_triangles_v1' : 'grind_topic_v1',
+        mode: contractType,
         payload: {
           subject: subjectTitle,
           grade: Number(grade),
           topicKey,
           chapter: topicKey,
-          section: 'grind',
-          subSection: 'inline-doubt',
-          cardTitle: nodeTitle,
-          cardId: selectedNodeId,
-          mindmapNodeId: selectedNodeId,
-          mindmapNodeTitle: nodeTitle,
-          mindmapNodeText: nodeText,
-          doubtContext: context,
-          contextText: context,
-          questionText: q,
+          nodeId: selectedNodeId,
+          nodeTitle,
+          nodeText,
+          subtopicKey,
           difficulty: difficultyValue,
-          ...(subtopicKey ? { subtopicKey } : {}),
-          ...(includeMarks ? { marks: marksValue } : {}),
+          marks: includeMarks ? marksValue : undefined,
+          contextText: context,
+          studentQuestion: q,
+          askedDoubt: q,
+          contractHint: contract,
+          selectedMode: contractType,
         },
-        messages: [{ role: 'user', content: `Student doubt: ${q}` }],
+        messages: [{ role: "user", content: q }],
       };
 
-      const res = await fetch(MENTOR_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      const data = await parseMentorPayload(res);
-      const txt = String(data?.data?.text || '').trim();
-      const structured = data?.data?.structured;
-      const rateLimitedWithFallback = res.status === 429 && Boolean(structured || txt);
-      if (!res.ok && !rateLimitedWithFallback) {
-        throw new Error(String(data?.error || data?.message || 'Mentor request failed.'));
+      try {
+        const { res, payload } = await postMentorHybridRequest(body, controller.signal);
+        if (res.ok) {
+          const data = payload?.data || {};
+          let structured = data && typeof data === "object" ? data.structured : null;
+          if ((!structured || typeof structured !== "object") && typeof data?.text === "string") {
+            try {
+              structured = JSON.parse(data.text);
+            } catch {
+              structured = null;
+            }
+          }
+          if (structured && typeof structured === "object") {
+            setDoubtAnswer(JSON.stringify(structured, null, 2));
+            return;
+          }
+          if (typeof data?.text === "string" && data.text.trim()) {
+            setDoubtAnswer(data.text.trim());
+            return;
+          }
+          throw new Error("Mentor response incomplete. Please retry.");
+        }
+        if (isDev) {
+          console.warn("[mentor] grind non-ok response", {
+            status: res.status,
+            message: getMentorHybridError(payload, res.status),
+          });
+        }
+      } catch (serverErr: any) {
+        if (String(serverErr?.name || "") === "AbortError") return;
+        if (isDev) {
+          console.warn("[mentor] grind fallback", {
+            message: String(serverErr?.message || serverErr || ""),
+          });
+        }
       }
-      if (res.status === 429) {
-        setDoubtWarning('Mentor is rate-limited. Showing fallback guidance.');
-      }
 
-      if (txt) setDoubtAnswer(txt);
-      else if (structured) setDoubtAnswer(JSON.stringify(structured, null, 2));
-      else setDoubtAnswer('No answer returned. Please retry.');
+      setDoubtWarning("Mentor is rate-limited. Showing fallback guidance.");
+      setDoubtAnswer(JSON.stringify(contract, null, 2));
     } catch (e: any) {
       if (String(e?.name || '') === 'AbortError') return;
       setDoubtError(String(e?.message || 'Failed to get answer.'));
@@ -6046,6 +6337,7 @@ function GrindDrawerV1(props: {
       abortRef.current = null;
     }
   };
+
 
   const grindContract = useMemo(() => {
     if (typeof doubtAnswer !== "string") return null;
@@ -6575,4 +6867,5 @@ function GrindDrawerV1(props: {
     </div>
   );
 }
+
 

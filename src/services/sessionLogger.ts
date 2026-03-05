@@ -1,8 +1,12 @@
 // src/services/sessionLogger.ts
-//
-// A lightweight session logger for study sessions.  It provides
-// functions to start a session, record activities and end a session.
-// Logs can be persisted to local storage or sent to a backend later.
+import { firestoreDb } from "./firebaseClient";
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp,
+} from "firebase/firestore";
 
 export type ActivityType =
   | "practice"
@@ -12,8 +16,6 @@ export type ActivityType =
   | "mock"
   | "mentor";
 
-// Represents a single activity in a study session.  Additional fields
-// (e.g. question IDs, scores) can be added as needed.
 export interface StudySessionActivity {
   timestamp: string;
   type: ActivityType;
@@ -23,8 +25,6 @@ export interface StudySessionActivity {
   durationMinutes?: number;
 }
 
-// Represents a study session log.  Each session has a unique ID and
-// records the start/end times and all activities performed.
 export interface StudySessionLog {
   id: string;
   userId: string;
@@ -32,70 +32,141 @@ export interface StudySessionLog {
   endTime?: string;
   energyLevel?: "Low" | "High";
   activities: StudySessionActivity[];
+  platform: "web";
+  status: "active" | "completed";
 }
 
-// Internal storage for the current session and log history.  In a real
-// implementation these would be persisted via IndexedDB or sent to a
-// backend API.
+// Keep local copy for instant UI updates
 let currentSession: StudySessionLog | null = null;
 const logs: StudySessionLog[] = [];
 
-// Generate a random ID for sessions.  Replace with a UUID library if
-// available.
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
 }
 
 /**
- * Start a new study session.  If a session is already in progress it
- * will be closed and stored in the log history.
- *
- * @param userId The ID of the user starting the session.
- * @param energyLevel The energy/vibe level for this session (optional).
+ * Start a new session and save to Firestore.
  */
-export function startSession(userId: string, energyLevel?: "Low" | "High"): void {
+export async function startSession(
+  userId: string,
+  energyLevel?: "Low" | "High",
+) {
+  // 1. Close existing if any
   if (currentSession) {
     endSession();
   }
+
+  const sessionId = generateId();
+  const startTime = new Date().toISOString();
+
+  // 2. Update Local State (Instant UI)
   currentSession = {
-    id: generateId(),
+    id: sessionId,
     userId,
-    startTime: new Date().toISOString(),
+    startTime,
     energyLevel,
     activities: [],
+    platform: "web",
+    status: "active",
   };
+
+  // 3. Save to Cloud (Background)
+  if (firestoreDb && userId) {
+    try {
+      const sessionRef = doc(
+        firestoreDb,
+        "learnerProfiles",
+        userId,
+        "sessions",
+        sessionId,
+      );
+      await setDoc(sessionRef, {
+        ...currentSession,
+        createdAt: serverTimestamp(), // Server time is more accurate
+        lastUpdated: serverTimestamp(),
+      });
+      console.log("☁️ Session started in Cloud:", sessionId);
+    } catch (e) {
+      console.error("🔥 Failed to start cloud session:", e);
+    }
+  }
 }
 
 /**
- * Log an activity within the current session.  If no session is in
- * progress this call is ignored.
- *
- * @param activity Partial activity data to record.
+ * Log an activity. Adds to local array AND appends to Firestore array.
  */
-export function logActivity(activity: Omit<StudySessionActivity, "timestamp">): void {
+export async function logActivity(
+  activityData: Omit<StudySessionActivity, "timestamp">,
+) {
   if (!currentSession) return;
-  currentSession.activities.push({
+
+  const newActivity: StudySessionActivity = {
     timestamp: new Date().toISOString(),
-    ...activity,
-  });
+    ...activityData,
+  };
+
+  // 1. Local Update
+  currentSession.activities.push(newActivity);
+
+  // 2. Cloud Update
+  if (firestoreDb && currentSession.userId) {
+    try {
+      const sessionRef = doc(
+        firestoreDb,
+        "learnerProfiles",
+        currentSession.userId,
+        "sessions",
+        currentSession.id,
+      );
+      await updateDoc(sessionRef, {
+        activities: arrayUnion(newActivity),
+        lastUpdated: serverTimestamp(),
+      });
+      console.log("☁️ Activity logged:", activityData.type);
+    } catch (e) {
+      console.error("🔥 Failed to log activity to cloud:", e);
+    }
+  }
 }
 
 /**
- * End the current study session.  Sets the endTime and stores the
- * session in history.  If no session is in progress this call is
- * ignored.
+ * End the session. Marks as completed in Firestore.
  */
-export function endSession(): void {
+export async function endSession() {
   if (!currentSession) return;
-  currentSession.endTime = new Date().toISOString();
+
+  const endTime = new Date().toISOString();
+
+  // 1. Local Update
+  currentSession.endTime = endTime;
+  currentSession.status = "completed";
   logs.push(currentSession);
+
+  const finalSession = { ...currentSession }; // Copy for async use
   currentSession = null;
+
+  // 2. Cloud Update
+  if (firestoreDb && finalSession.userId) {
+    try {
+      const sessionRef = doc(
+        firestoreDb,
+        "learnerProfiles",
+        finalSession.userId,
+        "sessions",
+        finalSession.id,
+      );
+      await updateDoc(sessionRef, {
+        endTime: endTime,
+        status: "completed",
+        lastUpdated: serverTimestamp(),
+      });
+      console.log("☁️ Session ended in Cloud");
+    } catch (e) {
+      console.error("🔥 Failed to end cloud session:", e);
+    }
+  }
 }
 
-/**
- * Get all recorded study sessions.  In a real app this might fetch
- * from local storage or a backend service.
- */
 export function getStudyLogs(): StudySessionLog[] {
   return logs;
 }

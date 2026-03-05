@@ -103,6 +103,9 @@ export default function SessionPlayPage() {
             </>
           ) : null}
         </p>
+        <p style={{ marginTop: 6, opacity: 0.8 }}>
+          Match Score / Yield updates as you submit answers in this session.
+        </p>
       </div>
 
       <div className="card">

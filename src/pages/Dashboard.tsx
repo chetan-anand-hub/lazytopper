@@ -19,7 +19,13 @@ import {
   setCbseExamDateAdminOverride,
 } from "../services/cbseExamDate";
 import { loadDashboardPrefs, saveDashboardPrefs } from "../services/studentCloudStore";
-import { startSession } from "../services/sessionApi";
+import {
+  SESSION_AUTH_TIMEOUT,
+  SESSION_AUTH_UNAVAILABLE,
+  SESSION_FIRESTORE_UNAVAILABLE,
+  getSessionApiErrorCode,
+  startSession,
+} from "../services/sessionApi";
 
 type SubjectTitle = "Maths" | "Science";
 
@@ -103,6 +109,11 @@ function formatIsoDate(isoDate: string): string {
   return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(d);
 }
 
+function toCloudSessionErrorMessage(error: unknown): string {
+  const detail = error instanceof Error ? error.message : "Unknown cloud error.";
+  return `Cloud session start failed: ${detail}`;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { profile, strategy, loadingProfile, setProfileAndCompute } = useProfile();
@@ -120,11 +131,42 @@ export default function Dashboard() {
   const [adminDateInput, setAdminDateInput] = useState("");
   const [adminNoteInput, setAdminNoteInput] = useState("Admin confirmed official CBSE date.");
   const [plannerMessage, setPlannerMessage] = useState("");
+  const [sessionLaunchError, setSessionLaunchError] = useState("");
+  const [retrySessionConfig, setRetrySessionConfig] = useState<{
+    subject: SubjectTitle;
+    chapterId: string;
+  } | null>(null);
 
   const [planRecord, setPlanRecord] = useState<StrategyPlan | null>(() => getStrategyPlan());
   const mixItems = useMemo<string[]>(() => (planRecord ? computeDailyMix(planRecord) : []), [planRecord]);
   const [streak] = useState<number>(() => updateAndGetStreak());
   const attempts = getAttempts();
+
+  const openGuestDailyMixSession = async () => {
+    setSessionLaunchError("");
+    try {
+      const started = await startSession({
+        kind: "daily_mix",
+        subjectId: "maths",
+        chapterId: "triangles",
+        vibe: mode === "zombie" ? "low" : "high",
+      });
+      navigate(`/play/${encodeURIComponent(started.sessionId)}`);
+    } catch (error) {
+      const code = getSessionApiErrorCode(error);
+      if (
+        code === SESSION_AUTH_TIMEOUT ||
+        code === SESSION_AUTH_UNAVAILABLE ||
+        code === SESSION_FIRESTORE_UNAVAILABLE
+      ) {
+        setSessionLaunchError(
+          "Cloud session start is blocked because authentication is not ready. Please retry."
+        );
+        return;
+      }
+      setSessionLaunchError(toCloudSessionErrorMessage(error));
+    }
+  };
 
   useEffect(() => {
     const uid = user?.uid;
@@ -269,9 +311,20 @@ export default function Dashboard() {
         <h2 className="title">Your Personal Dashboard</h2>
         <div className="card">
           <p>We need your study details to create a plan.</p>
-          <button className="cta-btn" onClick={() => navigate("/onboarding")}>
-            Fill My Study Details
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <button className="cta-btn" onClick={() => navigate("/onboarding")}>
+              Fill My Study Details
+            </button>
+            <button className="pill-btn" type="button" onClick={() => void openGuestDailyMixSession()}>
+              Start Daily Mix
+            </button>
+          </div>
+          <p style={{ marginTop: 10, opacity: 0.82 }}>
+            Match Score is enabled after your first Learn/Practice attempts.
+          </p>
+          {sessionLaunchError ? (
+            <p style={{ marginTop: 6, color: "#991b1b", fontWeight: 700 }}>{sessionLaunchError}</p>
+          ) : null}
         </div>
       </div>
     );
@@ -370,6 +423,8 @@ export default function Dashboard() {
   };
 
   const openDailyMixSession = async (subject: SubjectTitle, chapterId: string) => {
+    setSessionLaunchError("");
+    setRetrySessionConfig({ subject, chapterId });
     try {
       const started = await startSession({
         kind: "daily_mix",
@@ -377,9 +432,22 @@ export default function Dashboard() {
         chapterId,
         vibe: mode === "zombie" ? "low" : "high",
       });
+      setSessionLaunchError("");
+      setRetrySessionConfig(null);
       navigate(`/play/${encodeURIComponent(started.sessionId)}`);
-    } catch {
-      navigate(`/daily-mix/${gradeNum}/${subject}?topic=${encodeURIComponent(chapterId)}`);
+    } catch (error) {
+      const code = getSessionApiErrorCode(error);
+      if (
+        code === SESSION_AUTH_TIMEOUT ||
+        code === SESSION_AUTH_UNAVAILABLE ||
+        code === SESSION_FIRESTORE_UNAVAILABLE
+      ) {
+        setSessionLaunchError(
+          "Cloud session start is blocked because authentication is not ready. Please retry."
+        );
+        return;
+      }
+      setSessionLaunchError(toCloudSessionErrorMessage(error));
     }
   };
 
@@ -393,6 +461,13 @@ export default function Dashboard() {
           Pick one action and continue your Learn to Practice to Mastery loop.
         </p>
         <div className="focus-cta-row">
+          <button
+            className="cta-btn small"
+            data-ux-above-fold-cta="dashboard"
+            onClick={() => void openDailyMixSession(subjectForQuickActions, weakestTopicKey)}
+          >
+            Start Daily Mix
+          </button>
           <button
             className="cta-btn small"
             data-ux-above-fold-cta="dashboard"
@@ -423,6 +498,32 @@ export default function Dashboard() {
               Play Mix
             </button>
           </p>
+        ) : null}
+        {sessionLaunchError ? (
+          <div
+            style={{
+              marginTop: 10,
+              border: "1px solid rgba(185,28,28,0.35)",
+              background: "rgba(254,242,242,0.95)",
+              borderRadius: 10,
+              padding: "10px 12px",
+            }}
+          >
+            <div style={{ color: "#991b1b", fontWeight: 800, fontSize: 13 }}>{sessionLaunchError}</div>
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="pill-btn"
+                onClick={() => {
+                  if (!retrySessionConfig) return;
+                  void openDailyMixSession(retrySessionConfig.subject, retrySessionConfig.chapterId);
+                }}
+                disabled={!retrySessionConfig}
+              >
+                Retry session start
+              </button>
+            </div>
+          </div>
         ) : null}
       </div>
 
@@ -624,7 +725,7 @@ export default function Dashboard() {
                   <th style={{ textAlign: "left", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Subject</th>
                   <th style={{ textAlign: "right", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Attempted</th>
                   <th style={{ textAlign: "right", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Accuracy</th>
-                  <th style={{ textAlign: "right", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Match</th>
+                  <th style={{ textAlign: "right", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Match Score</th>
                   <th style={{ textAlign: "left", padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.15)" }}>Last activity</th>
                 </tr>
               </thead>
@@ -635,7 +736,9 @@ export default function Dashboard() {
                     <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)" }}>{row.subject}</td>
                     <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)", textAlign: "right" }}>{row.attempted}</td>
                     <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)", textAlign: "right" }}>{row.accuracy}%</td>
-                    <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)", textAlign: "right", fontWeight: 700 }}>{row.matchScore}%</td>
+                    <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)", textAlign: "right", fontWeight: 700 }}>
+                      Match Score: {row.matchScore}%
+                    </td>
                     <td style={{ padding: "8px 6px", borderBottom: "1px solid rgba(15,23,42,0.08)", opacity: 0.8 }}>
                       {row.lastPracticedAt ? new Date(row.lastPracticedAt).toLocaleDateString() : "-"}
                     </td>

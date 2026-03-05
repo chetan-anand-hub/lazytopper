@@ -24,11 +24,14 @@ function readFirebaseConfig(): FirebaseConfig {
 }
 
 function isConfigComplete(config: FirebaseConfig): boolean {
-  return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
+  return Boolean(
+    config.apiKey && config.authDomain && config.projectId && config.appId,
+  );
 }
 
 const firebaseConfig = readFirebaseConfig();
 export const firebaseConfigured = isConfigComplete(firebaseConfig);
+export const firebaseProjectId = firebaseConfig.projectId;
 
 let app: FirebaseApp | null = null;
 let authClient: Auth | null = null;
@@ -41,4 +44,3 @@ if (firebaseConfigured) {
 }
 
 export { app, authClient, firestoreDb };
-

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useVibeMode } from "../context/vibeModeContext";
+import { firebaseProjectId } from "../services/firebaseClient";
 import { trackUxEvent } from "../services/uxTelemetry";
+import { startSession } from "../services/sessionApi";
 
 type LocationState = { from?: string };
 
@@ -20,6 +22,11 @@ function normalizePhone(raw: string): string {
   if (digits.length === 10) return `+91${digits}`;
   if (raw.trim().startsWith("+")) return raw.trim();
   return "";
+}
+
+function isTruthyFlag(value: string): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 export default function Login() {
@@ -42,6 +49,9 @@ export default function Login() {
   const [realOtpOnly, setRealOtpOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const showLocalQuickStart =
+    Boolean(import.meta.env.DEV) &&
+    isTruthyFlag(String(import.meta.env.VITE_ENABLE_LOCAL_SESSION_FALLBACK || ""));
   const nextPath = useMemo(() => {
     const st = (location.state || {}) as LocationState;
     return st.from || "/onboarding";
@@ -66,6 +76,26 @@ export default function Login() {
       await signInWithGoogle();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLocalQuickStart = async () => {
+    setBusy(true);
+    setError("");
+    trackUxEvent("login_google_click", "login", { nextPath, flow: "local_quick_start" });
+    try {
+      continueLocalSession();
+      const started = await startSession({
+        kind: "chapter",
+        subjectId: "maths",
+        chapterId: "real-numbers",
+        vibe: mode === "zombie" ? "low" : "high",
+      });
+      navigate(`/play/${encodeURIComponent(started.sessionId)}`, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Local quick start failed.");
     } finally {
       setBusy(false);
     }
@@ -131,6 +161,9 @@ export default function Login() {
         <p className="subtitle" style={{ marginTop: 6 }}>
           After sign-in, you will continue to <strong>{nextPath}</strong>.
         </p>
+        <p className="subtitle" style={{ marginTop: 6 }}>
+          Connected Firebase project: <strong>{firebaseProjectId || "not-configured"}</strong>
+        </p>
         <div style={{ marginTop: 10, marginBottom: 12 }}>
           <label style={{ fontWeight: 700 }}>Energy Level:</label>
           <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -161,8 +194,18 @@ export default function Login() {
         {firebaseReady ? (
           <>
             <button className="cta-btn" onClick={handleGoogle} disabled={busy} data-testid="login-email-google">
-              Continue with Email (Google) - Recommended
+              Sign in with Email (Google) - Recommended
             </button>
+            {showLocalQuickStart ? (
+              <button
+                className="pill-btn"
+                onClick={() => void handleLocalQuickStart()}
+                disabled={busy}
+                style={{ marginTop: 10 }}
+              >
+                Dev only: Continue in Local Session (no cloud save)
+              </button>
+            ) : null}
 
             <details style={{ marginTop: 14 }}>
               <summary style={{ cursor: "pointer", fontWeight: 800 }}>
@@ -247,8 +290,8 @@ export default function Login() {
                 {FIREBASE_ENV_TEMPLATE}
               </pre>
             </div>
-            <button className="pill-btn" onClick={continueLocalSession} disabled={busy}>
-              Continue in Local Session
+            <button className="pill-btn" onClick={() => void handleLocalQuickStart()} disabled={busy}>
+              Continue in Local Session (no cloud save)
             </button>
           </>
         )}

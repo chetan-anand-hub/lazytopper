@@ -228,3 +228,20 @@ export async function hydrateLocalProgressFromCloud(uid: string): Promise<void> 
     });
   }
 }
+
+export async function ensureLearnerProgressBaseline(uid: string): Promise<void> {
+  const safeUid = String(uid || "").trim();
+  if (!safeUid || !firestoreDb) return;
+  try {
+    await setDoc(
+      doc(firestoreDb, "learnerProgress", safeUid),
+      {
+        uid: safeUid,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch {
+    // noop: local cache remains fallback
+  }
+}

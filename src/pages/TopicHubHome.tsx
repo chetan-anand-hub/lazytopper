@@ -7,7 +7,13 @@ import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
 import { topicHubV2Content } from "../data/topicHubV2Full";
 import { useSmartLearning } from "../engine/smartLearningStore";
 import type { ChapterMeta } from "../engine/smartLearningTypes";
-import { startSession } from "../services/sessionApi";
+import {
+  SESSION_AUTH_TIMEOUT,
+  SESSION_AUTH_UNAVAILABLE,
+  SESSION_FIRESTORE_UNAVAILABLE,
+  getSessionApiErrorCode,
+  startSession,
+} from "../services/sessionApi";
 import { loadTopicMasterySnapshot } from "../services/topicHubMastery";
 import { normalizeTopicKey, resolveRuntimeTopicKey } from "../utils/topicHubV2Store";
 
@@ -125,6 +131,11 @@ function formatUpdatedAt(value: string): string {
   }
 }
 
+function toCloudSessionErrorMessage(error: unknown): string {
+  const detail = error instanceof Error ? error.message : "Unknown cloud error.";
+  return `Cloud session start failed: ${detail}`;
+}
+
 function readRecentTopics(subject: SubjectTitle): RecentTopicRecord[] {
   if (typeof window === "undefined") return [];
   try {
@@ -156,6 +167,8 @@ function TopicHubHomeContent() {
   const [query, setQuery] = useState<string>("");
   const [recentTopics, setRecentTopics] = useState<RecentTopicRecord[]>([]);
   const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionLaunchError, setSessionLaunchError] = useState("");
+  const [retryTopicKey, setRetryTopicKey] = useState("");
 
   const topicOptions = useMemo(() => buildTopicOptions(subject), [subject]);
 
@@ -267,22 +280,43 @@ function TopicHubHomeContent() {
     navigate(target);
   };
 
-  const playSelectedTopic = async () => {
-    if (!selectedTopicKey || sessionBusy) return;
+  const startChapterSession = async (topicKey: string) => {
+    const targetKey = normalizeTopicKey(topicKey);
+    if (!targetKey || sessionBusy) return;
+    setSessionLaunchError("");
+    setRetryTopicKey(targetKey);
     setSessionBusy(true);
     try {
       const started = await startSession({
         kind: "chapter",
         subjectId: subject === "Science" ? "science" : "maths",
-        chapterId: selectedTopicKey,
+        chapterId: targetKey,
         vibe: "high",
       });
+      setSessionLaunchError("");
+      setRetryTopicKey("");
       navigate(`/play/${encodeURIComponent(started.sessionId)}`);
-    } catch {
-      goToSelectedTopic();
+    } catch (error) {
+      const code = getSessionApiErrorCode(error);
+      if (
+        code === SESSION_AUTH_TIMEOUT ||
+        code === SESSION_AUTH_UNAVAILABLE ||
+        code === SESSION_FIRESTORE_UNAVAILABLE
+      ) {
+        setSessionLaunchError(
+          "Cloud session start is blocked because authentication is not ready. Please retry."
+        );
+        return;
+      }
+      setSessionLaunchError(toCloudSessionErrorMessage(error));
     } finally {
       setSessionBusy(false);
     }
+  };
+
+  const playSelectedTopic = async () => {
+    if (!selectedTopicKey) return;
+    await startChapterSession(selectedTopicKey);
   };
 
   const goToLastRoute = () => {
@@ -472,7 +506,7 @@ function TopicHubHomeContent() {
                 {filteredOptions.length ? (
                   filteredOptions.map((option) => (
                     <option key={option.key} value={option.key}>
-                      {option.name} ({option.tier} | {matchScoreByTopic[option.key] ?? 0}% match)
+                      {option.name} ({option.tier} | Match Score: {matchScoreByTopic[option.key] ?? 0}%)
                     </option>
                   ))
                 ) : (
@@ -508,7 +542,7 @@ function TopicHubHomeContent() {
                     color: "rgba(22,101,52,1)",
                   }}
                 >
-                  {matchScoreByTopic[selectedTopic.key] ?? 0}% Match
+                  Match Score: {matchScoreByTopic[selectedTopic.key] ?? 0}%
                 </span>
               ) : null}
               <span
@@ -538,7 +572,7 @@ function TopicHubHomeContent() {
               className="lt-pill"
               style={{ padding: "10px 14px" }}
               data-ux-above-fold-cta="topichub"
-              onClick={goToSelectedTopic}
+              onClick={() => void playSelectedTopic()}
               disabled={!selectedTopicKey}
             >
               Start Learning
@@ -548,10 +582,10 @@ function TopicHubHomeContent() {
               className="lt-pill"
               style={{ padding: "10px 14px" }}
               data-ux-above-fold-cta="topichub"
-              onClick={() => void playSelectedTopic()}
+              onClick={goToSelectedTopic}
               disabled={!selectedTopicKey || sessionBusy}
             >
-              {sessionBusy ? "Starting..." : "Play this chapter"}
+              {sessionBusy ? "Starting..." : "Open Topic Hub"}
             </button>
             <button
               type="button"
@@ -563,6 +597,35 @@ function TopicHubHomeContent() {
               See trends (optional)
             </button>
           </div>
+          {sessionLaunchError ? (
+            <div
+              style={{
+                marginTop: 10,
+                border: "1px solid rgba(185,28,28,0.35)",
+                background: "rgba(254,242,242,0.95)",
+                borderRadius: 10,
+                padding: "10px 12px",
+              }}
+            >
+              <div style={{ color: "#991b1b", fontWeight: 800, fontSize: 13 }}>
+                {sessionLaunchError}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="lt-pill"
+                  style={{ padding: "8px 12px" }}
+                  onClick={() => {
+                    if (!retryTopicKey) return;
+                    void startChapterSession(retryTopicKey);
+                  }}
+                  disabled={!retryTopicKey || sessionBusy}
+                >
+                  Retry session start
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

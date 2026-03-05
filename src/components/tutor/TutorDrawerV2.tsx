@@ -1,6 +1,5 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { DiagramBlock } from "../DiagramBlock";
-import { MENTOR_ENDPOINT } from "../../ai/aiClient";
 import {
   buildTutorFallback,
   extractDiagramMeta,
@@ -8,7 +7,22 @@ import {
 } from "../../contracts/tutorContracts.ts";
 import { getHintVariant } from "../../services/abFlags";
 import { logActivity } from "../../services/sessionLogger";
+import {
+  SESSION_AUTH_TIMEOUT,
+  SESSION_AUTH_UNAVAILABLE,
+  SESSION_FIRESTORE_UNAVAILABLE,
+  SESSION_NOT_FOUND,
+  getSession,
+  getSessionApiErrorCode,
+  startSession as startCloudSession,
+  type SessionDoc,
+} from "../../services/sessionApi";
 import { HumanGradeCoachView } from "../mentor/HumanGradeCoachView";
+import {
+  canUseMentorServer,
+  isMentorNetworkFailure,
+  markMentorServerUnavailable,
+} from "../../services/mentorServerGate";
 import { isRecord } from "../../types/mentor";
 import type { MentorDiagramSpec, MentorStructured, TutorBlock } from "../../types/mentor";
 
@@ -80,96 +94,20 @@ const getResponseError = (payload: unknown, fallback: string) => {
   if (typeof payload.message === "string") return payload.message;
   return fallback;
 };
-const getResponseStructured = (payload: unknown): MentorStructured | null => {
-  if (!isRecord(payload)) return null;
-  const dataBlock = isRecord(payload.data) ? payload.data : null;
-  const structuredCandidate = dataBlock?.structured;
-  const textFallback = dataBlock?.text;
-  const parsed = structuredCandidate ?? safeJsonParse(String(textFallback ?? ""));
-  return (parsed ?? null) as MentorStructured | null;
-};
-const MENTOR_REQUEST_TIMEOUT_MS = 30_000;
-const MENTOR_SOFT_TIMEOUT_MS = 12_000;
 const MENTOR_MAX_ATTEMPTS = 2;
 const MENTOR_RETRY_BASE_MS = 900;
+const MENTOR_SERVER_TIMEOUT_MS = 9_000;
 
 const waitMs = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, Math.max(0, ms));
   });
-
-const isRetryableStatus = (status: number) =>
-  status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
-
-const parseRetryAfterMs = (res: Response, payload: unknown) => {
-  const header = res.headers.get("Retry-After");
-  if (header) {
-    const sec = Number(header);
-    if (Number.isFinite(sec) && sec >= 0) return sec * 1000;
-    const dateMs = Date.parse(header);
-    if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
-  }
-  if (isRecord(payload)) {
-    const retryAfterMs = Number(payload.retryAfterMs);
-    if (Number.isFinite(retryAfterMs) && retryAfterMs >= 0) return retryAfterMs;
-    const retryAfterSec = Number(payload.retryAfterSec);
-    if (Number.isFinite(retryAfterSec) && retryAfterSec >= 0) return retryAfterSec * 1000;
-  }
-  return null;
-};
-
-const isRetryableMentorError = (err: unknown) => {
-  if (getErrorName(err) === "AbortError") return false;
-  const msg = getErrorMessage(err, "").toLowerCase();
-  return /timed out|timeout|network|failed to fetch|econnreset|enotfound|503|502|504/.test(msg);
-};
-
-const computeBackoffMs = (attempt: number, retryAfterMs: number | null) => {
-  if (Number.isFinite(retryAfterMs as number) && (retryAfterMs as number) >= 0) {
-    return Math.min(6_000, Number(retryAfterMs));
-  }
-  return Math.min(5_000, MENTOR_RETRY_BASE_MS * (attempt + 1));
-};
-
-const fetchMentorPayload = async (
-  body: unknown,
-  externalSignal?: AbortSignal,
-  timeoutMs: number = MENTOR_REQUEST_TIMEOUT_MS
-): Promise<{ res: Response; data: unknown }> => {
-  const controller = new AbortController();
-  let timedOut = false;
-  const relayAbort = () => controller.abort();
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      controller.abort();
-    } else {
-      externalSignal.addEventListener("abort", relayAbort, { once: true });
-    }
-  }
-  const timeoutId = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  try {
-    const res = await fetch(MENTOR_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const data = await parseResponsePayload(res);
-    return { res, data };
-  } catch (err) {
-    if (timedOut && getErrorName(err) === "AbortError") {
-      throw new Error("Mentor request timed out. Please retry.");
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-    if (externalSignal) {
-      externalSignal.removeEventListener("abort", relayAbort);
-    }
-  }
+const isRetryableMentorError = (err: unknown): boolean => {
+  if (!isRecord(err)) return false;
+  const status = typeof err.status === "number" ? err.status : Number.NaN;
+  if (status === 429 || status === 503) return true;
+  const message = typeof err.message === "string" ? err.message : "";
+  return /failed to fetch|networkerror|network request failed|timeout|timed out/i.test(message);
 };
 const toTutorErrorMessage = (err: unknown, fallback: string): string => {
   const msg = getErrorMessage(err, fallback);
@@ -317,6 +255,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const [hintVariant] = useState(() => getHintVariant());
   const isDev = Boolean(import.meta?.env?.DEV);
   const abortRef = useRef<AbortController | null>(null);
+  const continuitySessionByNodeRef = useRef<Record<string, string>>({});
   const doubtInputRef = useRef<HTMLInputElement | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
   const lastProgressRef = useRef<string>("");
@@ -384,67 +323,262 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     setLoadingKey(null);
   }, []);
 
+  const buildClientContinuityStructured = useCallback(
+    async (body: unknown) => {
+      const payload = isRecord(body) && isRecord(body.payload) ? body.payload : {};
+      const subjectId = String(subjectTitle || "").toLowerCase().includes("science")
+        ? "science"
+        : "maths";
+      const chapterId = String(payload.chapter || topicKey || "topic").trim() || "topic";
+      const scopeKey = `${subjectId}:${chapterId}:${String(nodeId || "node")}`;
+      let sessionId = continuitySessionByNodeRef.current[scopeKey] || "";
+      let session: SessionDoc | null = null;
+
+      if (sessionId) {
+        try {
+          session = (await getSession(sessionId)).session;
+        } catch (err) {
+          const code = getSessionApiErrorCode(err);
+          if (code !== SESSION_NOT_FOUND) throw err;
+          session = null;
+          sessionId = "";
+        }
+      }
+
+      if (!session) {
+        const started = await startCloudSession({
+          kind: "chapter",
+          subjectId,
+          chapterId,
+          vibe: mode === "zombie" ? "low" : "high",
+        });
+        sessionId = started.sessionId;
+        session = started.session;
+        continuitySessionByNodeRef.current[scopeKey] = sessionId;
+      }
+
+      const items = Array.isArray(session.items) ? session.items : [];
+      const cursor = Math.max(0, Math.min(items.length - 1, Number(session.cursor || 0)));
+      const currentItem = items[cursor] || items[0] || null;
+      const itemPayload = currentItem && isRecord(currentItem.payload) ? currentItem.payload : {};
+
+      const prompt = String(
+        itemPayload.question ||
+          itemPayload.prompt ||
+          currentItem?.title ||
+          currentItem?.description ||
+          `Placeholder question for ${nodeTitle}.`
+      ).trim();
+      const options = Array.isArray(itemPayload.options)
+        ? itemPayload.options.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+      const expected = String(
+        itemPayload.answer ||
+          itemPayload.correctAnswer ||
+          itemPayload.expected ||
+          "Write your answer in short board format."
+      ).trim();
+      const explanation = String(itemPayload.explanation || "").trim();
+
+      const fallbackPayload = isRecord(body) ? body.payload : undefined;
+      const structured = buildTutorFallback("learn_teach", fallbackPayload) as MentorStructured;
+      const teach = isRecord(structured.teach)
+        ? ({ ...structured.teach } as Record<string, unknown>)
+        : {};
+      const existingDiagram = isRecord(teach.diagram)
+        ? ({ ...teach.diagram } as Record<string, unknown>)
+        : {};
+      const labels = Array.isArray(existingDiagram.labels)
+        ? existingDiagram.labels.map((x) => String(x || "").trim()).filter(Boolean)
+        : [];
+      teach.diagram = {
+        required: Boolean(existingDiagram.required),
+        type: String(existingDiagram.type || "none"),
+        labels: labels.length >= 2 ? labels : ["A", "B"],
+        spec: Object.prototype.hasOwnProperty.call(existingDiagram, "spec") ? existingDiagram.spec : null,
+        altText:
+          String(existingDiagram.altText || "").trim() ||
+          "Placeholder tutor response without diagram dependency.",
+      };
+      teach.goal = `Teacher goal: Learn ${nodeTitle} with cloud continuity mode.`;
+      teach.keyIdeas = [
+        `Definition: ${prompt}`,
+        "Criterion: write your answer in clear board format.",
+        "Correspondence: map your step to the asked prompt.",
+        "Conclusion: finish with one final answer line.",
+      ];
+      teach.checkpoint = {
+        question: options.length
+          ? `${prompt}\nOptions: ${options.join(" | ")}`
+          : `Checkpoint: ${prompt}`,
+        answer: `Expected answer: ${expected}${explanation ? ` (${explanation})` : ""}`,
+      };
+      teach.commonMistake = "Skipping the final answer line in board format.";
+
+      const continuityLines = [
+        "Client continuity mode active (server-free).",
+        `Session: ${session.sessionId}`,
+        `Topic: ${chapterId}`,
+        `Prompt: ${prompt}`,
+        options.length ? `Options: ${options.join(" | ")}` : "",
+        `Expected: ${expected}`,
+        explanation ? `Note: ${explanation}` : "",
+      ].filter(Boolean);
+
+      const tutor = isRecord(structured.tutor)
+        ? ({ ...structured.tutor } as Record<string, unknown>)
+        : {};
+      tutor.text = continuityLines.join("\n");
+      tutor.rawText = String(tutor.text);
+      tutor.source = "client-continuity";
+
+      structured.kind = "learn_teach";
+      structured.teach = teach;
+      structured.tutor = tutor as MentorStructured["tutor"];
+      structured.goalLine = String(teach.goal || "");
+      structured.keyIdeaBullets = Array.isArray(teach.keyIdeas) ? teach.keyIdeas : [];
+      structured.checkpoint = teach.checkpoint;
+      structured.commonMistake = String(teach.commonMistake || "");
+
+      return {
+        structured,
+        data: { source: "client-continuity", sessionId: session.sessionId },
+        res: null as Response | null,
+        warning: "Using cloud continuity mode with Firestore placeholder content.",
+      };
+    },
+    [subjectTitle, topicKey, nodeId, mode, nodeTitle]
+  );
+
   const requestWithRecovery = useCallback(
     async (body: unknown, signal?: AbortSignal) => {
-      let lastError: unknown = null;
-      let lastData: unknown = {};
-      let lastRes: Response | null = null;
-      let retryUsed = false;
+      const requestMentorServer = async () => {
+        if (!canUseMentorServer()) {
+          throw new Error("Mentor server temporarily unavailable.");
+        }
+        const controller = new AbortController();
+        const relayAbort = () => controller.abort();
+        if (signal) {
+          if (signal.aborted) {
+            throw new DOMException("Aborted", "AbortError");
+          }
+          signal.addEventListener("abort", relayAbort, { once: true });
+        }
+        const timeoutId = setTimeout(() => controller.abort(), MENTOR_SERVER_TIMEOUT_MS);
+        try {
+          let res: Response;
+          try {
+            res = await fetch("/api/mentor", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+              signal: controller.signal,
+            });
+          } catch (error) {
+            if (isMentorNetworkFailure(error)) {
+              markMentorServerUnavailable();
+            }
+            throw error;
+          }
+          const payload = await parseResponsePayload(res);
+          if (!res.ok) {
+            if (res.status >= 500) {
+              markMentorServerUnavailable();
+            }
+            const err = new Error(
+              getResponseError(payload, `Mentor request failed (${res.status}).`)
+            ) as Error & { status?: number; payload?: unknown };
+            err.status = res.status;
+            err.payload = payload;
+            throw err;
+          }
+          const data = isRecord(payload) && isRecord(payload.data) ? payload.data : {};
+          const structuredRaw =
+            (isRecord(data) ? data.structured : undefined) ||
+            safeJsonParse(String((isRecord(data) && data.text) || ""));
+          if (!isRecord(structuredRaw)) {
+            throw new Error("Mentor response incomplete. Please retry.");
+          }
+          const warning = isRecord(payload) && typeof payload.warning === "string"
+            ? payload.warning
+            : "";
+          return {
+            structured: structuredRaw as MentorStructured,
+            data,
+            res,
+            warning,
+          };
+        } finally {
+          clearTimeout(timeoutId);
+          if (signal) {
+            signal.removeEventListener("abort", relayAbort);
+          }
+        }
+      };
 
+      let lastServerError: unknown = null;
       for (let attempt = 0; attempt < MENTOR_MAX_ATTEMPTS; attempt += 1) {
         try {
-          const timeoutMs = attempt === 0 ? MENTOR_SOFT_TIMEOUT_MS : MENTOR_REQUEST_TIMEOUT_MS;
-          const { res, data } = await fetchMentorPayload(body, signal, timeoutMs);
-          lastRes = res;
-          lastData = data;
-          const structured = getResponseStructured(data);
-          const rateLimitedWithStructured = res.status === 429 && Boolean(structured);
-          if ((res.ok || rateLimitedWithStructured) && structured) {
-            return {
-              structured,
-              data,
-              res,
-              warning: retryUsed
-                ? "Mentor recovered after retry."
-                : rateLimitedWithStructured
-                  ? "Mentor is busy; continuing with available guidance."
-                  : "",
-            };
-          }
-          const errMsg = getResponseError(data, "Mentor response incomplete.");
-          lastError = new Error(errMsg);
-
-          if (attempt < MENTOR_MAX_ATTEMPTS - 1 && isRetryableStatus(res.status)) {
-            retryUsed = true;
-            const retryAfterMs = parseRetryAfterMs(res, data);
-            await waitMs(computeBackoffMs(attempt, retryAfterMs));
-            continue;
-          }
-          break;
+          return await requestMentorServer();
         } catch (err) {
           if (getErrorName(err) === "AbortError") throw err;
-          lastError = err;
+          lastServerError = err;
           if (attempt < MENTOR_MAX_ATTEMPTS - 1 && isRetryableMentorError(err)) {
-            retryUsed = true;
-            await waitMs(computeBackoffMs(attempt, null));
+            await waitMs(Math.min(5_000, MENTOR_RETRY_BASE_MS * (attempt + 1)));
             continue;
           }
           break;
         }
       }
 
+      let lastContinuityError: unknown = null;
+      for (let attempt = 0; attempt < MENTOR_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          const continuity = await buildClientContinuityStructured(body);
+          return {
+            ...continuity,
+            warning:
+              continuity.warning ||
+              "Live mentor unavailable; switched to cloud continuity fallback.",
+            fallbackReason: toTutorErrorMessage(lastServerError, "Live mentor unavailable."),
+          };
+        } catch (err) {
+          if (getErrorName(err) === "AbortError") throw err;
+          lastContinuityError = err;
+          if (attempt < MENTOR_MAX_ATTEMPTS - 1) {
+            await waitMs(Math.min(5_000, MENTOR_RETRY_BASE_MS * (attempt + 1)));
+            continue;
+          }
+        }
+      }
+
+      const code = getSessionApiErrorCode(lastContinuityError);
       const fallbackPayload = isRecord(body) ? body.payload : undefined;
       const fallbackStructured = buildTutorFallback("learn_teach", fallbackPayload) as MentorStructured;
+      const tutor = isRecord(fallbackStructured.tutor)
+        ? ({ ...fallbackStructured.tutor } as Record<string, unknown>)
+        : {};
+      const authBlocked =
+        code === SESSION_AUTH_TIMEOUT ||
+        code === SESSION_AUTH_UNAVAILABLE ||
+        code === SESSION_FIRESTORE_UNAVAILABLE;
+      tutor.text = authBlocked
+        ? "Cloud continuity is blocked because auth/firestore is unavailable. Please sign in and retry."
+        : "Local tutor fallback is active because cloud continuity fetch failed.";
+      fallbackStructured.tutor = tutor as MentorStructured["tutor"];
       return {
         structured: fallbackStructured,
-        data: lastData,
-        res: lastRes,
+        data: {},
+        res: null as Response | null,
         warning:
-          "Mentor is unavailable. Showing local human-tutor fallback so your session continues.",
-        fallbackReason: toTutorErrorMessage(lastError, "Mentor error. Please retry."),
+          "Live mentor and cloud continuity are unavailable. Showing local fallback response.",
+        fallbackReason: toTutorErrorMessage(
+          lastContinuityError ?? lastServerError,
+          "Mentor fallback activated."
+        ),
       };
     },
-    []
+    [buildClientContinuityStructured]
   );
 
 

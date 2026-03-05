@@ -3,6 +3,7 @@ import {
   GoogleAuthProvider,
   RecaptchaVerifier,
   onAuthStateChanged,
+  signInAnonymously,
   signInWithPhoneNumber,
   signInWithPopup,
   signOut,
@@ -13,8 +14,10 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { authClient, firebaseConfigured } from "../services/firebaseClient";
 import {
   hydrateLocalProgressFromCloud,
+  ensureLearnerProgressBaseline,
   setActiveProgressUser,
 } from "../services/studentProgressStore";
+import { ensureLearnerCloudBaseline } from "../services/studentCloudStore";
 
 export type AuthUser = {
   uid: string;
@@ -41,6 +44,16 @@ type AuthContextType = {
 
 const LOCAL_AUTH_KEY = "lazytopper.auth.local.v1";
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function shouldAutoAnonBootstrap(): boolean {
+  const explicit = String(import.meta.env.VITE_E2E_AUTO_ANON_AUTH || "").trim().toLowerCase();
+  if (explicit === "1" || explicit === "true" || explicit === "yes") return true;
+  const isAutomation =
+    typeof navigator !== "undefined" &&
+    typeof navigator.webdriver === "boolean" &&
+    navigator.webdriver;
+  return Boolean(import.meta.env.DEV) && isAutomation;
+}
 
 function toAuthUser(user: User): AuthUser {
   return {
@@ -84,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [phoneRecaptchaStatus, setPhoneRecaptchaStatus] = useState<PhoneRecaptchaStatus>("idle");
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const autoAnonAttemptedRef = useRef(false);
 
   const resetRecaptcha = async () => {
     const verifier = recaptchaRef.current;
@@ -102,7 +116,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!firebaseConfigured || !authClient) return;
-    const unsubscribe = onAuthStateChanged(authClient, (next) => {
+    const auth = authClient;
+    const unsubscribe = onAuthStateChanged(auth, (next) => {
+      if (!next && shouldAutoAnonBootstrap() && !autoAnonAttemptedRef.current) {
+        autoAnonAttemptedRef.current = true;
+        setUser(null);
+        setLoading(true);
+        void signInAnonymously(auth).catch(() => {
+          setLoading(false);
+        });
+        return;
+      }
       const mapped = next ? toAuthUser(next) : null;
       setUser(mapped);
       setLoading(false);
@@ -114,7 +138,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const uid = user?.uid || null;
     setActiveProgressUser(uid);
     if (uid && !user?.isLocalSession) {
-      void hydrateLocalProgressFromCloud(uid);
+      void (async () => {
+        await Promise.allSettled([
+          ensureLearnerCloudBaseline(uid),
+          ensureLearnerProgressBaseline(uid),
+          hydrateLocalProgressFromCloud(uid),
+        ]);
+      })();
     }
   }, [user?.uid, user?.isLocalSession]);
 
