@@ -97,6 +97,8 @@
     "test:matrix:execution": "node scripts/ops/matrix_execution_acceptance.mjs",
     "test:backlog:1-19": "node scripts/ops/backlog_1_19_acceptance.mjs",
     "test:persona:audit": "node scripts/ops/persona_audit_acceptance.mjs",
+    "verify:fast": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ops/codex_testing/codex_verify.ps1 -TaskName quick -Suite fast",
+    "verify:full": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ops/codex_testing/codex_verify.ps1 -TaskName full -Suite full",
     "tutor:eval": "node scripts/tutorEval.mjs",
     "start:safe": "node scripts/startSafe.mjs",
     "start:quick": "npm run blackbox && npx tsc --noEmit && npm run build"
