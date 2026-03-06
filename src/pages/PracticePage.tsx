@@ -188,6 +188,32 @@ function normaliseSubject(raw?: string | null): SubjectKey {
   return "Maths";
 }
 
+function parseDifficultyChoice(raw: unknown): DifficultyChoice | undefined {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "easy") return "Easy";
+  if (s === "medium") return "Medium";
+  if (s === "hard") return "Hard";
+  if (s === "all") return "All";
+  return undefined;
+}
+
+function parsePositiveInt(raw: unknown): number | undefined {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return undefined;
+  const whole = Math.floor(n);
+  return whole > 0 ? whole : undefined;
+}
+
+function parseFocusBankIds(raw: unknown): string[] | undefined {
+  const s = String(raw ?? "").trim();
+  if (!s) return undefined;
+  const ids = s
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return ids.length > 0 ? ids : undefined;
+}
+
 
 interface AiTopupArgs {
   grade: string;
@@ -421,19 +447,17 @@ const PracticePage: React.FC = () => {
   const grade = params.grade || "10";
   const subjectKey: SubjectKey = normaliseSubject(params.subject ?? "Maths");
 
-  // Topic from query string
-  const search = new URLSearchParams(location.search);
-  const topicParam = search.get("topic") || "Generic";
-  const topicKeyParam = search.get("topicKey");
+  const qp = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const topicParam = qp.get("topic") || "Generic";
+  const topicKeyParam = qp.get("topicKey");
 
   // Navigation state for Back button + label
   const navState = (location.state as any) || {};
-// Support deep-linking via URL query params (e.g., /practice/10/Maths?topic=Triangles&section=A)
-const qp = useMemo(() => new URLSearchParams(location.search), [location.search]);
-const qpSectionRaw = (qp.get("section") || qp.get("pattern") || qp.get("type") || "").trim();
-const qpSection = qpSectionRaw ? qpSectionRaw.toUpperCase() : "";
+  // Support deep-linking via URL query params (e.g., /practice/10/Maths?topic=Triangles&section=A)
+  const qpSectionRaw = (qp.get("section") || qp.get("pattern") || qp.get("type") || "").trim();
+  const qpSection = qpSectionRaw ? qpSectionRaw.toUpperCase() : "";
 
-    const subjectKeyStr = String(navState.subjectKey ?? navState.subject ?? subjectKey ?? "").toLowerCase();
+  const subjectKeyStr = String(navState.subjectKey ?? navState.subject ?? subjectKey ?? "").toLowerCase();
   const subjectTitle = String(
     navState.subjectTitle ||
     (subjectKeyStr.includes("math") ? "Maths" :
@@ -454,19 +478,32 @@ const qpSection = qpSectionRaw ? qpSectionRaw.toUpperCase() : "";
     recommendedCount?: number;
     difficultyPreset?: DifficultyChoice;
   };
-  const subtopicHint = practiceFilters.subtopicHint;
-  const focusBankIds = practiceFilters.focusBankIds;
-  const recommendedCountFromNav = practiceFilters.recommendedCount;
-  const difficultyPreset = practiceFilters.difficultyPreset;
+  const navSubtopicHint = String(practiceFilters.subtopicHint || "").trim() || undefined;
+  const navFocusBankIds = Array.isArray(practiceFilters.focusBankIds)
+    ? practiceFilters.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
+    : undefined;
+  const navRecommendedCount = parsePositiveInt(practiceFilters.recommendedCount);
+  const navDifficultyPreset = parseDifficultyChoice(practiceFilters.difficultyPreset);
 
-  const initialCount =
-    recommendedCountFromNav && recommendedCountFromNav > 0
-      ? recommendedCountFromNav
-      : 10;
+  // Precedence: URL query params -> location.state.practiceFilters -> defaults.
+  const querySubtopicHint = String(qp.get("subtopicHint") || "").trim() || undefined;
+  const queryFocusBankIds = parseFocusBankIds(qp.get("focusBankIds"));
+  const queryRecommendedCount = parsePositiveInt(qp.get("count"));
+  const queryDifficultyPreset = parseDifficultyChoice(qp.get("difficulty"));
+
+  const subtopicHint = querySubtopicHint ?? navSubtopicHint;
+  const focusBankIds = queryFocusBankIds ?? navFocusBankIds;
+  const resolvedRecommendedCount = queryRecommendedCount ?? navRecommendedCount ?? 10;
+  const resolvedDifficultyPreset = queryDifficultyPreset ?? navDifficultyPreset ?? "All";
+
+  const initialCount = Math.max(
+    MIN_QUESTION_COUNT,
+    Math.min(MAX_QUESTION_COUNT, resolvedRecommendedCount)
+  );
 
   const [questionCount, setQuestionCount] = useState<number>(initialCount);
   const [difficulty, setDifficulty] = useState<DifficultyChoice>(
-    difficultyPreset || "All"
+    resolvedDifficultyPreset
   );
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
 

@@ -86,6 +86,12 @@ export function navigateToPractice(
       backLabel: backLabel ?? "Back",
       topicName: topicName ?? topicKey,
       source, // so PracticePage knows where this came from
+      practiceFilters: {
+        subtopicHint,
+        focusBankIds,
+        recommendedCount,
+        difficultyPreset,
+      },
       ...(sectionFilter ? { sectionFilter } : {}),
     },
   });
