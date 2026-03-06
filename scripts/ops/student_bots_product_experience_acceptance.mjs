@@ -157,8 +157,24 @@ function buildSuggestion(bot, dimensions) {
 
 function runPracticeCountProbe() {
   const req = registerTsLoader();
-  const generator = req(path.join(repoRoot, "src/data/practiceSetGenerator.ts"));
-  const packs = req(path.join(repoRoot, "src/data/promptDPracticePacks.ts")).promptDPracticePacks;
+  let generator = null;
+  let engineLoadError = null;
+  try {
+    generator = req(path.join(repoRoot, "src/data/practiceSetGenerator.ts"));
+  } catch (err) {
+    engineLoadError = String(err?.message || err);
+    generator = null;
+  }
+
+  let packs = {};
+  let packLoadError = null;
+  try {
+    const packModule = req(path.join(repoRoot, "src/data/promptDPracticePacks.ts"));
+    packs = packModule?.promptDPracticePacks || {};
+  } catch (err) {
+    packLoadError = String(err?.message || err);
+    packs = {};
+  }
 
   const scenarios = [
     { subject: "maths", topicKey: "Triangles", packKey: "triangles", requested: 10 },
@@ -176,13 +192,20 @@ function runPracticeCountProbe() {
   ];
 
   const rows = scenarios.map((s) => {
-    const generated = generator.generatePracticeSet({
-      subject: s.subject,
-      topicKey: s.topicKey,
-      totalQuestions: s.requested,
-      shuffle: false,
-    });
-    const engineCount = Array.isArray(generated?.questions) ? generated.questions.length : 0;
+    let engineCount = 0;
+    if (generator && typeof generator.generatePracticeSet === "function") {
+      try {
+        const generated = generator.generatePracticeSet({
+          subject: s.subject,
+          topicKey: s.topicKey,
+          totalQuestions: s.requested,
+          shuffle: false,
+        });
+        engineCount = Array.isArray(generated?.questions) ? generated.questions.length : 0;
+      } catch {
+        engineCount = 0;
+      }
+    }
     const packCount = Number(((packs?.[s.subject] || {})?.[s.packKey]?.questions || []).length || 0);
     const likelyCountWithoutAi = Math.max(engineCount, packCount);
     const fillsRequestedWithoutAi = likelyCountWithoutAi >= s.requested;
@@ -206,6 +229,9 @@ function runPracticeCountProbe() {
     fitPercent,
     weakHighDemandPass,
     weakHighDemandRows,
+    probeMode: generator ? "engine_plus_pack" : "pack_only_fallback",
+    engineLoadError,
+    packLoadError,
   };
 }
 
