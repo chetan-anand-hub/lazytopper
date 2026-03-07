@@ -34,6 +34,7 @@ export const canonicalTopicAliasMap: Record<string, string[]> = {
   ],
   trigonometry: [
     "maths_introduction_trigonometry",
+    "maths_applications_trigonometry",
   ],
   "areas-related-to-circles": [
     "maths_areas_circles",

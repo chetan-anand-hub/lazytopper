@@ -1,6 +1,6 @@
 // src/pages/PracticePage.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { type PracticeQuestion } from "../data/predictionDataService";
@@ -22,13 +22,68 @@ import {
   isMentorNetworkFailure,
   markMentorServerUnavailable,
 } from "../services/mentorServerGate";
+import {
+  getQuestionMeta,
+  getStrategyPackForTopic,
+  resolveCanonicalTopicForStrategy,
+} from "../services/questionTypeFirstResolver";
 import { trackUxEvent } from "../services/uxTelemetry";
+import type { LearningObject, QuestionMeta } from "../data/contentStrategy/types";
+import type { StudentMentorIntent } from "../types/studentMentorIntent";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
 type InternalDifficultyBucket = "Easy" | "Medium" | "Hard";
 const MIN_QUESTION_COUNT = 3;
 const MAX_QUESTION_COUNT = 100;
+const QTYPE_FIRST_TRIG = import.meta.env.VITE_QTYPE_FIRST_TRIGONOMETRY === "true";
+const PRACTICE_MENTOR_LABELS: Record<StudentMentorIntent, string> = {
+  hint: "Hint / Next step",
+  explain: "Explain",
+  check_cbse: "Check my solution (CBSE)",
+};
+
+type QuestionStrategyDetails = {
+  meta: QuestionMeta;
+  learningObjects: LearningObject[];
+  commonMistakes: string[];
+  boardWritingTip: string;
+};
+
+function deriveMentorDefaultIntent(meta: QuestionMeta | null): StudentMentorIntent {
+  if (!meta) return "hint";
+  const format = String(meta.cbseFormat || "").trim().toUpperCase();
+  const skillFamily = String(meta.skillFamily || "").trim();
+  if (format === "D" || format === "E") return "check_cbse";
+  if (skillFamily === "Proof_Pattern" || /proof/i.test(skillFamily)) return "check_cbse";
+  if (format === "B" || format === "C") return "explain";
+  return "hint";
+}
+
+function buildStrategyContextHeader(details: QuestionStrategyDetails | null): string {
+  if (!details) return "";
+  const lines = ["[CONTEXT]"];
+  if (details.meta.cbseFormat) {
+    lines.push(`CBSE Format: ${details.meta.cbseFormat}`);
+  }
+  if (details.meta.skillFamily) {
+    lines.push(`Skill: ${details.meta.skillFamily}`);
+  }
+  const loTitles = details.learningObjects
+    .map((lo) => String(lo.title || "").trim())
+    .filter(Boolean);
+  if (loTitles.length > 0) {
+    lines.push(`Learning Objects: ${loTitles.join(", ")}`);
+  }
+  if (details.boardWritingTip) {
+    lines.push(`Board Tip: ${details.boardWritingTip}`);
+  }
+  if (details.commonMistakes.length > 0) {
+    lines.push(`Common mistakes: ${details.commonMistakes.slice(0, 2).join(" | ")}`);
+  }
+  lines.push("[/CONTEXT]");
+  return lines.join("\n");
+}
 
 function difficultyChoiceToMix(
   choice: DifficultyChoice
@@ -214,6 +269,14 @@ function parseFocusBankIds(raw: unknown): string[] | undefined {
   return ids.length > 0 ? ids : undefined;
 }
 
+function parseBooleanFlag(raw: unknown): boolean | undefined {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (!s) return undefined;
+  if (s === "1" || s === "true" || s === "yes" || s === "on") return true;
+  if (s === "0" || s === "false" || s === "no" || s === "off") return false;
+  return undefined;
+}
+
 
 interface AiTopupArgs {
   grade: string;
@@ -232,6 +295,7 @@ interface AiTopupArgs {
   difficulty: DifficultyChoice;
   subtopicHint?: string;
   focusBankIds?: string[];
+  strictFocus?: boolean;
   sectionFilter?: string;
 }
 
@@ -300,7 +364,23 @@ const bankQuestionsFiltered = desiredSection
   ? bankQuestions.filter((q) => inferBoardPatternFromQuestion(q) === desiredSection)
   : bankQuestions;
 
-const baseQuestions = bankQuestionsFiltered.slice(0, safeCount);
+const focusIdSet =
+  args.strictFocus && Array.isArray(args.focusBankIds) && args.focusBankIds.length > 0
+    ? new Set(args.focusBankIds.map((id) => String(id)))
+    : null;
+
+const strictFocusPool = focusIdSet
+  ? bankQuestionsFiltered.filter((q) => focusIdSet.has(String((q as any).id ?? "")))
+  : bankQuestionsFiltered;
+
+const strictBase = strictFocusPool.slice(0, safeCount);
+const remainingForTopUp = Math.max(0, safeCount - strictBase.length);
+const topUpPool = focusIdSet
+  ? bankQuestionsFiltered.filter((q) => !focusIdSet.has(String((q as any).id ?? "")))
+  : [];
+const baseQuestions = focusIdSet
+  ? [...strictBase, ...topUpPool.slice(0, remainingForTopUp)]
+  : strictBase;
 
 function expandQuestionsForDrill(source: PracticeQuestion[], targetCount: number): PracticeQuestion[] {
   if (!Array.isArray(source) || source.length === 0) return [];
@@ -475,37 +555,70 @@ const PracticePage: React.FC = () => {
   const practiceFilters = (navState.practiceFilters || {}) as {
     subtopicHint?: string;
     focusBankIds?: string[];
+    strictFocus?: boolean;
     recommendedCount?: number;
     difficultyPreset?: DifficultyChoice;
   };
-  const navSubtopicHint = String(practiceFilters.subtopicHint || "").trim() || undefined;
-  const navFocusBankIds = Array.isArray(practiceFilters.focusBankIds)
-    ? practiceFilters.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
-    : undefined;
-  const navRecommendedCount = parsePositiveInt(practiceFilters.recommendedCount);
-  const navDifficultyPreset = parseDifficultyChoice(practiceFilters.difficultyPreset);
 
-  // Precedence: URL query params -> location.state.practiceFilters -> defaults.
-  const querySubtopicHint = String(qp.get("subtopicHint") || "").trim() || undefined;
-  const queryFocusBankIds = parseFocusBankIds(qp.get("focusBankIds"));
-  const queryRecommendedCount = parsePositiveInt(qp.get("count"));
-  const queryDifficultyPreset = parseDifficultyChoice(qp.get("difficulty"));
+  const initialPracticeDefaults = useMemo(() => {
+    const navSubtopicHint = String(practiceFilters.subtopicHint || "").trim() || undefined;
+    const navFocusBankIds = Array.isArray(practiceFilters.focusBankIds)
+      ? practiceFilters.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
+      : undefined;
+    const navStrictFocus = Boolean(practiceFilters.strictFocus);
+    const navRecommendedCount = parsePositiveInt(practiceFilters.recommendedCount);
+    const navDifficultyPreset = parseDifficultyChoice(practiceFilters.difficultyPreset);
 
-  const subtopicHint = querySubtopicHint ?? navSubtopicHint;
-  const focusBankIds = queryFocusBankIds ?? navFocusBankIds;
-  const resolvedRecommendedCount = queryRecommendedCount ?? navRecommendedCount ?? 10;
-  const resolvedDifficultyPreset = queryDifficultyPreset ?? navDifficultyPreset ?? "All";
+    // Precedence (initial load only): URL query params -> location.state.practiceFilters -> defaults.
+    const querySubtopicHint = String(qp.get("subtopicHint") || "").trim() || undefined;
+    const queryFocusBankIds = parseFocusBankIds(qp.get("focusBankIds"));
+    const queryStrictFocus = parseBooleanFlag(qp.get("strictFocus"));
+    const queryRecommendedCount = parsePositiveInt(qp.get("count"));
+    const queryDifficultyPreset = parseDifficultyChoice(qp.get("difficulty"));
 
-  const initialCount = Math.max(
-    MIN_QUESTION_COUNT,
-    Math.min(MAX_QUESTION_COUNT, resolvedRecommendedCount)
+    const recommendedCount = queryRecommendedCount ?? navRecommendedCount ?? 10;
+    const clampedCount = Math.max(
+      MIN_QUESTION_COUNT,
+      Math.min(MAX_QUESTION_COUNT, recommendedCount)
+    );
+
+    return {
+      subtopicHint: querySubtopicHint ?? navSubtopicHint,
+      focusBankIds: queryFocusBankIds ?? navFocusBankIds,
+      strictFocus: queryStrictFocus ?? navStrictFocus ?? false,
+      recommendedCount: clampedCount,
+      difficultyPreset: queryDifficultyPreset ?? navDifficultyPreset ?? "All",
+    };
+  }, [practiceFilters, qp]);
+
+  const didInitFromUrlRef = useRef(false);
+
+  const [subtopicHint, setSubtopicHint] = useState<string | undefined>(
+    () => initialPracticeDefaults.subtopicHint
   );
-
-  const [questionCount, setQuestionCount] = useState<number>(initialCount);
+  const [focusBankIds, setFocusBankIds] = useState<string[] | undefined>(
+    () => initialPracticeDefaults.focusBankIds
+  );
+  const [strictFocus, setStrictFocus] = useState<boolean>(
+    () => Boolean(initialPracticeDefaults.strictFocus)
+  );
+  const [questionCount, setQuestionCount] = useState<number>(
+    () => initialPracticeDefaults.recommendedCount
+  );
   const [difficulty, setDifficulty] = useState<DifficultyChoice>(
-    resolvedDifficultyPreset
+    () => initialPracticeDefaults.difficultyPreset
   );
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
+
+  useEffect(() => {
+    if (didInitFromUrlRef.current) return;
+    setSubtopicHint(initialPracticeDefaults.subtopicHint);
+    setFocusBankIds(initialPracticeDefaults.focusBankIds);
+    setStrictFocus(Boolean(initialPracticeDefaults.strictFocus));
+    setQuestionCount(initialPracticeDefaults.recommendedCount);
+    setDifficulty(initialPracticeDefaults.difficultyPreset);
+    didInitFromUrlRef.current = true;
+  }, [initialPracticeDefaults]);
 
 
   const [sectionFilter, setSectionFilter] = useState<"ALL" | "A" | "B" | "C" | "D" | "E">(() => {
@@ -549,6 +662,8 @@ useEffect(() => {
     if (sectionFilter === "ALL") return questions;
     return questions.filter((q) => getQuestionSection(q) === sectionFilter);
   }, [questions, sectionFilter]);
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [isWhyPanelOpen, setIsWhyPanelOpen] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -561,9 +676,12 @@ const [mentorDrawerOpen, setMentorDrawerOpen] = useState(false);
 const [mentorSolveStyle, setMentorSolveStyle] = useState<"socratic" | "board">("socratic");
 const [mentorSeedExample, setMentorSeedExample] = useState<{
   title: string;
+  questionId: string;
   question: string;
   marks?: number;
   section?: string;
+  defaultIntent?: StudentMentorIntent;
+  strategyContextHeader?: string;
 } | null>(null);
 
 
@@ -575,6 +693,51 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
     topicKey: topicKeyParam || explicitFromState || null,
   });
 }, [subjectKey, topicParam, topicKeyParam, navState]);
+
+  const strategyTopicSeed = useMemo(() => {
+    const explicitFromState = (navState as any)?.topicKey as string | undefined;
+    return canonicalTopicKey || topicKeyParam || explicitFromState || topicParam || "";
+  }, [canonicalTopicKey, topicKeyParam, navState, topicParam]);
+  const strategyCanonicalTopicKey = useMemo(
+    () => resolveCanonicalTopicForStrategy(strategyTopicSeed),
+    [strategyTopicSeed]
+  );
+  const isWhyThisQuestionEnabled =
+    QTYPE_FIRST_TRIG && strategyCanonicalTopicKey === "trigonometry";
+  const strategyPack = useMemo(() => {
+    if (!isWhyThisQuestionEnabled) return null;
+    return getStrategyPackForTopic(strategyCanonicalTopicKey);
+  }, [isWhyThisQuestionEnabled, strategyCanonicalTopicKey]);
+
+  const getQuestionStrategyDetails = useCallback(
+    (question: PracticeQuestion | null): QuestionStrategyDetails | null => {
+      if (!isWhyThisQuestionEnabled || !strategyPack || !question) return null;
+      const meta = getQuestionMeta(String(question.id), strategyCanonicalTopicKey);
+      if (!meta) return null;
+      const loSet = new Set(meta.loIds || []);
+      const learningObjects = strategyPack.learningObjects.filter((lo) => loSet.has(lo.loId));
+      const mistakes: string[] = [];
+      if (Array.isArray(meta.mistakeTags)) {
+        mistakes.push(...meta.mistakeTags.map((m) => String(m).trim()).filter(Boolean));
+      }
+      for (const lo of learningObjects) {
+        if (!Array.isArray(lo.commonMistakes)) continue;
+        mistakes.push(...lo.commonMistakes.map((m) => String(m).trim()).filter(Boolean));
+      }
+      const commonMistakes = Array.from(new Set(mistakes)).slice(0, 3);
+      const boardWritingTip =
+        learningObjects
+          .map((lo) => String(lo.boardWritingTip || "").trim())
+          .find(Boolean) || "";
+      return {
+        meta,
+        learningObjects,
+        commonMistakes,
+        boardWritingTip,
+      };
+    },
+    [isWhyThisQuestionEnabled, strategyPack, strategyCanonicalTopicKey]
+  );
 
   // Two topic identifiers are used:
   // - topicLabel: display name used by the canonical bank (e.g., "Real Numbers")
@@ -594,6 +757,20 @@ const packTopicKey = useMemo(() => {
 }, [subjectKey, topicParam, topicKeyParam, navState]);
 
   useEffect(() => {
+    if (filteredQuestions.length === 0) {
+      if (activeQuestionId !== null) setActiveQuestionId(null);
+      return;
+    }
+    if (
+      activeQuestionId &&
+      filteredQuestions.some((q) => String(q.id) === String(activeQuestionId))
+    ) {
+      return;
+    }
+    setActiveQuestionId(String(filteredQuestions[0].id));
+  }, [filteredQuestions, activeQuestionId]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
@@ -609,6 +786,7 @@ const packTopicKey = useMemo(() => {
           difficulty,
           subtopicHint,
           focusBankIds,
+          strictFocus,
           sectionFilter: sectionFilter === "ALL" ? undefined : sectionFilter,
         });
 
@@ -645,6 +823,7 @@ const packTopicKey = useMemo(() => {
     difficulty,
     subtopicHint,
     focusBankIds,
+    strictFocus,
     sectionFilter,
     regenerationKey,
   ]);
@@ -688,16 +867,27 @@ const packTopicKey = useMemo(() => {
     (
       q: PracticeQuestion,
       idx: number,
-      solveStyle: "socratic" | "board",
+      entryMode: "auto" | "hint" | "check_cbse",
       trigger?: EventTarget | null
     ) => {
+      const strategyDetails = getQuestionStrategyDetails(q);
+      const autoIntent = deriveMentorDefaultIntent(strategyDetails?.meta || null);
+      const defaultIntent =
+        entryMode === "auto"
+          ? autoIntent
+          : entryMode === "check_cbse"
+            ? "check_cbse"
+            : "hint";
       setMentorSeedExample({
         title: `Q${idx + 1}`,
+        questionId: String(q.id),
         question: String(q.questionText || ""),
         marks: Number((q as any).marks) || undefined,
         section: String((q as any).section || ""),
+        defaultIntent,
+        strategyContextHeader: buildStrategyContextHeader(strategyDetails),
       });
-      setMentorSolveStyle(solveStyle);
+      setMentorSolveStyle(defaultIntent === "check_cbse" ? "board" : "socratic");
       setMentorDrawerOpen(true);
       if (trigger instanceof HTMLElement) {
         const detailsEl = trigger.closest("details");
@@ -706,7 +896,7 @@ const packTopicKey = useMemo(() => {
         }
       }
     },
-    []
+    [getQuestionStrategyDetails]
   );
 
   const title = useMemo(() => {
@@ -715,6 +905,34 @@ const packTopicKey = useMemo(() => {
     }
     return `Practice - ${topicLabel}`;
   }, [topicParam, topicLabel, grade, subjectKey]);
+
+  const activeQuestion = useMemo(() => {
+    if (filteredQuestions.length === 0) return null;
+    if (!activeQuestionId) return filteredQuestions[0];
+    const hit = filteredQuestions.find((q) => String(q.id) === String(activeQuestionId));
+    return hit || filteredQuestions[0];
+  }, [filteredQuestions, activeQuestionId]);
+
+  const activeQuestionNumber = useMemo(() => {
+    if (!activeQuestion) return null;
+    const idx = filteredQuestions.findIndex(
+      (q) => String(q.id) === String(activeQuestion.id)
+    );
+    return idx >= 0 ? idx + 1 : null;
+  }, [filteredQuestions, activeQuestion]);
+
+  const activeQuestionStrategyDetails = useMemo(
+    () => getQuestionStrategyDetails(activeQuestion),
+    [getQuestionStrategyDetails, activeQuestion]
+  );
+  const activeQuestionMeta = activeQuestionStrategyDetails?.meta || null;
+  const activeQuestionLearningObjects = activeQuestionStrategyDetails?.learningObjects || [];
+  const whyCommonMistakes = activeQuestionStrategyDetails?.commonMistakes || [];
+  const whyBoardWritingTip = activeQuestionStrategyDetails?.boardWritingTip || "";
+  const mentorDefaultIntent = useMemo(
+    () => deriveMentorDefaultIntent(activeQuestionMeta),
+    [activeQuestionMeta]
+  );
 
   return (
     <div
@@ -1001,6 +1219,140 @@ const packTopicKey = useMemo(() => {
           </span>
         </section>
 
+        {isWhyThisQuestionEnabled && (
+          <section
+            style={{
+              marginBottom: 12,
+              borderRadius: 16,
+              border: "1px solid rgba(59,130,246,0.28)",
+              background: "rgba(239,246,255,0.82)",
+              boxShadow: "0 8px 22px rgba(148,163,184,0.22)",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setIsWhyPanelOpen((prev) => !prev)}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                border: "none",
+                borderBottom: isWhyPanelOpen ? "1px solid rgba(59,130,246,0.2)" : "none",
+                background: "rgba(219,234,254,0.7)",
+                color: "#1e3a8a",
+                padding: "10px 12px",
+                cursor: "pointer",
+                fontWeight: 800,
+                fontSize: "0.84rem",
+                textAlign: "left",
+              }}
+              aria-expanded={isWhyPanelOpen}
+            >
+              <span>
+                Why this question?
+                {activeQuestionNumber ? ` (Q${activeQuestionNumber})` : ""}
+              </span>
+              <span style={{ fontSize: "0.76rem" }}>{isWhyPanelOpen ? "Hide" : "Show"}</span>
+            </button>
+
+            {isWhyPanelOpen && (
+              <div style={{ padding: "12px 12px 10px" }}>
+                {activeQuestionMeta ? (
+                  <>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                      {activeQuestionMeta.skillFamily && (
+                        <span
+                          style={{
+                            fontSize: "0.73rem",
+                            borderRadius: 999,
+                            padding: "3px 9px",
+                            background: "rgba(30,64,175,0.12)",
+                            color: "#1e40af",
+                            border: "1px solid rgba(30,64,175,0.2)",
+                          }}
+                        >
+                          Skill: {activeQuestionMeta.skillFamily}
+                        </span>
+                      )}
+                      {activeQuestionMeta.cbseFormat && (
+                        <span
+                          style={{
+                            fontSize: "0.73rem",
+                            borderRadius: 999,
+                            padding: "3px 9px",
+                            background: "rgba(14,116,144,0.12)",
+                            color: "#155e75",
+                            border: "1px solid rgba(14,116,144,0.2)",
+                          }}
+                        >
+                          CBSE format: {activeQuestionMeta.cbseFormat}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
+                          Learning objects
+                        </div>
+                        {activeQuestionLearningObjects.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
+                            {activeQuestionLearningObjects.map((lo) => (
+                              <li key={lo.loId}>
+                                <strong>{lo.title}:</strong> {lo.description}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div style={{ fontSize: "0.78rem", color: "#475569" }}>
+                            Learning objects are being mapped for this question.
+                          </div>
+                        )}
+                      </div>
+
+                      {whyCommonMistakes.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
+                            Common mistakes
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
+                            {whyCommonMistakes.map((mistake) => (
+                              <li key={mistake}>{mistake}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {whyBoardWritingTip && (
+                        <div
+                          style={{
+                            borderRadius: 10,
+                            border: "1px solid rgba(14,116,144,0.2)",
+                            background: "rgba(236,254,255,0.75)",
+                            padding: "8px 10px",
+                            fontSize: "0.78rem",
+                            color: "#164e63",
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          <strong>Board writing tip:</strong> {whyBoardWritingTip}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: "0.8rem", color: "#475569" }}>
+                    This question isn&apos;t tagged yet. Practice normally.
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Questions list */}
         <section>
           {isLoading && (
@@ -1048,10 +1400,16 @@ const packTopicKey = useMemo(() => {
             >
               {filteredQuestions.map((q, idx) => {
                 const isOpen = !!expandedAnswers[q.id];
+                const questionStrategyDetails = getQuestionStrategyDetails(q);
+                const questionMentorDefaultIntent =
+                  activeQuestion && String(activeQuestion.id) === String(q.id)
+                    ? mentorDefaultIntent
+                    : deriveMentorDefaultIntent(questionStrategyDetails?.meta || null);
 
                 return (
                   <article
                     key={q.id}
+                    onClick={() => setActiveQuestionId(String(q.id))}
                     style={{
                       borderRadius: 18,
                       padding: "14px 16px 12px",
@@ -1153,7 +1511,10 @@ const packTopicKey = useMemo(() => {
                     >
                       <button
                         type="button"
-                        onClick={() => handleToggleAnswer(q.id)}
+                        onClick={() => {
+                          setActiveQuestionId(String(q.id));
+                          handleToggleAnswer(q.id);
+                        }}
                         style={{
                           borderRadius: 999,
                           padding: "5px 12px",
@@ -1170,6 +1531,29 @@ const packTopicKey = useMemo(() => {
                         }}
                       >
                         <span>{isOpen ? "Hide solution" : "Show solution"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveQuestionId(String(q.id));
+                          openMentorForQuestion(q, idx, "auto");
+                        }}
+                        style={{
+                          borderRadius: 999,
+                          padding: "5px 12px",
+                          border: "1px solid rgba(14,116,144,0.45)",
+                          backgroundColor: "rgba(236,254,255,0.95)",
+                          fontSize: "0.78rem",
+                          color: "#155e75",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontWeight: 800,
+                        }}
+                        title={`Open mentor in ${PRACTICE_MENTOR_LABELS[questionMentorDefaultIntent]} mode for this question`}
+                      >
+                        <span>Ask mentor about this question</span>
                       </button>
                     </div>
 
@@ -1213,9 +1597,10 @@ const packTopicKey = useMemo(() => {
                         >
                           <button
                             type="button"
-                            onClick={(event) =>
-                              openMentorForQuestion(q, idx, "socratic", event.currentTarget)
-                            }
+                            onClick={(event) => {
+                              setActiveQuestionId(String(q.id));
+                              openMentorForQuestion(q, idx, "hint", event.currentTarget);
+                            }}
                             style={{
                               borderRadius: 10,
                               padding: "6px 10px",
@@ -1233,9 +1618,10 @@ const packTopicKey = useMemo(() => {
                           </button>
                           <button
                             type="button"
-                            onClick={(event) =>
-                              openMentorForQuestion(q, idx, "board", event.currentTarget)
-                            }
+                            onClick={(event) => {
+                              setActiveQuestionId(String(q.id));
+                              openMentorForQuestion(q, idx, "check_cbse", event.currentTarget);
+                            }}
                             style={{
                               borderRadius: 10,
                               padding: "6px 10px",
@@ -1282,7 +1668,15 @@ const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
 function MentorSolveDrawer(props: {
   open: boolean;
   onClose: () => void;
-  seed: { title: string; question: string; marks?: number; section?: string } | null;
+  seed: {
+    title: string;
+    questionId: string;
+    question: string;
+    marks?: number;
+    section?: string;
+    defaultIntent?: StudentMentorIntent;
+    strategyContextHeader?: string;
+  } | null;
   solveStyle: "socratic" | "board";
   grade: number;
   subjectTitle: string;
@@ -1320,6 +1714,20 @@ function MentorSolveDrawer(props: {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const resolvedIntent: StudentMentorIntent =
+    seed?.defaultIntent ?? (solveStyle === "board" ? "check_cbse" : "hint");
+  const mentorTitle = PRACTICE_MENTOR_LABELS[resolvedIntent];
+
+  const applyStrategyContext = useCallback(
+    (message: string) => {
+      const header = String(seed?.strategyContextHeader || "").trim();
+      const trimmedMessage = String(message || "").trim();
+      if (!header) return trimmedMessage;
+      if (!trimmedMessage) return header;
+      return `${header}\n\n${trimmedMessage}`;
+    },
+    [seed]
+  );
 
   const parseMentorJson = (raw: string) => {
     try {
@@ -1397,7 +1805,7 @@ function MentorSolveDrawer(props: {
       const lastUser = [...history].reverse().find((m) => m.role === "user");
       const studentText = String(lastUser?.content || "").trim();
 
-      if (solveStyle === "board") {
+      if (resolvedIntent === "check_cbse") {
         const { tpl, section } = getOfflineBoardSteps();
         const steps = Array.isArray(tpl?.steps)
           ? tpl.steps.map((s: any) => ({
@@ -1422,6 +1830,16 @@ function MentorSolveDrawer(props: {
         });
       }
 
+      if (resolvedIntent === "explain") {
+        return [
+          "Concept focus:",
+          `- Identify which trig idea ${seed?.title || "this question"} is testing before solving.`,
+          "- Write the correct ratio / identity first, then substitute values carefully.",
+          "- Keep one clean algebra line and simplify before concluding.",
+          "- End with one short exam-ready statement.",
+        ].join("\n");
+      }
+
       return JSON.stringify({
         kind: "hint",
         tutor: studentText
@@ -1430,7 +1848,7 @@ function MentorSolveDrawer(props: {
         answerFormat: "One short step + reason.",
       });
     },
-    [solveStyle, seed]
+    [resolvedIntent, seed]
   );
 
   const requestMentorHybrid = useCallback(
@@ -1446,7 +1864,12 @@ function MentorSolveDrawer(props: {
         controller.abort();
       }, MENTOR_HYBRID_TIMEOUT_MS);
       try {
-        const modeApi = solveStyle === "board" ? "board_steps_ms" : "solve_with_me";
+        const modeApi =
+          resolvedIntent === "check_cbse"
+            ? "board_steps_ms"
+            : resolvedIntent === "explain"
+              ? "learn_teach"
+              : "solve_with_me";
         const lastUser = [...history].reverse().find((m) => m.role === "user");
         const body = {
           mode: modeApi,
@@ -1456,14 +1879,17 @@ function MentorSolveDrawer(props: {
             topicKey,
             chapter: topicKey,
             selectedMode: modeApi,
-            solveStyle,
+            solveStyle: resolvedIntent === "check_cbse" ? "board" : "socratic",
             questionText: String(seed.question || ""),
-            studentQuestion: String(lastUser?.content || "").trim(),
+            studentQuestion: applyStrategyContext(String(lastUser?.content || "").trim()),
             cardTitle: seed.title,
             cardSection: seed.section,
             marks: Number(seed.marks || 0) || undefined,
           },
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
+          messages: history.map((m) => ({
+            role: m.role,
+            content: m.role === "user" ? applyStrategyContext(m.content) : m.content,
+          })),
         };
         let res: Response;
         try {
@@ -1522,7 +1948,7 @@ function MentorSolveDrawer(props: {
         clearTimeout(timeoutId);
       }
     },
-    [seed, solveStyle, subjectTitle, grade, topicKey]
+    [applyStrategyContext, grade, resolvedIntent, seed, subjectTitle, topicKey]
   );
 
   const kickoff = useCallback(async () => {
@@ -1631,8 +2057,15 @@ function MentorSolveDrawer(props: {
             gap: 10,
           }}
         >
-          <div style={{ fontWeight: 950, fontSize: 14 }}>
-            {solveStyle === "board" ? "Board Steps" : "Solve With Me"} - {seed.title}
+          <div style={{ display: "grid", gap: 2 }}>
+            <div style={{ fontWeight: 950, fontSize: 14 }}>
+              {mentorTitle} - {seed.title}
+            </div>
+            {seed.strategyContextHeader && (
+              <div style={{ fontSize: 12, color: "#475569" }}>
+                Strategy context is being used for this question.
+              </div>
+            )}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button

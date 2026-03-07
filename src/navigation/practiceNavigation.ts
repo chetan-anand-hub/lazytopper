@@ -14,6 +14,7 @@ export interface PracticeNavRequest {
   subtopicHint?: string; // e.g. bucket.topic, concept tag
   sectionFilter?: PracticeSectionFilter; // CBSE board section/pattern filter
   focusBankIds?: string[]; // HPQ / predictive engine IDs to bias sampling from
+  strictFocus?: boolean; // if true, treat focusBankIds as strict-first filter
   recommendedCount?: number; // suggested number of questions (UI can override)
   difficultyPreset?: PracticeDifficultyPreset;
   source?: string;
@@ -40,6 +41,7 @@ export function navigateToPractice(
     subtopicHint,
     sectionFilter,
     focusBankIds,
+    strictFocus = false,
     recommendedCount,
     difficultyPreset = "All",
     source = "hpq",
@@ -63,6 +65,9 @@ export function navigateToPractice(
   // HPQ / predictive IDs to bias sampling from
   if (focusBankIds && focusBankIds.length > 0) {
     search.set("focusBankIds", focusBankIds.join(","));
+  }
+  if (strictFocus) {
+    search.set("strictFocus", "true");
   }
 
   // Recommended question count - UI slider on Practice can override
@@ -89,6 +94,7 @@ export function navigateToPractice(
       practiceFilters: {
         subtopicHint,
         focusBankIds,
+        strictFocus,
         recommendedCount,
         difficultyPreset,
       },

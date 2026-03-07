@@ -26,10 +26,17 @@ import SharedTutorDrawerV2, {
 } from "../components/tutor/TutorDrawerV2";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
+import type { QuestionTypeTile } from "../data/contentStrategy/types";
 import {
   navigateToPractice,
   type PracticeSectionFilter,
 } from "../navigation/practiceNavigation";
+import {
+  getQuestionIdsForLo,
+  getQuestionIdsForQType,
+  getStrategyPackForTopic,
+  resolveCanonicalTopicForStrategy,
+} from "../services/questionTypeFirstResolver";
 import {
   ensureTopicMasterySnapshot,
   getMasteryCounts,
@@ -55,6 +62,7 @@ import {
 import { trackUxEvent } from "../services/uxTelemetry";
 
 const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
+const QTYPE_FIRST_TRIG = import.meta.env.VITE_QTYPE_FIRST_TRIGONOMETRY === "true";
 
 type MentorHybridResponse = {
   res: Response;
@@ -832,6 +840,14 @@ export default function TopicHub() {
 
   // Derived display title for this TopicHub page (must be declared before hooks that depend on it).
   const title = String(v2?.topicName || topicKey || '').trim() || 'Topic';
+  const strategyCanonicalTopicKey = useMemo(
+    () => resolveCanonicalTopicForStrategy(topicKey),
+    [topicKey]
+  );
+  const strategyPack = useMemo(() => {
+    if (!QTYPE_FIRST_TRIG || strategyCanonicalTopicKey !== "trigonometry") return null;
+    return getStrategyPackForTopic(topicKey);
+  }, [strategyCanonicalTopicKey, topicKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1910,6 +1926,43 @@ const showInZombie = (sectionId: string) => {
     ]
   );
 
+  const openPracticeFromQTypeTile = useCallback(
+    (tile: QuestionTypeTile) => {
+      const primaryIds = getQuestionIdsForQType(tile.qtypeId);
+      const loFallbackIds = Array.from(
+        new Set(
+          (tile.loIds || []).flatMap((loId) => getQuestionIdsForLo(loId))
+        )
+      );
+      const focusBankIds = primaryIds.length > 0 ? primaryIds : loFallbackIds;
+      const backTab = activeTab;
+
+      trackUxEvent("topichub_open_practice", "topichub", {
+        topicKey,
+        tab: backTab,
+        qtypeId: tile.qtypeId,
+        sectionFilter: tile.cbseFormat,
+        focusCount: focusBankIds.length,
+      });
+
+      navigateToPractice(navigate, {
+        grade,
+        subject: subjectTitle,
+        topicKey,
+        topicName: title,
+        backPath: `/topic-hub/${grade}/${subject}/${topicKey}?tab=${backTab}`,
+        backLabel: "Back to TopicHub",
+        sectionFilter: tile.cbseFormat as PracticeSectionFilter,
+        focusBankIds,
+        recommendedCount: 10,
+        difficultyPreset: "All",
+        strictFocus: true,
+        source: "qtype_first_tiles",
+      });
+    },
+    [activeTab, grade, navigate, subject, subjectTitle, title, topicKey]
+  );
+
   const onTutorNodeProgress = useCallback(
     (progress: TutorNodeProgress) => {
       if (!progress?.nodeId) return;
@@ -2149,6 +2202,71 @@ const showInZombie = (sectionId: string) => {
 
         {/* Content */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
+          {QTYPE_FIRST_TRIG &&
+          strategyCanonicalTopicKey === "trigonometry" &&
+          strategyPack?.tiles?.length &&
+          (isLearn || isGrind) ? (
+            <section
+              style={{
+                borderRadius: 18,
+                padding: "12px 12px",
+                background: "rgba(255,255,255,0.8)",
+                border: "1px solid rgba(0,0,0,0.1)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ fontWeight: 900, fontSize: 15 }}>
+                Board question types in this chapter
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.76, marginTop: 2 }}>
+                Pick a board pattern type to open focused practice.
+              </div>
+              <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                {strategyPack.tiles.map((tile) => {
+                  const marksLabel =
+                    Array.isArray(tile.typicalMarks) && tile.typicalMarks.length > 0
+                      ? ` • ${tile.typicalMarks.join("/") }m`
+                      : "";
+                  return (
+                    <button
+                      key={tile.qtypeId}
+                      type="button"
+                      onClick={() => openPracticeFromQTypeTile(tile)}
+                      style={{
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: "rgba(255,255,255,0.95)",
+                        padding: "10px 12px",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontWeight: 850, fontSize: 13 }}>{tile.title}</div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 900,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "rgba(15,23,42,0.92)",
+                            color: "#fff",
+                          }}
+                        >
+                          {tile.cbseFormat}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, opacity: 0.8 }}>
+                        {tile.skillFamily}
+                        {marksLabel}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
           {isLearn ? (
             <div
               style={{
