@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 // Import the strategy plan helper.  Use a relative import since this file
 // sits at the project root alongside planStorage.ts.
 // We no longer persist plan drafts from within the MentorPanel.  Plan
@@ -24,6 +24,7 @@ import type {
 } from "../types/MentorRequest";
 import type { MentorPayload } from "../ai/aiClient";
 import type { TutorBlock } from "../types/mentor";
+import type { StudentMentorIntent } from "../types/studentMentorIntent";
 
 /**
  * MentorPanel
@@ -33,7 +34,7 @@ import type { TutorBlock } from "../types/mentor";
  * unified persona.  When `showModes` is enabled, users can switch between
  * modes using the chips; otherwise it defaults to planner functionality.
  * A `persona` prop can optionally be provided to forward persona metadata to
- * the backend.  The UI remains largely unchanged from the original version –
+ * the backend.  The UI remains largely unchanged from the original version -
  * subject/chapter selectors, plan preview bubble and tweak input are all
  * preserved.
  */
@@ -50,6 +51,10 @@ interface MentorPanelProps {
   onPlanUpdated?: (planText: string | null) => void;
   /** optional persona definition forwarded to the backend. */
   persona?: MentorPersona;
+  /** student view hides internal modes; advanced view allows opt-in full mode selector. */
+  uiPreset?: "student" | "advanced";
+  /** optional student-first intent default for the current context/question. */
+  defaultIntent?: StudentMentorIntent;
 }
 
 const MODES: { key: MentorMode; label: string }[] = [
@@ -58,7 +63,41 @@ const MODES: { key: MentorMode; label: string }[] = [
   { key: "plan", label: "Plan" },
   { key: "coach", label: "Coach" },
   { key: "mindset", label: "Mindset" },
+  { key: "topic_explain", label: "Topic Explain" },
+  { key: "topic_exam_tips", label: "Topic Exam Tips" },
+  { key: "solve_with_me", label: "Solve With Me" },
+  { key: "board_steps_ms", label: "Board Steps" },
+  { key: "learn_teach", label: "Learn Teach" },
+  { key: "learn_proof", label: "Learn Proof" },
+  { key: "learn_mindmap", label: "Learn Mindmap" },
 ];
+
+const STUDENT_INTENT_TO_MODE: Record<StudentMentorIntent, MentorMode> = {
+  hint: "solve_with_me",
+  explain: "learn_teach",
+  check_cbse: "board_steps_ms",
+};
+
+const STUDENT_ACTIONS: Array<{ key: StudentMentorIntent; label: string }> = [
+  { key: "hint", label: "Hint / Next step" },
+  { key: "explain", label: "Explain" },
+  { key: "check_cbse", label: "Check my solution (CBSE)" },
+];
+
+const STUDENT_SUBTITLES: Record<StudentMentorIntent, string> = {
+  hint: "I'll guide you step-by-step (hints first).",
+  explain: "I'll teach the concept simply + a short example.",
+  check_cbse: "I'll format your answer like CBSE marking-scheme steps.",
+};
+
+const CHECK_CBSE_PREFIX =
+  "Use CBSE marking scheme style. Give stepwise solution with marks allocation if possible. Box the final answer.";
+
+const resolveIntentFromMode = (initialMode: MentorMode): StudentMentorIntent => {
+  if (initialMode === "solve" || initialMode === "solve_with_me") return "hint";
+  if (initialMode === "explain" || initialMode === "topic_explain") return "explain";
+  return "explain";
+};
 
 // Full-ish CBSE Class 10 chapter lists for now
 const CHAPTERS_BY_SUBJECT: Record<"Maths" | "Science", string[]> = {
@@ -91,7 +130,7 @@ const CHAPTERS_BY_SUBJECT: Record<"Maths" | "Science", string[]> = {
     "Control and Coordination",
     "How do Organisms Reproduce?",
     "Heredity and Evolution",
-    "Light – Reflection and Refraction",
+    "Light - Reflection and Refraction",
     "The Human Eye and the Colourful World",
     "Electricity",
     "Magnetic Effects of Electric Current",
@@ -416,7 +455,7 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
       data.seasonPlan.forEach((phase) => {
         if (!isRecord(phase)) return;
         lines.push(
-          `• ${phase.phase} – ${phase.durationDays} days: ${phase.focus}`
+          `- ${phase.phase} - ${phase.durationDays} days: ${phase.focus}`
         );
       });
       lines.push("");
@@ -427,7 +466,7 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
       data.chapterHours.forEach((ch) => {
         if (!isRecord(ch)) return;
         lines.push(
-          `• ${ch.chapter} [${ch.tier}] – ${ch.recommendedHours} hrs (${ch.weightagePercent}% weightage)`
+          `- ${ch.chapter} [${ch.tier}] - ${ch.recommendedHours} hrs (${ch.weightagePercent}% weightage)`
         );
       });
       lines.push("");
@@ -442,7 +481,7 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
           if (d.hours.Maths) parts.push(`Maths: ${d.hours.Maths}h`);
           if (d.hours.Science) parts.push(`Science: ${d.hours.Science}h`);
         }
-        lines.push(`• Day ${d.dayNumber}: ${parts.join(", ")}`);
+        lines.push(`- Day ${d.dayNumber}: ${parts.join(", ")}`);
       });
     }
 
@@ -465,9 +504,14 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   showModes = false,
   onPlanUpdated,
   persona,
+  uiPreset = "student",
+  defaultIntent,
 }) => {
-  // Current mentor mode.  Defaults to the provided mode and can change via chips.
-  const [mode, setMode] = useState<MentorMode>(defaultMode);
+  const [intent, setIntent] = useState<StudentMentorIntent>(() =>
+    defaultIntent ?? resolveIntentFromMode(defaultMode)
+  );
+  const [advancedMode, setAdvancedMode] = useState<MentorMode>(defaultMode);
+  const [showAdvancedModes, setShowAdvancedModes] = useState(false);
   const [messages, setMessages] = useState<MentorMessageView[]>([]);
   const [planPreview, setPlanPreview] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -485,7 +529,13 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   const [hintWarnings, setHintWarnings] = useState<Record<number, string>>({});
   const [hintFallback, setHintFallback] = useState<Record<number, boolean>>({});
   const [hintVariant] = useState(() => getHintVariant());
+  const userTouchedIntentRef = useRef(false);
   const isDev = Boolean(import.meta?.env?.DEV);
+  const canUseAdvanced = uiPreset === "advanced" && showModes;
+  const usingAdvancedMode = canUseAdvanced && showAdvancedModes;
+  const resolvedMode: MentorMode = usingAdvancedMode
+    ? advancedMode
+    : STUDENT_INTENT_TO_MODE[intent];
 
   const effectivePageContext: PageContext = {
     ...pageContext,
@@ -494,11 +544,30 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   };
   const chaptersForSubject = CHAPTERS_BY_SUBJECT[subject] ?? ["All Chapters"];
 
-  const handleAssistantReply = (reply: MentorReply) => {
+  useEffect(() => {
+    setAdvancedMode(defaultMode);
+    if (uiPreset !== "student") {
+      setIntent(resolveIntentFromMode(defaultMode));
+      return;
+    }
+    if (userTouchedIntentRef.current) return;
+    setIntent(defaultIntent ?? resolveIntentFromMode(defaultMode));
+  }, [defaultMode, defaultIntent, uiPreset]);
+
+  useEffect(() => {
+    if (!canUseAdvanced) setShowAdvancedModes(false);
+  }, [canUseAdvanced]);
+
+  const resetConversation = () => {
+    setMessages([]);
+    setPlanPreview(null);
+  };
+
+  const handleAssistantReply = (reply: MentorReply, requestMode: MentorMode) => {
     const assistantMsg: MentorMessageView = {
       role: "assistant",
       content: reply.text,
-      mode,
+      mode: requestMode,
       structured: reply.structured,
     };
     setMessages((prev) => [...prev, assistantMsg]);
@@ -510,9 +579,9 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     // reply is nonempty.  The context contains grade and subject
     // information, which we forward to the storage helper.  Saving
     // plans helps bridge the mentor and dashboard flows.
-    if (mode === "plan" && reply.text && reply.text.trim().length > 0) {
+    if (requestMode === "plan" && reply.text && reply.text.trim().length > 0) {
       try {
-        // grade is stored as e.g. "Class 10", remove non‑digits for route convenience
+        // grade is stored as e.g. "Class 10", remove non-digits for route convenience
         const _gradeNum = String(
           (effectivePageContext.grade || "Class 10").replace(/\D/g, "")
         ) || "10";
@@ -536,13 +605,18 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
 
   const sendPrompt = async (prompt: string) => {
     if (!prompt.trim()) return;
-    const userMsg: MentorMessage = { role: "user", content: prompt, mode };
+    const requestMode = resolvedMode;
+    const requestMessage =
+      !usingAdvancedMode && intent === "check_cbse"
+        ? `${CHECK_CBSE_PREFIX}\n\n${prompt}`
+        : prompt;
+    const userMsg: MentorMessage = { role: "user", content: prompt, mode: requestMode };
     const newHistory = [...messages, userMsg];
     setMessages(newHistory);
     setIsLoading(true);
     const payload: MentorRequest = {
-      mode,
-      message: prompt,
+      mode: requestMode,
+      message: requestMessage,
       pageContext: effectivePageContext,
       studentState,
       history: newHistory,
@@ -550,11 +624,11 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     };
     try {
       const reply = await callMentorAPI(payload);
-      handleAssistantReply(reply);
+      handleAssistantReply(reply, requestMode);
     } catch {
       handleAssistantReply({
         text: "Hmm, something glitched while talking to your mentor. Try again in a few seconds.",
-      });
+      }, requestMode);
     } finally {
       setIsLoading(false);
     }
@@ -576,14 +650,15 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  // 🔹 Auto-generate first plan using homepage inputs, but only in plan mode.
+  // Auto-generate first plan using homepage inputs, but only in plan mode.
   useEffect(() => {
-    if (!autoFirstPrompt || hasAutoPrompted || mode !== "plan") return;
+    if (!autoFirstPrompt || hasAutoPrompted || resolvedMode !== "plan") return;
     setHasAutoPrompted(true);
     setIsLoading(true);
+    const requestMode = resolvedMode;
     const run = async () => {
       const payload: MentorRequest = {
-        mode,
+        mode: requestMode,
         message: autoFirstPrompt,
         pageContext: effectivePageContext,
         studentState,
@@ -592,50 +667,60 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
       };
       try {
         const reply = await callMentorAPI(payload);
-        handleAssistantReply(reply);
+        handleAssistantReply(reply, requestMode);
       } catch {
         handleAssistantReply({
           text: "I couldn't auto-generate your plan. Try typing a quick tweak and I'll rebuild it.",
-        });
+        }, requestMode);
       } finally {
         setIsLoading(false);
       }
     };
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFirstPrompt, hasAutoPrompted, mode]);
+  }, [autoFirstPrompt, hasAutoPrompted, resolvedMode]);
 
   // Simple descriptions per mode for the header subtitle.
   const MODE_DESCRIPTIONS: Partial<Record<MentorMode, string>> = {
-    solve:
-      "Solve mode: I’ll walk through a question step-by-step and highlight common mistakes.",
-    explain:
-      "Explain mode: I’ll break down tough topics into simple, easy-to-follow explanations.",
-    plan:
-      "Planner mode: I’ll turn your targets, days left and hours/day into a realistic daily roadmap.",
-    coach:
-      "Coach mode: I’ll offer tips, strategies and exam-ready advice based on your progress.",
-    mindset:
-      "Mindset mode: I’ll help you build a positive growth mindset and exam resilience.",
+    solve: "Solve mode: I will walk through a question step-by-step.",
+    explain: "Explain mode: I will break concepts into exam-ready understanding.",
+    plan: "Planner mode: I will build a realistic daily roadmap.",
+    coach: "Coach mode: I will give strategy and execution feedback.",
+    mindset: "Mindset mode: I will help with consistency and confidence.",
+    topic_explain: "Topic explain mode: chapter-first explanation with key ideas.",
+    topic_exam_tips: "Topic exam tips mode: scoring strategy and writing tips.",
+    solve_with_me: "Hint mode: I will nudge your next step without over-revealing.",
+    board_steps_ms:
+      "CBSE check mode: stepwise board-style solution with marks-aware structure.",
+    learn_teach: "Explain mode: focused teaching with checkpoints and examples.",
+    learn_proof: "Proof mode: structured logic with complete justification.",
+    learn_mindmap: "Mindmap mode: concept links and quick memory hooks.",
   };
 
   // Placeholders for the input box depending on the active mode.  This helps
   // users understand what to type when not in planner mode.
   const INPUT_PLACEHOLDERS: Partial<Record<MentorMode, string>> = {
-    solve: "Type your question here…",
-    explain: "Type the topic or concept you want explained…",
+    solve: "Type your question here...",
+    explain: "Type the topic or concept you want explained...",
     plan:
-      "Want tweaks? Tell me what to adjust — e.g. ‘more revision days’, ‘focus Trigonometry & Light first’…",
-    coach: "Tell me about your study challenges or ask for exam tips…",
-    mindset: "Share any thoughts or worries for mindset advice…",
+      "Want tweaks? Tell me what to adjust, for example more revision days.",
+    coach: "Tell me your study challenge or ask for exam tips...",
+    mindset: "Share your concern for mindset guidance...",
+    topic_explain: "Ask for chapter-level explanation or concept breakdown...",
+    topic_exam_tips: "Ask for scoring strategy, pitfalls, and revision method...",
+    solve_with_me: "Share your current step and ask for the next hint...",
+    board_steps_ms: "Paste your attempt and ask for CBSE stepwise checking...",
+    learn_teach: "Ask to explain a concept with checkpoints and examples...",
+    learn_proof: "Ask for proof structure and justification checks...",
+    learn_mindmap: "Ask for concept map, links, and recall cues...",
   };
-
 
   const logHintEvent = (event: string, level: number) => {
     try {
       logActivity({
         type: "mentor",
-        topicKey: effectivePageContext.chapter ?? effectivePageContext.topic ?? mode,
+        topicKey:
+          effectivePageContext.chapter ?? effectivePageContext.topic ?? resolvedMode,
         questionIds: [event, hintVariant],
         score: level,
       });
@@ -667,7 +752,7 @@ Give me hint level ${targetLevel} only (keep it short).`
       : `Give me hint level ${targetLevel} only (keep it short).`;
 
     const payload: MentorRequestWithHints = {
-      mode,
+      mode: resolvedMode,
       message: hintPrompt,
       pageContext: effectivePageContext,
       studentState,
@@ -774,7 +859,11 @@ Give me hint level ${targetLevel} only (keep it short).`
       <div className="mentor-panel__header">
         <div className="mentor-panel__header-text">
           <h3 className="mentor-panel__title">Your AI Mentor</h3>
-          <p className="mentor-panel__subtitle">{MODE_DESCRIPTIONS[mode] ?? ""}</p>
+          <p className="mentor-panel__subtitle">
+            {usingAdvancedMode
+              ? (MODE_DESCRIPTIONS[resolvedMode] ?? "")
+              : STUDENT_SUBTITLES[intent]}
+          </p>
         </div>
         {/* AI avatar */}
         <div className="mentor-panel__avatar">
@@ -788,22 +877,63 @@ Give me hint level ${targetLevel} only (keep it short).`
           </div>
         </div>
       </div>
-      {/* (Optional) MODE CHIPS – hidden on home for now */}
-      {showModes && (
+      {/* Student-first action chips. */}
+      <div className="mentor-panel__modes">
+        {STUDENT_ACTIONS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              userTouchedIntentRef.current = true;
+              setIntent(key);
+              setShowAdvancedModes(false);
+            }}
+            className={
+              "mentor-panel__mode-chip" +
+              (!usingAdvancedMode && key === intent
+                ? " mentor-panel__mode-chip--active"
+                : "")
+            }
+          >
+            {label}
+          </button>
+        ))}
+        {canUseAdvanced && (
+          <button
+            type="button"
+            onClick={() => setShowAdvancedModes((prev) => !prev)}
+            className={
+              "mentor-panel__mode-chip" +
+              (usingAdvancedMode ? " mentor-panel__mode-chip--active" : "")
+            }
+          >
+            {usingAdvancedMode ? "Hide Advanced" : "Advanced"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={resetConversation}
+          className="mentor-panel__mode-chip"
+        >
+          New chat
+        </button>
+      </div>
+
+      {canUseAdvanced && showAdvancedModes && (
         <div className="mentor-panel__modes">
           {MODES.map(({ key, label }) => (
             <button
               key={key}
               type="button"
               onClick={() => {
-                setMode(key);
-                // reset history and preview when switching modes to avoid mixing contexts
-                setMessages([]);
-                setPlanPreview(null);
+                setAdvancedMode(key);
+                resetConversation();
               }}
               className={
                 "mentor-panel__mode-chip" +
-                (key === mode ? " mentor-panel__mode-chip--active" : "")
+                (key === advancedMode
+                  ? " mentor-panel__mode-chip--active"
+                  : "")
               }
             >
               {label}
@@ -883,8 +1013,8 @@ Give me hint level ${targetLevel} only (keep it short).`
                 : null}
             </div>
           ))}
-        {/* If no conversation yet and we’re in plan mode with a plan preview, show the plan preview bubble. */}
-        {messages.length === 0 && planPreview && mode === "plan" && (
+        {/* If no conversation yet and we're in plan mode with a plan preview, show the plan preview bubble. */}
+        {messages.length === 0 && planPreview && resolvedMode === "plan" && (
           <div className="mentor-panel__message mentor-panel__message--assistant">
             <div className="mentor-panel__bubble">
               {planPreview.split("\n").map((line, i) => (
@@ -893,12 +1023,12 @@ Give me hint level ${targetLevel} only (keep it short).`
             </div>
           </div>
         )}
-        {/* When there’s no plan preview and no messages, display a friendly placeholder. */}
+        {/* When there's no plan preview and no messages, display a friendly placeholder. */}
         {messages.length === 0 && !planPreview && !isLoading && (
           <div className="mentor-panel__message mentor-panel__message--assistant">
             <div className="mentor-panel__bubble mentor-panel__bubble--placeholder">
-              I’ll use your Maths &amp; Science targets and hours from the left to build a
-              roadmap preview here. Once you’re happy, tap <strong>“Show my study plan”</strong>
+              I'll use your Maths &amp; Science targets and hours from the left to build a
+              roadmap preview here. Once you're happy, tap <strong>"Show my study plan"</strong>
               to see the full schedule.
             </div>
           </div>
@@ -907,7 +1037,7 @@ Give me hint level ${targetLevel} only (keep it short).`
         {isLoading && (
           <div className="mentor-panel__message mentor-panel__message--assistant">
             <div className="mentor-panel__bubble mentor-panel__bubble--loading">
-              Typing…
+              Typing...
             </div>
           </div>
         )}
@@ -918,7 +1048,7 @@ Give me hint level ${targetLevel} only (keep it short).`
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={INPUT_PLACEHOLDERS[mode] ?? ""}
+          placeholder={INPUT_PLACEHOLDERS[resolvedMode] ?? ""}
           /* Provide more space by default; let the textarea grow as needed. */
           rows={3}
           style={{ resize: "vertical" }}
@@ -931,7 +1061,7 @@ Give me hint level ${targetLevel} only (keep it short).`
         >
           {/* Change the button label based on the mode.  In plan mode we update
               the plan; in other modes we simply send the query. */}
-          {mode === "plan"
+          {resolvedMode === "plan"
             ? isLoading
               ? "Updating..."
               : "Update plan"
@@ -943,3 +1073,4 @@ Give me hint level ${targetLevel} only (keep it short).`
     </div>
   );
 };
+

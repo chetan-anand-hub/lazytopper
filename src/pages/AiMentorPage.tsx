@@ -175,6 +175,7 @@ const AiMentorPage: React.FC = () => {
           defaultMode={defaultMode as any}
           autoFirstPrompt={state.gpt_directive}
           showModes
+          uiPreset="advanced"
           // Forward the unified persona so the backend knows which
           // system prompts and rules to apply.
           persona={centralMentorPersona}
