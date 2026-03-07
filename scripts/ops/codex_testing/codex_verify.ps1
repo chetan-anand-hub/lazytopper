@@ -24,7 +24,19 @@ function Write-LogLine {
     [string]$Path,
     [string]$Line
   )
-  Add-Content -Path $Path -Value $Line -Encoding UTF8
+  for ($attempt = 1; $attempt -le 8; $attempt++) {
+    try {
+      [System.IO.File]::AppendAllText(
+        $Path,
+        ([string]$Line + [Environment]::NewLine),
+        [System.Text.UTF8Encoding]::new($false)
+      )
+      return
+    } catch [System.IO.IOException] {
+      if ($attempt -eq 8) { throw }
+      Start-Sleep -Milliseconds 120
+    }
+  }
 }
 
 function Invoke-LoggedCommand {
