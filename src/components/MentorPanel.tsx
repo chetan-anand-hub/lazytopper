@@ -918,6 +918,18 @@ Give me hint level ${targetLevel} only (keep it short).`
           New chat
         </button>
       </div>
+      {!usingAdvancedMode && intent === "check_cbse" && (
+        <div
+          style={{
+            marginTop: -4,
+            marginBottom: 8,
+            fontSize: 12,
+            color: "#334155",
+          }}
+        >
+          Tip: Paste your full working. I'll check it like CBSE and tell where marks may be cut.
+        </div>
+      )}
 
       {canUseAdvanced && showAdvancedModes && (
         <div className="mentor-panel__modes">

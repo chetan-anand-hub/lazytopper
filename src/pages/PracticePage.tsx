@@ -28,6 +28,7 @@ import {
   resolveCanonicalTopicForStrategy,
 } from "../services/questionTypeFirstResolver";
 import { trackUxEvent } from "../services/uxTelemetry";
+import { getTrigRubric } from "../data/contentStrategy/trigonometry/trigonometryRubrics";
 import type { LearningObject, QuestionMeta } from "../data/contentStrategy/types";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
 type SubjectKey = "Maths" | "Science";
@@ -82,6 +83,32 @@ function buildStrategyContextHeader(details: QuestionStrategyDetails | null): st
     lines.push(`Common mistakes: ${details.commonMistakes.slice(0, 2).join(" | ")}`);
   }
   lines.push("[/CONTEXT]");
+  return lines.join("\n");
+}
+
+function buildRubricContextHeader(
+  details: QuestionStrategyDetails | null,
+  intent: StudentMentorIntent
+): string {
+  if (!details || intent !== "check_cbse") return "";
+  const rubric = getTrigRubric({
+    cbseFormat: details.meta.cbseFormat,
+    skillFamily: details.meta.skillFamily,
+    loIds: details.meta.loIds || [],
+  });
+  const lines = ["[RUBRIC_CONTEXT]", "Expected steps checklist:"];
+  for (const step of rubric.checklist) {
+    lines.push(`- ${step}`);
+  }
+  lines.push("Common deductions:");
+  for (const deduction of rubric.commonDeductions) {
+    lines.push(`- ${deduction}`);
+  }
+  lines.push("Examiner tips:");
+  for (const tip of rubric.examinerTips) {
+    lines.push(`- ${tip}`);
+  }
+  lines.push("[/RUBRIC_CONTEXT]");
   return lines.join("\n");
 }
 
@@ -682,6 +709,7 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
   section?: string;
   defaultIntent?: StudentMentorIntent;
   strategyContextHeader?: string;
+  rubricContextHeader?: string;
 } | null>(null);
 
 
@@ -886,6 +914,7 @@ const packTopicKey = useMemo(() => {
         section: String((q as any).section || ""),
         defaultIntent,
         strategyContextHeader: buildStrategyContextHeader(strategyDetails),
+        rubricContextHeader: buildRubricContextHeader(strategyDetails, defaultIntent),
       });
       setMentorSolveStyle(defaultIntent === "check_cbse" ? "board" : "socratic");
       setMentorDrawerOpen(true);
@@ -1676,6 +1705,7 @@ function MentorSolveDrawer(props: {
     section?: string;
     defaultIntent?: StudentMentorIntent;
     strategyContextHeader?: string;
+    rubricContextHeader?: string;
   } | null;
   solveStyle: "socratic" | "board";
   grade: number;
@@ -1718,15 +1748,21 @@ function MentorSolveDrawer(props: {
     seed?.defaultIntent ?? (solveStyle === "board" ? "check_cbse" : "hint");
   const mentorTitle = PRACTICE_MENTOR_LABELS[resolvedIntent];
 
-  const applyStrategyContext = useCallback(
+  const applyMentorContext = useCallback(
     (message: string) => {
-      const header = String(seed?.strategyContextHeader || "").trim();
+      const contextHeader = String(seed?.strategyContextHeader || "").trim();
+      const rubricHeader =
+        resolvedIntent === "check_cbse"
+          ? String(seed?.rubricContextHeader || "").trim()
+          : "";
+      const headerParts = [contextHeader, rubricHeader].filter(Boolean);
       const trimmedMessage = String(message || "").trim();
-      if (!header) return trimmedMessage;
-      if (!trimmedMessage) return header;
-      return `${header}\n\n${trimmedMessage}`;
+      if (headerParts.length === 0) return trimmedMessage;
+      const fullHeader = headerParts.join("\n\n");
+      if (!trimmedMessage) return fullHeader;
+      return `${fullHeader}\n\n${trimmedMessage}`;
     },
-    [seed]
+    [resolvedIntent, seed]
   );
 
   const parseMentorJson = (raw: string) => {
@@ -1881,14 +1917,14 @@ function MentorSolveDrawer(props: {
             selectedMode: modeApi,
             solveStyle: resolvedIntent === "check_cbse" ? "board" : "socratic",
             questionText: String(seed.question || ""),
-            studentQuestion: applyStrategyContext(String(lastUser?.content || "").trim()),
+            studentQuestion: applyMentorContext(String(lastUser?.content || "").trim()),
             cardTitle: seed.title,
             cardSection: seed.section,
             marks: Number(seed.marks || 0) || undefined,
           },
           messages: history.map((m) => ({
             role: m.role,
-            content: m.role === "user" ? applyStrategyContext(m.content) : m.content,
+            content: m.role === "user" ? applyMentorContext(m.content) : m.content,
           })),
         };
         let res: Response;
@@ -1948,7 +1984,7 @@ function MentorSolveDrawer(props: {
         clearTimeout(timeoutId);
       }
     },
-    [applyStrategyContext, grade, resolvedIntent, seed, subjectTitle, topicKey]
+    [applyMentorContext, grade, resolvedIntent, seed, subjectTitle, topicKey]
   );
 
   const kickoff = useCallback(async () => {
