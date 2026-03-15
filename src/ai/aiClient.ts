@@ -2,7 +2,11 @@
 // Thin client for talking to LazyTopper AI gateway (mentor + more-like-this)
 // Uses relative /api/* calls so it works in dev (Vite proxy) and prod.
 
-import type { MentorMode as MentorModeCore, MentorGatewayData } from "../types/mentor";
+import type {
+  MentorImageMimeType,
+  MentorMode as MentorModeCore,
+  MentorGatewayData,
+} from "../types/mentor";
 
 /**
  * Supported mentor modes.  In addition to the original modes (plan, solve, explain,
@@ -27,6 +31,9 @@ export interface MentorPayload {
   hoursPerDayTotal?: number;
   targetPercent?: number;
   extraNotes?: string;
+  imageBase64?: string;
+  imageMimeType?: MentorImageMimeType;
+  imageName?: string;
 }
 
 export interface MentorPersona {
@@ -77,7 +84,7 @@ async function handleJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
 
   if (!res.ok) {
-    let details: any;
+    let details: { error?: string; message?: string; raw?: string };
     try {
       details = JSON.parse(text);
     } catch {

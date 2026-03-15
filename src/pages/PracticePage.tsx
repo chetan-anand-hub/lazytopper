@@ -31,6 +31,12 @@ import { trackUxEvent } from "../services/uxTelemetry";
 import { getTrigRubric } from "../data/contentStrategy/trigonometry/trigonometryRubrics";
 import type { LearningObject, QuestionMeta } from "../data/contentStrategy/types";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
+import {
+  createMentorImageAttachment,
+  getMentorImageErrorMessage,
+  revokeMentorImagePreview,
+  type MentorImageAttachment,
+} from "../utils/mentorImage";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
@@ -43,6 +49,8 @@ const PRACTICE_MENTOR_LABELS: Record<StudentMentorIntent, string> = {
   explain: "Explain",
   check_cbse: "Check my solution (CBSE)",
 };
+const PRACTICE_CBSE_IMAGE_ONLY_PROMPT =
+  "Please check the attached handwritten solution photo in CBSE marking-scheme style.";
 
 type QuestionStrategyDetails = {
   meta: QuestionMeta;
@@ -1744,9 +1752,53 @@ function MentorSolveDrawer(props: {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [attachedImage, setAttachedImage] = useState<MentorImageAttachment | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachedImageRef = useRef<MentorImageAttachment | null>(null);
   const resolvedIntent: StudentMentorIntent =
     seed?.defaultIntent ?? (solveStyle === "board" ? "check_cbse" : "hint");
   const mentorTitle = PRACTICE_MENTOR_LABELS[resolvedIntent];
+  const showSolutionImageUpload = resolvedIntent === "check_cbse";
+
+  useEffect(() => {
+    attachedImageRef.current = attachedImage;
+  }, [attachedImage]);
+
+  useEffect(
+    () => () => {
+      revokeMentorImagePreview(attachedImageRef.current?.previewUrl);
+    },
+    []
+  );
+
+  const clearAttachedImage = (nextError: string | null = null) => {
+    setAttachedImage((prev) => {
+      if (prev?.previewUrl) revokeMentorImagePreview(prev.previewUrl);
+      return null;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setErrorText(nextError);
+  };
+
+  const handleImageFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
+    event
+  ) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    setErrorText(null);
+    try {
+      const nextImage = await createMentorImageAttachment(file);
+      setAttachedImage((prev) => {
+        if (prev?.previewUrl && prev.previewUrl !== nextImage.previewUrl) {
+          revokeMentorImagePreview(prev.previewUrl);
+        }
+        return nextImage;
+      });
+    } catch (error) {
+      setErrorText(getMentorImageErrorMessage(error));
+    }
+  };
 
   const applyMentorContext = useCallback(
     (message: string) => {
@@ -1888,7 +1940,7 @@ function MentorSolveDrawer(props: {
   );
 
   const requestMentorHybrid = useCallback(
-    async (history: MentorChatMsg[]) => {
+    async (history: MentorChatMsg[], imageForRequest?: MentorImageAttachment | null) => {
       if (!seed) return "";
       if (!canUseMentorServer()) {
         throw new Error("Mentor server temporarily unavailable.");
@@ -1921,6 +1973,13 @@ function MentorSolveDrawer(props: {
             cardTitle: seed.title,
             cardSection: seed.section,
             marks: Number(seed.marks || 0) || undefined,
+            ...(imageForRequest
+              ? {
+                  imageBase64: imageForRequest.base64,
+                  imageMimeType: imageForRequest.mimeType,
+                  imageName: imageForRequest.name,
+                }
+              : {}),
           },
           messages: history.map((m) => ({
             role: m.role,
@@ -2004,7 +2063,7 @@ function MentorSolveDrawer(props: {
     try {
       let assistantRaw = "";
       try {
-        assistantRaw = await requestMentorHybrid([firstUser]);
+        assistantRaw = await requestMentorHybrid([firstUser], null);
       } catch (serverErr: any) {
         console.warn("Mentor server unavailable, using fallback", serverErr);
         assistantRaw = buildLocalMentorReply([firstUser]);
@@ -2024,35 +2083,52 @@ function MentorSolveDrawer(props: {
       setInput("");
       setErrorText(null);
       setLoading(false);
+      clearAttachedImage();
     }
   }, [open, seed, solveStyle, kickoff]);
 
   const sendStudentMessage = useCallback(async () => {
-    if (solveStyle !== "socratic") return;
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    const imageForRequest = showSolutionImageUpload ? attachedImage : null;
+    if ((!trimmed && !imageForRequest) || loading) return;
 
     setErrorText(null);
-    const nextHistory: MentorChatMsg[] = [...messages, { role: "user", content: trimmed }];
+    const userContent =
+      trimmed ||
+      (imageForRequest
+        ? "Uploaded a solution photo for CBSE checking."
+        : PRACTICE_CBSE_IMAGE_ONLY_PROMPT);
+    const nextHistory: MentorChatMsg[] = [...messages, { role: "user", content: userContent }];
     setMessages(nextHistory);
     setInput("");
 
     setLoading(true);
+    let nextError: string | null = null;
     try {
       let assistantRaw = "";
       try {
-        assistantRaw = await requestMentorHybrid(nextHistory);
+        assistantRaw = await requestMentorHybrid(nextHistory, imageForRequest);
       } catch (serverErr: any) {
         console.warn("Mentor server unavailable, using fallback", serverErr);
         assistantRaw = buildLocalMentorReply(nextHistory);
       }
       setMessages((prev) => [...prev, { role: "assistant", content: assistantRaw }]);
     } catch (e: any) {
-      setErrorText(e?.message || "Failed to send.");
+      nextError = e?.message || "Failed to send.";
+      setErrorText(nextError);
     } finally {
+      if (imageForRequest) clearAttachedImage(nextError);
       setLoading(false);
     }
-  }, [input, loading, messages, solveStyle, buildLocalMentorReply, requestMentorHybrid]);
+  }, [
+    attachedImage,
+    buildLocalMentorReply,
+    input,
+    loading,
+    messages,
+    requestMentorHybrid,
+    showSolutionImageUpload,
+  ]);
 
   if (!open || !seed) return null;
 
@@ -2105,7 +2181,10 @@ function MentorSolveDrawer(props: {
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <button
-              onClick={kickoff}
+              onClick={() => {
+                clearAttachedImage();
+                void kickoff();
+              }}
               disabled={loading}
               style={{
                 borderRadius: 999,
@@ -2250,6 +2329,76 @@ function MentorSolveDrawer(props: {
             </div>
           )}
 
+          {showSolutionImageUpload && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 14,
+                background: "rgba(248,250,252,0.9)",
+                border: "1px solid rgba(148,163,184,0.32)",
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                onChange={handleImageFileChange}
+                style={{ display: "none" }}
+              />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    borderRadius: 999,
+                    padding: "6px 10px",
+                    border: "1px solid rgba(0,0,0,0.14)",
+                    background: "white",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  Upload solution photo
+                </button>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>
+                  {attachedImage ? attachedImage.name : "Accepts JPG or PNG up to 3 MB."}
+                </div>
+                {attachedImage && (
+                  <button
+                    type="button"
+                    onClick={() => clearAttachedImage()}
+                    style={{
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      border: "1px solid rgba(0,0,0,0.14)",
+                      background: "white",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {attachedImage?.previewUrl && (
+                <img
+                  src={attachedImage.previewUrl}
+                  alt="Solution preview"
+                  style={{
+                    marginTop: 10,
+                    maxWidth: 180,
+                    maxHeight: 180,
+                    display: "block",
+                    borderRadius: 12,
+                    border: "1px solid rgba(148,163,184,0.35)",
+                    objectFit: "cover",
+                  }}
+                />
+              )}
+            </div>
+          )}
+
           {solveStyle === "socratic" ? (
             <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
               <input
@@ -2287,8 +2436,51 @@ function MentorSolveDrawer(props: {
               </button>
             </div>
           ) : (
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-              Tip: Copy this step-pattern in your answer sheet - that's how marks are awarded.
+            <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Paste your working or add a short note for CBSE checking..."
+                rows={4}
+                style={{
+                  width: "100%",
+                  borderRadius: 14,
+                  border: "1px solid rgba(0,0,0,0.14)",
+                  padding: "10px 12px",
+                  fontSize: 14,
+                  outline: "none",
+                  background: "white",
+                  resize: "vertical",
+                }}
+                disabled={loading}
+              />
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={sendStudentMessage}
+                  disabled={loading || (!input.trim() && !attachedImage)}
+                  style={{
+                    borderRadius: 14,
+                    border: "1px solid rgba(0,0,0,0.14)",
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    fontWeight: 900,
+                    cursor:
+                      loading || (!input.trim() && !attachedImage)
+                        ? "not-allowed"
+                        : "pointer",
+                    background:
+                      loading || (!input.trim() && !attachedImage)
+                        ? "rgba(0,0,0,0.05)"
+                        : "white",
+                  }}
+                >
+                  {loading ? "Sending..." : "Send for CBSE check"}
+                </button>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  Tip: Copy this step-pattern in your answer sheet - that's how marks are awarded.
+                </div>
+              </div>
             </div>
           )}
         </div>

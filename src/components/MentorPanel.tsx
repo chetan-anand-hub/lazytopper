@@ -23,8 +23,14 @@ import type {
   SolveWithMeStructured,
 } from "../types/MentorRequest";
 import type { MentorPayload } from "../ai/aiClient";
-import type { TutorBlock } from "../types/mentor";
+import type { MentorImageMimeType, TutorBlock } from "../types/mentor";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
+import {
+  createMentorImageAttachment,
+  getMentorImageErrorMessage,
+  revokeMentorImagePreview,
+  type MentorImageAttachment,
+} from "../utils/mentorImage";
 
 /**
  * MentorPanel
@@ -92,6 +98,8 @@ const STUDENT_SUBTITLES: Record<StudentMentorIntent, string> = {
 
 const CHECK_CBSE_PREFIX =
   "Use CBSE marking scheme style. Give stepwise solution with marks allocation if possible. Box the final answer.";
+const CHECK_CBSE_IMAGE_ONLY_PROMPT =
+  "Please check the attached handwritten solution photo in CBSE marking-scheme style.";
 
 const resolveIntentFromMode = (initialMode: MentorMode): StudentMentorIntent => {
   if (initialMode === "solve" || initialMode === "solve_with_me") return "hint";
@@ -414,6 +422,11 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
   const requestNextHint = payload.requestNextHint;
   if (hintLevel != null) mentorPayload.hintLevel = hintLevel;
   if (requestNextHint != null) mentorPayload.requestNextHint = requestNextHint;
+  if (payload.imageBase64 && payload.imageMimeType) {
+    mentorPayload.imageBase64 = payload.imageBase64;
+    mentorPayload.imageMimeType = payload.imageMimeType as MentorImageMimeType;
+    if (payload.imageName) mentorPayload.imageName = payload.imageName;
+  }
 
   const result = await callMentor(
     payload.mode,
@@ -530,12 +543,18 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   const [hintFallback, setHintFallback] = useState<Record<number, boolean>>({});
   const [hintVariant] = useState(() => getHintVariant());
   const userTouchedIntentRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachedImageRef = useRef<MentorImageAttachment | null>(null);
   const isDev = Boolean(import.meta?.env?.DEV);
   const canUseAdvanced = uiPreset === "advanced" && showModes;
   const usingAdvancedMode = canUseAdvanced && showAdvancedModes;
   const resolvedMode: MentorMode = usingAdvancedMode
     ? advancedMode
     : STUDENT_INTENT_TO_MODE[intent];
+  const showSolutionImageUpload =
+    uiPreset === "student" && !usingAdvancedMode && intent === "check_cbse";
+  const [attachedImage, setAttachedImage] = useState<MentorImageAttachment | null>(null);
+  const [imageErrorText, setImageErrorText] = useState<string | null>(null);
 
   const effectivePageContext: PageContext = {
     ...pageContext,
@@ -543,6 +562,33 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     chapter,
   };
   const chaptersForSubject = CHAPTERS_BY_SUBJECT[subject] ?? ["All Chapters"];
+
+  useEffect(() => {
+    attachedImageRef.current = attachedImage;
+  }, [attachedImage]);
+
+  useEffect(
+    () => () => {
+      revokeMentorImagePreview(attachedImageRef.current?.previewUrl);
+    },
+    []
+  );
+
+  const clearAttachedImage = (nextError: string | null = null) => {
+    setAttachedImage((prev) => {
+      if (prev?.previewUrl) revokeMentorImagePreview(prev.previewUrl);
+      return null;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setImageErrorText(nextError);
+  };
+
+  useEffect(() => {
+    if (!showSolutionImageUpload && (attachedImage || imageErrorText)) {
+      clearAttachedImage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSolutionImageUpload]);
 
   useEffect(() => {
     setAdvancedMode(defaultMode);
@@ -561,6 +607,27 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   const resetConversation = () => {
     setMessages([]);
     setPlanPreview(null);
+    clearAttachedImage();
+  };
+
+  const handleImageFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
+    event
+  ) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    setImageErrorText(null);
+    try {
+      const nextImage = await createMentorImageAttachment(file);
+      setAttachedImage((prev) => {
+        if (prev?.previewUrl && prev.previewUrl !== nextImage.previewUrl) {
+          revokeMentorImagePreview(prev.previewUrl);
+        }
+        return nextImage;
+      });
+    } catch (error) {
+      setImageErrorText(getMentorImageErrorMessage(error));
+    }
   };
 
   const handleAssistantReply = (reply: MentorReply, requestMode: MentorMode) => {
@@ -604,16 +671,27 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const sendPrompt = async (prompt: string) => {
-    if (!prompt.trim()) return;
+    const trimmedPrompt = prompt.trim();
+    const imageForRequest = showSolutionImageUpload ? attachedImage : null;
+    if (!trimmedPrompt && !imageForRequest) return;
     const requestMode = resolvedMode;
+    const userPrompt =
+      trimmedPrompt ||
+      (imageForRequest ? CHECK_CBSE_IMAGE_ONLY_PROMPT : "");
     const requestMessage =
       !usingAdvancedMode && intent === "check_cbse"
-        ? `${CHECK_CBSE_PREFIX}\n\n${prompt}`
-        : prompt;
-    const userMsg: MentorMessage = { role: "user", content: prompt, mode: requestMode };
+        ? `${CHECK_CBSE_PREFIX}\n\n${userPrompt}`
+        : userPrompt;
+    const userMsgContent =
+      trimmedPrompt ||
+      (imageForRequest
+        ? "Uploaded a solution photo for CBSE checking."
+        : userPrompt);
+    const userMsg: MentorMessage = { role: "user", content: userMsgContent, mode: requestMode };
     const newHistory = [...messages, userMsg];
     setMessages(newHistory);
     setIsLoading(true);
+    setImageErrorText(null);
     const payload: MentorRequest = {
       mode: requestMode,
       message: requestMessage,
@@ -622,21 +700,37 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
       history: newHistory,
       persona,
     };
+    let nextInlineError: string | null = null;
+    if (imageForRequest) {
+      payload.imageBase64 = imageForRequest.base64;
+      payload.imageMimeType = imageForRequest.mimeType;
+      payload.imageName = imageForRequest.name;
+    }
     try {
       const reply = await callMentorAPI(payload);
       handleAssistantReply(reply, requestMode);
-    } catch {
-      handleAssistantReply({
-        text: "Hmm, something glitched while talking to your mentor. Try again in a few seconds.",
-      }, requestMode);
+    } catch (error) {
+      const inlineError =
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : "";
+      if (imageForRequest && inlineError) {
+        nextInlineError = inlineError;
+        setImageErrorText(inlineError);
+      } else {
+        handleAssistantReply({
+          text: "Hmm, something glitched while talking to your mentor. Try again in a few seconds.",
+        }, requestMode);
+      }
     } finally {
+      if (imageForRequest) clearAttachedImage(nextInlineError);
       setIsLoading(false);
     }
   };
 
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+    if ((!trimmed && !attachedImage) || isLoading) return;
     setInput("");
     await sendPrompt(trimmed);
   };
@@ -918,16 +1012,82 @@ Give me hint level ${targetLevel} only (keep it short).`
           New chat
         </button>
       </div>
-      {!usingAdvancedMode && intent === "check_cbse" && (
+      {showSolutionImageUpload && (
         <div
           style={{
             marginTop: -4,
-            marginBottom: 8,
-            fontSize: 12,
-            color: "#334155",
+            marginBottom: 10,
+            padding: 10,
+            borderRadius: 14,
+            border: "1px solid rgba(148,163,184,0.3)",
+            background: "rgba(248,250,252,0.92)",
           }}
         >
-          Tip: Paste your full working. I'll check it like CBSE and tell where marks may be cut.
+          <div
+            style={{
+              marginBottom: 8,
+              fontSize: 12,
+              color: "#334155",
+            }}
+          >
+            Tip: Paste your full working. I'll check it like CBSE and tell where marks may be cut.
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+            onChange={handleImageFileChange}
+            style={{ display: "none" }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="mentor-panel__mode-chip"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload solution photo
+            </button>
+            <div style={{ fontSize: 12, color: "#475569" }}>
+              {attachedImage ? attachedImage.name : "Accepts JPG or PNG up to 3 MB."}
+            </div>
+            {attachedImage && (
+              <button
+                type="button"
+                className="mentor-panel__mode-chip"
+                onClick={() => clearAttachedImage()}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {attachedImage?.previewUrl && (
+            <div style={{ marginTop: 10 }}>
+              <img
+                src={attachedImage.previewUrl}
+                alt="Solution preview"
+                style={{
+                  maxWidth: 180,
+                  maxHeight: 180,
+                  display: "block",
+                  borderRadius: 12,
+                  border: "1px solid rgba(148,163,184,0.35)",
+                  objectFit: "cover",
+                }}
+              />
+            </div>
+          )}
+          {imageErrorText && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 8,
+                fontSize: 12,
+                color: "#b91c1c",
+              }}
+            >
+              {imageErrorText}
+            </div>
+          )}
         </div>
       )}
 
@@ -1069,7 +1229,7 @@ Give me hint level ${targetLevel} only (keep it short).`
           type="button"
           className="mentor-panel__send-btn"
           onClick={handleSend}
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || (!input.trim() && !attachedImage)}
         >
           {/* Change the button label based on the mode.  In plan mode we update
               the plan; in other modes we simply send the query. */}

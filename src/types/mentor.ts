@@ -41,6 +41,8 @@ export type MentorMode =
   | 'learn_proof'
   | 'learn_mindmap';
 
+export type MentorImageMimeType = 'image/jpeg' | 'image/png';
+
 export type UnknownRecord = Record<string, unknown>;
 
 export const isRecord = (v: unknown): v is UnknownRecord =>

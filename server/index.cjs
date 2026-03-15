@@ -43,6 +43,10 @@ const { buildTrianglesGrindContractPrompt } = require(
 );
 
 const telemetry = require('./telemetry.cjs');
+const {
+  buildGeminiImagePart,
+  validateMentorImagePayload,
+} = require('./mentorImageSupport.cjs');
 const trianglesRubricsData = require(
   path.join(__dirname, '../src/data/bsre/triangles_bsre_rubrics_v1.json')
 );
@@ -4329,6 +4333,9 @@ function normalizeMentorRequest(reqJson) {
     extraNotes: reqJson.extraNotes,
     marks: reqJson.marks,
     questionText: reqJson.questionText || reqJson.question || reqJson.prompt || '',
+    imageBase64: reqJson.imageBase64,
+    imageMimeType: reqJson.imageMimeType,
+    imageName: reqJson.imageName,
   };
 
   return { mode, persona, payload };
@@ -4450,6 +4457,15 @@ async function handleRequest(req, res) {
     }
 
     const { mode, persona, payload } = normalizeMentorRequest(reqJson);
+    const mentorImageCheck = validateMentorImagePayload(payload);
+    const mentorImage =
+      mentorImageCheck && mentorImageCheck.ok ? mentorImageCheck : null;
+    if (!mentorImage && mentorImageCheck.error !== 'NO_IMAGE') {
+      return sendJson(res, 400, {
+        ok: false,
+        error: `Invalid image: ${mentorImageCheck.error}`,
+      });
+    }
     const isMisconceptionExplain = isLearnMisconceptionPayload(payload);
     const isCompetencyExplain = isLearnCompetencyPayload(payload);
     const isTeachTab = isTeachTabPayload(payload);
@@ -4767,11 +4783,18 @@ async function handleRequest(req, res) {
               : 900;
       const responseMimeType = isTeachContract ? 'application/json' : undefined;
 
-      const contents = [
-        { role: 'user', parts: [{ text: `${systemPrompt}
+      const requestParts = [{ text: `${systemPrompt}
 
-${userPrompt}` }] },
-      ];
+${userPrompt}` }];
+      if (mentorImage) {
+        requestParts.push(
+          buildGeminiImagePart({
+            mimeType: mentorImage.mimeType,
+            base64: mentorImage.base64,
+          })
+        );
+      }
+      const contents = [{ role: 'user', parts: requestParts }];
 
       const reply = await callGemini(GEMINI_MODEL, contents, {
         maxOutputTokens,

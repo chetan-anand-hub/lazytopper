@@ -116,6 +116,12 @@ export interface MentorRequest {
   studentState: StudentState;
   /** Chat history to maintain context across turns (optional). */
   history?: MentorMessage[];
+  /** Optional raw base64 image for a one-off mentor request. */
+  imageBase64?: string;
+  /** Optional mime type for an attached mentor image. */
+  imageMimeType?: import("./mentor").MentorImageMimeType;
+  /** Optional display name for an attached mentor image. */
+  imageName?: string;
   /** Optional persona configuration to override defaults on the backend. */
   persona?: MentorPersona;
 }
