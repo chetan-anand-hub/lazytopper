@@ -31,6 +31,7 @@ import { BackLink } from "../components/BackLink";
 // and mode definitions for the unified mentor.  See
 // src/mentors/centralPersona.ts for details.
 import { centralMentorPersona } from "../mentors/centralPersona";
+import type { MentorMode, PageContext } from "../types/MentorRequest";
 
 // Types
 type SubjectOption = "Maths" | "Science";
@@ -41,12 +42,34 @@ interface HPQStats {
   byDifficulty: Record<string, number>;
 }
 
+type AiMentorLocationState = Partial<{
+  mode: string;
+  hpqQuestionId: string;
+  conceptId: string;
+  subject: SubjectOption;
+  topic: string;
+  payload: { topic?: string };
+  from: string;
+  back: string;
+  backLabel: string;
+  grade: number;
+  daysLeft: number;
+  targetPercent: number;
+  mathTargetPercent: number;
+  scienceTargetPercent: number;
+  mathHoursPerDay: number;
+  scienceHoursPerDay: number;
+  gpt_directive: string;
+}>;
+
 // Normalize labels for HPQ lookup
 const normalizeLabel = (s: string): string =>
   s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
 
 // Difficulty % helpers
-const buildDifficultyPercentFromTrends = (mix: any) => ({
+const buildDifficultyPercentFromTrends = (
+  mix: Partial<Record<"Easy" | "Medium" | "Hard", number>> | undefined
+) => ({
   easyPercent: Number(mix?.Easy ?? 0),
   mediumPercent: Number(mix?.Medium ?? 0),
   hardPercent: Number(mix?.Hard ?? 0),
@@ -83,7 +106,7 @@ const AiMentorPage: React.FC = () => {
   // Capture the current URL for back navigation
   const currentURL = useCurrentURL();
   // State passed from other pages (HPQ hub, topic hub, etc.)
-  const state = location.state as any;
+  const state = (location.state ?? {}) as AiMentorLocationState;
 
   /**
    * Determine mode.  If state.mode is provided, use it;
@@ -97,92 +120,6 @@ const AiMentorPage: React.FC = () => {
       ? "explain"
       : undefined);
 
-  /**
-   * Solve/Explain/Coach modes
-   * If mode is set (solve/explain), we render the modal view.
-   * Otherwise we fall back to planner mode.
-   */
-  if (mode) {
-    const pageSubject: "Maths" | "Science" =
-      state.subject ?? subject ?? "Maths";
-    const pageChapter: string | undefined =
-      state.topic ?? state.payload?.topic ?? undefined;
-    const fromPath: string | undefined = state.from;
-    const back: string | undefined = state.back;
-    const backLabel: string =
-      state.backLabel ??
-      (back && back.includes("/highly-probable")
-        ? "Back to HPQ hub"
-        : "Back");
-
-    // The default mode for MentorPanel: use mode or derive from hpqQuestionId.
-    const defaultMode = mode ?? (state.hpqQuestionId ? "solve" : "explain");
-
-    const initialStudentState = {
-      grade: state.grade ?? 10,
-      daysLeft: state.daysLeft,
-      targetScore: state.targetPercent,
-      mathTargetScore: state.mathTargetPercent,
-      scienceTargetScore: state.scienceTargetPercent,
-      mathHoursPerDay: state.mathHoursPerDay,
-      scienceHoursPerDay: state.scienceHoursPerDay,
-    };
-
-    const pageContext = {
-      grade: state.grade ?? 10,
-      subject: pageSubject,
-      chapter: pageChapter,
-    } as const;
-
-    const handleBack = () => {
-      if (back) {
-        navigate(back);
-      } else if (fromPath) {
-        navigate(fromPath);
-      } else {
-        // Safe fallback to home page if nothing is provided
-        navigate("/");
-      }
-    };
-
-    return (
-      <div className="mentor-modal">
-        {/* Top strip for back + context when opened from HPQ / concept */}
-        <div className="mentor-modal-header">
-          <button
-            type="button"
-            className="mentor-back-button"
-            onClick={handleBack}
-          >
-            ← {backLabel || "Back"}
-          </button>
-          <div className="mentor-modal-context">
-            <span>
-              Class {pageContext.grade} • {pageSubject}
-              {pageChapter ? ` • ${pageChapter}` : ""}
-            </span>
-            {state.hpqQuestionId && (
-              <span className="mentor-modal-chip">
-                HPQ #{state.hpqQuestionId}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <MentorPanel
-          pageContext={pageContext}
-          initialStudentState={initialStudentState}
-          defaultMode={defaultMode as any}
-          autoFirstPrompt={state.gpt_directive}
-          showModes
-          uiPreset="advanced"
-          // Forward the unified persona so the backend knows which
-          // system prompts and rules to apply.
-          persona={centralMentorPersona}
-        />
-      </div>
-    );
-  }
 
   /* ------------------------------------------------------------------
    * Planner Mode
@@ -418,6 +355,102 @@ const AiMentorPage: React.FC = () => {
     });
   };
 
+
+  /**
+   * Solve/Explain/Coach modes
+   * If mode is set (solve/explain), we render the modal view.
+   * Otherwise we fall back to planner mode.
+   */
+  if (mode) {
+    const pageSubject: "Maths" | "Science" =
+      state.subject === "Maths" || state.subject === "Science"
+        ? state.subject
+        : subject === "Science"
+        ? "Science"
+        : "Maths";
+    const pageChapter: string | undefined =
+      state.topic ?? state.payload?.topic ?? undefined;
+    const fromPath: string | undefined = state.from;
+    const back: string | undefined = state.back;
+    const backLabel: string =
+      state.backLabel ??
+      (back && back.includes("/highly-probable")
+        ? "Back to HPQ hub"
+        : "Back");
+
+    // The default mode for MentorPanel: use mode or derive from hpqQuestionId.
+    const defaultMode: MentorMode =
+      mode === "solve" || mode === "explain"
+        ? mode
+        : state.hpqQuestionId
+        ? "solve"
+        : "explain";
+
+    const initialStudentState = {
+      grade: state.grade ?? 10,
+      daysLeft: state.daysLeft,
+      targetScore: state.targetPercent,
+      mathTargetScore: state.mathTargetPercent,
+      scienceTargetScore: state.scienceTargetPercent,
+      mathHoursPerDay: state.mathHoursPerDay,
+      scienceHoursPerDay: state.scienceHoursPerDay,
+    };
+
+    const pageContext: PageContext = {
+      grade: "Class 10",
+      subject: pageSubject,
+      chapter: pageChapter,
+    };
+
+    const handleBack = () => {
+      if (back) {
+        navigate(back);
+      } else if (fromPath) {
+        navigate(fromPath);
+      } else {
+        // Safe fallback to home page if nothing is provided
+        navigate("/");
+      }
+    };
+
+    return (
+      <div className="mentor-modal">
+        {/* Top strip for back + context when opened from HPQ / concept */}
+        <div className="mentor-modal-header">
+          <button
+            type="button"
+            className="mentor-back-button"
+            onClick={handleBack}
+          >
+            {"<-"} {backLabel || "Back"}
+          </button>
+          <div className="mentor-modal-context">
+            <span>
+              Class {pageContext.grade} - {pageSubject}
+              {pageChapter ? ` - ${pageChapter}` : ""}
+            </span>
+            {state.hpqQuestionId && (
+              <span className="mentor-modal-chip">
+                HPQ #{state.hpqQuestionId}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <MentorPanel
+          pageContext={pageContext}
+          initialStudentState={initialStudentState}
+          defaultMode={defaultMode}
+          autoFirstPrompt={state.gpt_directive}
+          showModes
+          uiPreset="advanced"
+          // Forward the unified persona so the backend knows which
+          // system prompts and rules to apply.
+          persona={centralMentorPersona}
+        />
+      </div>
+    );
+  }
   return (
     <div className="mentor-page">
       {/* NEW: BackLink replaces the manual Home button.
@@ -427,11 +460,11 @@ const AiMentorPage: React.FC = () => {
         defaultTo={`/trends/${grade}/${subject}`}
         className="mentor-back-button"
       >
-        ← Home
+        {"<-"} Home
       </BackLink>
 
       <div className="ai-mentor-header">
-        <h1>AI Mentor – Smart Study Planner</h1>
+        <h1>AI Mentor - Smart Study Planner</h1>
         <p className="ai-mentor-tagline">
           Planner mode only. Enter <strong>targets</strong>,{" "}
           <strong>days left</strong>, <strong>hours/day</strong>. Mentor
@@ -548,7 +581,7 @@ const AiMentorPage: React.FC = () => {
               setSelectedMathTopicKey(e.target.value as Class10TopicKey)
             }
           >
-            <option value="">— Select a Maths chapter —</option>
+            <option value="">- Select a Maths chapter -</option>
             {mathTopicOptions.map((entry) => (
               <option key={entry.topicKey} value={entry.topicKey}>
                 {entry.topicKey} ({entry.weightagePercent}%)
@@ -561,7 +594,7 @@ const AiMentorPage: React.FC = () => {
             value={selectedScienceTopicName}
             onChange={(e) => setSelectedScienceTopicName(e.target.value)}
           >
-            <option value="">— Select a Science chapter —</option>
+            <option value="">- Select a Science chapter -</option>
             {scienceTopicOptions.map((entry) => (
               <option key={entry.topicKey} value={entry.topicName}>
                 {entry.topicName} ({entry.weightagePercent}%)
@@ -640,7 +673,7 @@ const AiMentorPage: React.FC = () => {
                       currentTrend.tier ?? "good-to-do"
                     }`}
                   >
-                    {currentTrend.tier ?? "—"}
+                    {currentTrend.tier ?? "-"}
                   </span>
                 </div>
 
