@@ -32,8 +32,7 @@ import {
   type PracticeSectionFilter,
 } from "../navigation/practiceNavigation";
 import {
-  getQuestionIdsForLo,
-  getQuestionIdsForQType,
+  getFocusIdsForTile,
   getStrategyPackForTopic,
   resolveCanonicalTopicForStrategy,
 } from "../services/questionTypeFirstResolver";
@@ -848,6 +847,14 @@ export default function TopicHub() {
     if (!QTYPE_FIRST_TRIG || strategyCanonicalTopicKey !== "trigonometry") return null;
     return getStrategyPackForTopic(topicKey);
   }, [strategyCanonicalTopicKey, topicKey]);
+  const tileFocusIdMap = useMemo(() => {
+    if (!strategyPack?.tiles?.length) return {} as Record<string, string[]>;
+    const map: Record<string, string[]> = {};
+    for (const tile of strategyPack.tiles) {
+      map[tile.qtypeId] = getFocusIdsForTile(topicKey, tile);
+    }
+    return map;
+  }, [strategyPack, topicKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1928,13 +1935,7 @@ const showInZombie = (sectionId: string) => {
 
   const openPracticeFromQTypeTile = useCallback(
     (tile: QuestionTypeTile) => {
-      const primaryIds = getQuestionIdsForQType(tile.qtypeId);
-      const loFallbackIds = Array.from(
-        new Set(
-          (tile.loIds || []).flatMap((loId) => getQuestionIdsForLo(loId))
-        )
-      );
-      const focusBankIds = primaryIds.length > 0 ? primaryIds : loFallbackIds;
+      const focusBankIds = tileFocusIdMap[tile.qtypeId] || getFocusIdsForTile(topicKey, tile);
       const backTab = activeTab;
 
       trackUxEvent("topichub_open_practice", "topichub", {
@@ -1960,7 +1961,7 @@ const showInZombie = (sectionId: string) => {
         source: "qtype_first_tiles",
       });
     },
-    [activeTab, grade, navigate, subject, subjectTitle, title, topicKey]
+    [activeTab, grade, navigate, subject, subjectTitle, tileFocusIdMap, title, topicKey]
   );
 
   const onTutorNodeProgress = useCallback(
@@ -2223,6 +2224,8 @@ const showInZombie = (sectionId: string) => {
               </div>
               <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                 {strategyPack.tiles.map((tile) => {
+                  const tileFocusIds = tileFocusIdMap[tile.qtypeId] || [];
+                  const tileCountLabel = `(${tileFocusIds.length} questions)`;
                   const marksLabel =
                     Array.isArray(tile.typicalMarks) && tile.typicalMarks.length > 0
                       ? ` • ${tile.typicalMarks.join("/") }m`
@@ -2259,6 +2262,9 @@ const showInZombie = (sectionId: string) => {
                       <div style={{ marginTop: 4, fontSize: 11, opacity: 0.8 }}>
                         {tile.skillFamily}
                         {marksLabel}
+                      </div>
+                      <div style={{ marginTop: 3, fontSize: 11, opacity: 0.72 }}>
+                        {tileCountLabel}
                       </div>
                     </button>
                   );
