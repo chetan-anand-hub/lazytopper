@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { RequireAuth } from "../components/auth/RequireAuth";
+import { getTopicContent } from "../data/class10ContentConfig";
 import { getCanonicalChapters, toCanonicalSubjectId } from "../data/syllabus/cbse10Canonical";
 import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
 import { topicHubV2Content } from "../data/topicHubV2Full";
@@ -222,6 +223,11 @@ function TopicHubHomeContent() {
     () => topicOptions.find((item) => item.key === selectedTopicKey) || null,
     [selectedTopicKey, topicOptions]
   );
+  const selectedTopicContent = useMemo(
+    () => getTopicContent(subject, selectedTopicKey || selectedTopic?.key || ""),
+    [selectedTopic?.key, selectedTopicKey, subject]
+  );
+  const isTrianglesSelected = selectedTopicKey === "triangles";
 
   const maxBoardWeightageForSubject = useMemo(() => {
     const runtimeKeys = Object.keys(topicHubV2Content || {});
@@ -565,6 +571,94 @@ function TopicHubHomeContent() {
             </div>
             <div style={{ fontSize: 13, opacity: 0.82, marginTop: 6 }}>{masteryHint}</div>
           </div>
+
+          {isTrianglesSelected ? (
+            <div
+              style={{
+                marginTop: 14,
+                borderRadius: 18,
+                border: "1px solid rgba(15,23,42,0.12)",
+                background:
+                  "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.94) 52%, rgba(254,249,195,0.42) 100%)",
+                padding: 14,
+              }}
+              data-testid="triangles-topic-preview"
+            >
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(15,23,42,0.18)",
+                    background: "rgba(255,255,255,0.9)",
+                  }}
+                >
+                  Start here
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(15,23,42,0.18)",
+                    background: "rgba(255,255,255,0.9)",
+                  }}
+                >
+                  ~{selectedTopicContent.weightagePercent}% boards signal
+                </span>
+              </div>
+              <div style={{ marginTop: 10, fontWeight: 900, fontSize: 18 }}>
+                Triangles runway
+              </div>
+              <div style={{ marginTop: 6, opacity: 0.86, lineHeight: 1.55 }}>
+                {selectedTopicContent.heroTagline}
+              </div>
+              <div style={{ marginTop: 10, fontSize: 13, opacity: 0.82, lineHeight: 1.55 }}>
+                First move: similarity basics {"->"} BPT {"->"} one clean proof. Strong students can jump to Grind or HPQ once theorem naming feels stable.
+              </div>
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="lt-pill"
+                  style={{ padding: "9px 12px" }}
+                  onClick={() =>
+                    navigate(
+                      `/topic-hub/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}/triangles?tab=learn&teach=1`
+                    )
+                  }
+                >
+                  Start with tutor
+                </button>
+                <button
+                  type="button"
+                  className="lt-pill"
+                  style={{ padding: "9px 12px" }}
+                  onClick={() =>
+                    navigate(
+                      `/topic-hub/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}/triangles?tab=grind`
+                    )
+                  }
+                >
+                  Boards fast lane
+                </button>
+                <button
+                  type="button"
+                  className="lt-pill"
+                  style={{ padding: "9px 12px" }}
+                  onClick={() =>
+                    navigate(
+                      `/highly-probable/${encodeURIComponent(grade)}/${encodeURIComponent(subject)}?topic=${encodeURIComponent("Triangles")}`
+                    )
+                  }
+                >
+                  Open HPQ
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button

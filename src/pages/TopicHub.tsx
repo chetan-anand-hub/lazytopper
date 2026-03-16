@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { getTopicContent } from "../data/class10ContentConfig";
 import { getCanonicalChapters, toCanonicalSubjectId } from "../data/syllabus/cbse10Canonical";
 import { isSupplementalTopicKey } from "../data/syllabus/topicAliasMap";
 import { getTopicV2Content, normalizeTopicKey, resolveRuntimeTopicKey } from "../utils/topicHubV2Store";
@@ -59,6 +60,7 @@ import {
   markMentorServerUnavailable,
 } from "../services/mentorServerGate";
 import { trackUxEvent } from "../services/uxTelemetry";
+import { getChapterTutorPath } from "../utils/getChapterTutorPath";
 
 const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
 const QTYPE_FIRST_TRIG = import.meta.env.VITE_QTYPE_FIRST_TRIGONOMETRY === "true";
@@ -1963,6 +1965,65 @@ const showInZombie = (sectionId: string) => {
     },
     [activeTab, grade, navigate, subject, subjectTitle, tileFocusIdMap, title, topicKey]
   );
+  const runtimeTopicConfig = useMemo(
+    () => getTopicContent(subjectTitle, topicKey),
+    [subjectTitle, topicKey]
+  );
+  const chapterTutorPath = useMemo(() => getChapterTutorPath(topicKey), [topicKey]);
+  const trianglesRuntimeStrip = useMemo(() => {
+    if (!isTrianglesTopic) return null;
+
+    const path = chapterTutorPath?.canonicalTopicKey === "triangles" ? chapterTutorPath : null;
+    const startStep = path?.studentJourney.find((step) => step.stepType === "start") || null;
+    const practiceStep = path?.studentJourney.find((step) => step.stepType === "practice") || null;
+    const hpqStep = path?.studentJourney.find((step) => step.stepType === "hpq") || null;
+    const nextStep = path?.studentJourney.find((step) => step.stepType === "next-step") || null;
+
+    return {
+      status: path?.status || "partial",
+      stageLabels: [
+        "Start with similarity",
+        "Lock theorem names",
+        "Do one board proof",
+        "Practise BPT + ratio order",
+        "Sprint to HPQ",
+      ],
+      chapterPromise:
+        runtimeTopicConfig.heroTagline ||
+        "Similarity + BPT + proof writing should feel like one guided runway, not random geometry.",
+      weakPath:
+        startStep?.recommendedCTA ||
+        "Start with similarity basics, then move to BPT after the first guided explanation.",
+      boardPayoff:
+        runtimeTopicConfig.boardExamplesSummary ||
+        practiceStep?.recommendedCTA ||
+        "Board payoff comes from one clean proof, one BPT question, and one ratio/area application.",
+      fastPath:
+        hpqStep?.recommendedCTA ||
+        nextStep?.recommendedCTA ||
+        "If similarity feels stable, jump to exam grind, HPQ, and a timed proof set.",
+      firstTutorNodeId: guidedOrder[0] || "gQ1",
+      proofTutorNodeId: mapProofFocusToNodeId("similarity"),
+      checkpointNodeId: "gBPT",
+      proofGrindNodeId: guidedToGrindNodeId.gAA || guidedToGrindNodeId.gBPT || "S2",
+      boardWriteMentorPrompt:
+        "I am stuck in Triangles. Check my theorem choice, correspondence order, and conclusion line in CBSE board style. Keep it stepwise and marks-friendly.",
+      mentorTitle: "Triangles • Check my proof",
+      sourceNote:
+        path?.qtfSupport?.status === "none"
+          ? "Practice is coming from the live prediction/HPQ runtime, not a separate Triangles QTF pack."
+          : "",
+    };
+  }, [
+    chapterTutorPath,
+    guidedOrder,
+    guidedToGrindNodeId.gAA,
+    guidedToGrindNodeId.gBPT,
+    isTrianglesTopic,
+    mapProofFocusToNodeId,
+    runtimeTopicConfig.boardExamplesSummary,
+    runtimeTopicConfig.heroTagline,
+  ]);
 
   const onTutorNodeProgress = useCallback(
     (progress: TutorNodeProgress) => {
@@ -2274,6 +2335,298 @@ const showInZombie = (sectionId: string) => {
             </section>
           ) : null}
 
+          {trianglesRuntimeStrip ? (
+            <section
+              data-testid="triangles-runtime-runway"
+              style={{
+                borderRadius: 20,
+                padding: "14px 14px",
+                background:
+                  "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.94) 46%, rgba(254,249,195,0.42) 100%)",
+                border: "1px solid rgba(15,23,42,0.12)",
+                boxShadow: "0 12px 28px rgba(15,23,42,0.08)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ maxWidth: 760 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,255,255,0.92)",
+                        border: "1px solid rgba(15,23,42,0.16)",
+                      }}
+                    >
+                      Start here
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,255,255,0.92)",
+                        border: "1px solid rgba(15,23,42,0.16)",
+                      }}
+                    >
+                      Runtime ready
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,255,255,0.92)",
+                        border: "1px solid rgba(15,23,42,0.16)",
+                      }}
+                    >
+                      ~{runtimeTopicConfig.weightagePercent}% boards signal
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 10, fontWeight: 950, fontSize: 22, letterSpacing: -0.2 }}>
+                    Triangles, taught like a tutor
+                  </div>
+                  <div style={{ marginTop: 8, opacity: 0.88, lineHeight: 1.6 }}>
+                    {trianglesRuntimeStrip.chapterPromise}
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 13, opacity: 0.78, lineHeight: 1.55 }}>
+                    Clear order for weak students: learn similarity, lock theorem names, then do one proof before broader practice. Strong students can jump faster into Grind, HPQ, and exam-day revision once the theorem choice feels stable.
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    minWidth: 220,
+                    flex: "1 1 240px",
+                    borderRadius: 16,
+                    padding: "12px 12px",
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "rgba(255,255,255,0.78)",
+                  }}
+                >
+                  <div style={{ fontWeight: 900, fontSize: 13 }}>Board payoff</div>
+                  <div style={{ marginTop: 8, fontSize: 13, opacity: 0.85, lineHeight: 1.55 }}>
+                    1 mark: identify criterion or theorem.
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 13, opacity: 0.85, lineHeight: 1.55 }}>
+                    2-3 marks: prove similarity / use BPT with correct ratio order.
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 13, opacity: 0.85, lineHeight: 1.55 }}>
+                    3-5 marks: complete proof writing with Given {"->"} To Prove {"->"} Therefore/Hence.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {trianglesRuntimeStrip.stageLabels.map((label) => (
+                  <span
+                    key={label}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      padding: "5px 9px",
+                      borderRadius: 999,
+                      background: "rgba(255,255,255,0.92)",
+                      border: "1px solid rgba(15,23,42,0.14)",
+                    }}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 14,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    borderRadius: 16,
+                    padding: "12px 12px",
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "rgba(255,255,255,0.84)",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>Weak-student path</div>
+                  <div style={{ marginTop: 6, fontWeight: 900 }}>Start with similarity, then BPT</div>
+                  <div style={{ marginTop: 6, fontSize: 13, opacity: 0.82, lineHeight: 1.55 }}>
+                    {trianglesRuntimeStrip.weakPath}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() => {
+                        setActiveTab("learn");
+                        openTutorDrawer({ tab: "teach", nodeId: trianglesRuntimeStrip.firstTutorNodeId });
+                      }}
+                    >
+                      Start with tutor
+                    </button>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() =>
+                        openPracticeFromTopicHub({
+                          tab: "learn",
+                          nodeId: trianglesRuntimeStrip.checkpointNodeId,
+                          subtopicHint: "triangles-bpt-checkpoint",
+                          sectionFilter: "B",
+                        })
+                      }
+                    >
+                      First checkpoint
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 16,
+                    padding: "12px 12px",
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "rgba(255,255,255,0.84)",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>Boards lane</div>
+                  <div style={{ marginTop: 6, fontWeight: 900 }}>Proof writing + board practice</div>
+                  <div style={{ marginTop: 6, fontSize: 13, opacity: 0.82, lineHeight: 1.55 }}>
+                    {trianglesRuntimeStrip.boardPayoff}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() => {
+                        setActiveTab("grind");
+                        openGrindDrawer({ nodeId: trianglesRuntimeStrip.proofGrindNodeId });
+                      }}
+                    >
+                      Open exam grind
+                    </button>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() =>
+                        openPracticeFromTopicHub({
+                          tab: "grind",
+                          grindNodeId: trianglesRuntimeStrip.proofGrindNodeId,
+                          subtopicHint: "triangles-proof-practice",
+                          sectionFilter: "C",
+                        })
+                      }
+                    >
+                      Practice one proof
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 16,
+                    padding: "12px 12px",
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "rgba(255,255,255,0.84)",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>Advanced fast lane</div>
+                  <div style={{ marginTop: 6, fontWeight: 900 }}>Jump to high-value revision</div>
+                  <div style={{ marginTop: 6, fontSize: 13, opacity: 0.82, lineHeight: 1.55 }}>
+                    {trianglesRuntimeStrip.fastPath}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() =>
+                        navigate(
+                          `/highly-probable/${encodeURIComponent(grade)}/${encodeURIComponent(subjectTitle)}?topic=${encodeURIComponent(title)}`
+                        )
+                      }
+                    >
+                      Open HPQ
+                    </button>
+                    <button
+                      type="button"
+                      className="lt-pill"
+                      onClick={() => {
+                        setActiveTab("resources");
+                        const examDayPackEl = document.getElementById("resources-exam-day-pack");
+                        if (examDayPackEl) examDayPackEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                    >
+                      Exam-day pack
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 12,
+                  borderRadius: 16,
+                  padding: "12px 12px",
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  background: "rgba(255,255,255,0.8)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 900 }}>Stuck on theorem choice or proof writing?</div>
+                  <div style={{ marginTop: 4, fontSize: 13, opacity: 0.82, lineHeight: 1.55 }}>
+                    Open Tutor for concept repair, or ask Mentor to check your proof in CBSE-style steps.
+                  </div>
+                  {trianglesRuntimeStrip.sourceNote ? (
+                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.72 }}>
+                      {trianglesRuntimeStrip.sourceNote}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="lt-pill"
+                    onClick={() => {
+                      setActiveTab("learn");
+                      openTutorDrawer({ tab: "examples", nodeId: trianglesRuntimeStrip.proofTutorNodeId });
+                    }}
+                  >
+                    Board example
+                  </button>
+                  <button
+                    type="button"
+                    className="lt-pill"
+                    onClick={() =>
+                      openMentorDrawer({
+                        title: trianglesRuntimeStrip.mentorTitle,
+                        question: trianglesRuntimeStrip.boardWriteMentorPrompt,
+                        solveStyle: "board",
+                        requestedMode: "board_steps",
+                        section: "C",
+                        anchor: "triangles:runtime:proof-check",
+                        contextText: "Triangles board proof help from the chapter runway.",
+                      })
+                    }
+                  >
+                    Check my proof
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           {isLearn ? (
             <div
               style={{
@@ -2290,9 +2643,13 @@ const showInZombie = (sectionId: string) => {
               }}
             >
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16 }}>Let me teach you</div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>
+                  {isTrianglesTopic ? "Start here: Similarity -> BPT -> one proof" : "Let me teach you"}
+                </div>
                 <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  Start from basics and move step-by-step with the guided learning path.
+                  {isTrianglesTopic
+                    ? "Weak-student path: learn theorem choice first, then do one guided checkpoint before broad practice."
+                    : "Start from basics and move step-by-step with the guided learning path."}
                 </div>
                 <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>
                   Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
@@ -2303,19 +2660,33 @@ const showInZombie = (sectionId: string) => {
                 <button
                   type="button"
                   className="lt-pill"
-                  onClick={() => openTutorDrawer({ tab: "teach" })}
+                  onClick={() =>
+                    openTutorDrawer({
+                      tab: "teach",
+                      nodeId: isTrianglesTopic && trianglesRuntimeStrip
+                        ? trianglesRuntimeStrip.firstTutorNodeId
+                        : undefined,
+                    })
+                  }
                 >
-                  Teach this topic
+                  {isTrianglesTopic ? "Teach similarity first" : "Teach this topic"}
                 </button>
                 <button
                   type="button"
                   className="lt-pill"
                   onClick={() => {
                     setActiveTab("grind");
-                    if (hasGrindContractFlow) openGrindDrawer();
+                    if (hasGrindContractFlow) {
+                      openGrindDrawer({
+                        nodeId:
+                          isTrianglesTopic && trianglesRuntimeStrip
+                            ? trianglesRuntimeStrip.proofGrindNodeId
+                            : undefined,
+                      });
+                    }
                   }}
                 >
-                  Practice via Grind
+                  {isTrianglesTopic ? "Open proof grind" : "Practice via Grind"}
                 </button>
               </div>
             </div>
@@ -6992,5 +7363,3 @@ function GrindDrawerV1(props: {
     </div>
   );
 }
-
-

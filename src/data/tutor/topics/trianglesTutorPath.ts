@@ -4,7 +4,7 @@ export const trianglesTutorPath: ChapterTutorPath = {
   topicKey: "triangles",
   canonicalTopicKey: "triangles",
   subject: "Maths",
-  status: "partial",
+  status: "deep",
   studentJourney: [
     {
       id: "tri-start",
@@ -141,6 +141,28 @@ export const trianglesTutorPath: ChapterTutorPath = {
       cognitiveLoadNote: "Keep practice grouped by proof family or theorem family instead of broad random sets.",
     },
     {
+      id: "tri-hpq-sprint",
+      title: "Use HPQ as the fast exam-readiness sprint",
+      studentGoal: "Give stronger students a direct high-value path after the chapter spine is stable.",
+      stepType: "hpq",
+      sourceRefs: [
+        {
+          kind: "stringSearch",
+          path: "src/data/highlyProbableQuestions.ts",
+          value: 'topic: "Triangles"',
+          label: "Triangles HPQ bucket",
+        },
+        {
+          kind: "file",
+          path: "src/pages/HighlyProbableQuestions.tsx",
+          label: "HPQ student-facing surface",
+        },
+      ],
+      recommendedCTA: "After one clean proof + one BPT question, jump to HPQ for fast board payoff and confidence checks.",
+      expectedStudentOutcome: "Strong students get efficient exam-relevant repetition without feeling trapped in beginner flow.",
+      cognitiveLoadNote: "Keep HPQ as an intentional fast lane, not the first chapter step for anxious learners.",
+    },
+    {
       id: "tri-mentor-support",
       title: "Lean on the chapter-specific mentor stack when proof friction appears",
       studentGoal: "Use the strongest existing tutor assets in the repo without rewriting the chapter system.",
@@ -201,7 +223,7 @@ export const trianglesTutorPath: ChapterTutorPath = {
     topicHubV2: "authoritative",
     topicHubEnrichment: "authoritative",
     predictedQuestions: "authoritative",
-    highlyProbableQuestions: "supporting",
+    highlyProbableQuestions: "authoritative",
     qtfOverlay: "not-yet-available",
     canonicalQuestionBank: "not-yet-available",
     mentorAssets: "authoritative",
@@ -222,7 +244,7 @@ export const trianglesTutorPath: ChapterTutorPath = {
     "chapter-assets-live-across-topic-hub-mentor-bsre-and-final-json-paths",
   ],
   nextExpansionNotes: [
-    "Triangles is the best next chapter for QTF expansion because the teaching assets already exist.",
+    "Triangles is now a deep runtime chapter even without QTF; the next lift should be overlay + focused bank depth.",
     "Any expansion must respect scopePolicy before copying Pythagoras or area-ratio content into assessed-core flows.",
     "Keep mentor assets referenced, not duplicated, until the chapter gets its own overlay and pack.",
   ],
