@@ -1,13 +1,21 @@
-import { bodyText, isVisible, makeJourneyCheck, openAuthenticatedPath } from "../browser_journey_lib.mjs";
+import {
+  bodyText,
+  captureJourneyScreenshot,
+  collectSurfaceSignals,
+  isVisible,
+  makeJourneyCheck,
+  openAuthenticatedPath,
+} from "../browser_journey_lib.mjs";
 
 export const journey = {
   id: "topichub_guided_entry_journey",
   area: "topichub",
   title: "TopicHub guided entry journey",
-  async run({ browser }) {
+  async run({ browser, scenario = {}, taskId = "" }) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const startUrl = await openAuthenticatedPath(page, "/topic-hub/10/Maths/trigonometry?tab=learn");
+    const startPath = scenario.startingPath || "/topic-hub/10/Maths/trigonometry?tab=learn";
+    const startUrl = await openAuthenticatedPath(page, startPath);
     const checks = [];
 
     try {
@@ -43,6 +51,7 @@ export const journey = {
         )
       );
       const text = await bodyText(page);
+      const signals = await collectSurfaceSignals(page);
       checks.push(
         makeJourneyCheck(
           "recommended_order_copy_visible",
@@ -54,17 +63,45 @@ export const journey = {
       checks.push(
         makeJourneyCheck(
           "entry_surface_not_chaotic",
-          text.includes("Study flow") && text.includes("Mastery"),
-          "A first-time chapter entry should surface a clear flow and progress cues before deep branching.",
+          !signals.looksCluttered &&
+            signals.primaryCtaCount <= Number(scenario.expectations?.maxPrimaryCtas || 9),
+          `Above-fold CTA count should stay manageable. Count=${signals.primaryCtaCount}.`,
           "P2"
         )
       );
+      checks.push(
+        makeJourneyCheck(
+          "guided_start_signal_visible",
+          !scenario.expectations?.requiresGuidedCue || signals.guidedCueVisible,
+          "The chapter entry should expose a guided or recommended start signal.",
+          "P1"
+        )
+      );
+      checks.push(
+        makeJourneyCheck(
+          "advanced_depth_cues_visible",
+          !scenario.expectations?.requiresDepthCue ||
+            /board question types in this chapter|mastery|practice timed questions/i.test(text),
+          "High-agency students should still see meaningful depth or mastery cues on the chapter surface.",
+          "P1"
+        )
+      );
+      const screenshotPath = await captureJourneyScreenshot(page, {
+        taskId,
+        journeyId: "topichub_guided_entry_journey",
+        scenarioId: scenario.scenarioId,
+        label: "entry",
+      }).catch(() => "");
       return {
         startUrl,
         checks,
+        artifacts: screenshotPath ? [{ type: "screenshot", path: screenshotPath }] : [],
         meta: {
           finalUrl: page.url(),
-          bodySnippet: (await bodyText(page)).slice(0, 800),
+          keyVisibleCtas: signals.keyVisibleCtas,
+          primaryCtaCount: signals.primaryCtaCount,
+          guidedCueVisible: signals.guidedCueVisible,
+          bodySnippet: signals.bodySnippet,
         },
       };
     } finally {

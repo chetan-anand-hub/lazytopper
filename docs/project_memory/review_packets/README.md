@@ -1,10 +1,19 @@
 # Codex Review Packet Standard
 
-Every substantial Codex task should add a packet under this folder using:
-`<timestamp>_<task>.md`
+Every substantial Codex task should now prefer a task-scoped packet and evidence bundle using:
+`<task-id>_review.md` and `<task-id>_review.json`
 
-Required sections:
+Task-scoped evidence bundle:
+- `docs/project_memory/test_runs/<task-id>/manifest.json`
+- `docs/project_memory/test_runs/<task-id>/...task-scoped proof artifacts...`
+- `docs/project_memory/review_packets/<task-id>_review.md`
+- `docs/project_memory/review_packets/<task-id>_review.json`
+- `.project_memory/ops/out/<task-id>/...machine-readable reports...`
+
+Required review packet sections:
+- `## Task id`
 - `## Reviewer entry point`
+- `## Evidence bundle`
 - `## Task summary`
 - `## Changed files`
 - `## Tests run`
@@ -16,21 +25,35 @@ Required sections:
 
 Purpose:
 - give reviewers one deterministic entry point
-- tie code changes to proof artifacts
+- bind claims to one exact task-scoped evidence bundle
 - capture assumptions and residual risks before lane-wise commit/push
 
-Validation:
+Validation layers:
 - Structural validation checks the required headings exist.
-- Semantic validation checks the packet is useful: real changed files, real tests, aligned pass/fail, meaningful risks, and actionable reviewer steps.
+- Semantic validation checks the packet is genuinely useful and truthful. It must align with the task manifest, changed files, executed tests, manual QA file, and proof artifacts.
+
+Manifest-driven approval:
+- `manifest.json` is the primary evidence contract for V3 review.
+- Gatekeeper should prefer task-scoped evidence whenever `--task-id` is provided.
+- Latest-artifact fallback remains only for older tasks and should be treated as weaker evidence.
 
 When browser journeys are required:
 - TopicHub, Practice, Mentor, and tutor-path changes should carry browser journey proof.
 - Quality-gate or review-workflow changes should include browser journey proof plus semantic packet validation.
+- Browser journey coverage now supports scenario/state variants such as new student, weak student, revision-mode student, returning student, and advanced/high-agency student.
+
+Advanced student persona:
+- `advanced_value_seeking_student` exists to ensure LazyTopper still delivers depth, sharp reasoning, and efficient navigation for strong students.
+- Approval packets should mention this persona when the task affects chapter depth, routing to high-value practice, or board-readiness surfaces.
 
 What reviewers can trust more strongly:
-- browser journey JSON reports for real student/tutor surfaces
-- semantic packet validation for approval-packet completeness
+- task-scoped manifest + packet linkage
+- browser journey JSON reports with scenario-aware evidence
+- browser persona reports for student/tutor variation
+- evidence-linked semantic packet validation for approval-packet truthfulness
 
 What remains manual:
-- visual polish and nuanced pedagogy judgment beyond the deterministic checks
-- edge-case content quality that depends on human curriculum review
+- nuanced visual polish and layout quality
+- subtle pedagogy/curriculum judgment beyond deterministic signals
+- whether the chosen chapter sequencing feels optimal for real students at scale
+- long-tail browser/device combinations not covered by the current high-value journey set

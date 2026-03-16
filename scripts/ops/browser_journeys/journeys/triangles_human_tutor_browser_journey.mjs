@@ -1,13 +1,20 @@
-import { bodyText, isVisible, makeJourneyCheck, openAuthenticatedPath } from "../browser_journey_lib.mjs";
+import {
+  bodyText,
+  captureJourneyScreenshot,
+  collectSurfaceSignals,
+  isVisible,
+  makeJourneyCheck,
+  openAuthenticatedPath,
+} from "../browser_journey_lib.mjs";
 
 export const journey = {
   id: "triangles_human_tutor_browser_journey",
   area: "topichub",
   title: "Triangles human tutor browser journey",
-  async run({ browser }) {
+  async run({ browser, scenario = {}, taskId = "" }) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const startUrl = await openAuthenticatedPath(page, "/topic-hub/10/Maths/triangles?tab=learn");
+    const startUrl = await openAuthenticatedPath(page, scenario.startingPath || "/topic-hub/10/Maths/triangles?tab=learn");
     const checks = [];
 
     try {
@@ -44,6 +51,7 @@ export const journey = {
         )
       );
       const text = await bodyText(page);
+      const signals = await collectSurfaceSignals(page);
       checks.push(
         makeJourneyCheck(
           "partial_maturity_is_honest",
@@ -52,11 +60,38 @@ export const journey = {
           "P2"
         )
       );
+      checks.push(
+        makeJourneyCheck(
+          "guided_start_signal_visible",
+          !scenario.expectations?.requiresGuidedCue || signals.guidedCueVisible,
+          "Triangles should still expose a guided start signal even as a partial chapter.",
+          "P1"
+        )
+      );
+      checks.push(
+        makeJourneyCheck(
+          "advanced_depth_signal_visible",
+          !scenario.expectations?.requiresDepthCue ||
+            /proof writing|mentor|practice|mastery/i.test(text),
+          "Advanced students should still see enough depth and progression cues in Triangles.",
+          "P1"
+        )
+      );
+      const screenshotPath = await captureJourneyScreenshot(page, {
+        taskId,
+        journeyId: "triangles_human_tutor_browser_journey",
+        scenarioId: scenario.scenarioId,
+        label: "triangles",
+      }).catch(() => "");
       return {
         startUrl,
         checks,
+        artifacts: screenshotPath ? [{ type: "screenshot", path: screenshotPath }] : [],
         meta: {
           finalUrl: page.url(),
+          keyVisibleCtas: signals.keyVisibleCtas,
+          primaryCtaCount: signals.primaryCtaCount,
+          guidedCueVisible: signals.guidedCueVisible,
           bodySnippet: text.slice(0, 800),
         },
       };

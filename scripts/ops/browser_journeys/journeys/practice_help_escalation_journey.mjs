@@ -1,13 +1,21 @@
-import { bodyText, isVisible, makeJourneyCheck, openAuthenticatedPath } from "../browser_journey_lib.mjs";
+import {
+  bodyText,
+  captureJourneyScreenshot,
+  collectSurfaceSignals,
+  isVisible,
+  makeJourneyCheck,
+  openAuthenticatedPath,
+} from "../browser_journey_lib.mjs";
 
 export const journey = {
   id: "practice_help_escalation_journey",
   area: "practice",
   title: "Practice help escalation journey",
-  async run({ browser }) {
+  async run({ browser, scenario = {}, taskId = "" }) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const startUrl = await openAuthenticatedPath(page, "/practice/10/Maths?topic=trigonometry&count=5&journeyMentor=auto");
+    const startPath = scenario.startingPath || "/practice/10/Maths?topic=trigonometry&count=5";
+    const startUrl = await openAuthenticatedPath(page, startPath);
     const checks = [];
 
     try {
@@ -28,7 +36,7 @@ export const journey = {
           "P1"
         )
       );
-      const mentorButton = firstQuestion.getByTestId("practice-mentor-cta").first();
+      const mentorButton = firstQuestion.getByRole("button", { name: /ask mentor about this question/i }).first();
       checks.push(
         makeJourneyCheck(
           "mentor_escalation_cta_visible",
@@ -37,14 +45,20 @@ export const journey = {
           "P1"
         )
       );
+      if (await isVisible(mentorButton, 8000)) {
+        await mentorButton.scrollIntoViewIfNeeded().catch(() => {});
+        await mentorButton.click().catch(() => {});
+      }
+      const mentorDrawer = page.getByTestId("practice-mentor-drawer");
       checks.push(
         makeJourneyCheck(
           "mentor_drawer_reachable",
-          await isVisible(page.getByTestId("practice-mentor-drawer"), 12000),
+          await isVisible(mentorDrawer, 12000),
           "The mentor drawer should open from practice without leaving the question context.",
           "P0"
         )
       );
+      const signals = await collectSurfaceSignals(page);
       checks.push(
         makeJourneyCheck(
           "handholding_preserved",
@@ -55,12 +69,39 @@ export const journey = {
           "P1"
         )
       );
+      checks.push(
+        makeJourneyCheck(
+          "help_reachable_within_two_interactions",
+          !scenario.expectations?.helpReachableWithinClicks || (await isVisible(mentorDrawer, 12000)),
+          "Help should be reachable from practice with minimal friction.",
+          "P1"
+        )
+      );
+      checks.push(
+        makeJourneyCheck(
+          "quick_value_cues_visible",
+          !scenario.expectations?.requiresQuickValue ||
+            /fast drill presets|why this question|board steps/i.test(await bodyText(page)),
+          "Returning or high-agency students should still see quick value cues on the practice surface.",
+          "P2"
+        )
+      );
+      const screenshotPath = await captureJourneyScreenshot(page, {
+        taskId,
+        journeyId: "practice_help_escalation_journey",
+        scenarioId: scenario.scenarioId,
+        label: "practice",
+      }).catch(() => "");
       return {
         startUrl,
         checks,
+        artifacts: screenshotPath ? [{ type: "screenshot", path: screenshotPath }] : [],
         meta: {
           finalUrl: page.url(),
-          bodySnippet: (await bodyText(page)).slice(0, 800),
+          keyVisibleCtas: signals.keyVisibleCtas,
+          primaryCtaCount: signals.primaryCtaCount,
+          helpCueVisible: signals.helpCueVisible,
+          bodySnippet: signals.bodySnippet,
         },
       };
     } finally {

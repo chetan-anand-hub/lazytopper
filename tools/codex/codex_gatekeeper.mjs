@@ -3,13 +3,28 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
+  defaultTaskManifest,
+  ensureTaskEvidenceDirs,
+  getTaskEvidencePaths,
+  normalizeRepoPath,
+  parseTaskIdArg,
+  readTaskManifest,
+  taskIdFromTaskName,
+  updateTaskManifest,
+  writeTaskScopedJsonReport,
+} from "./task_evidence_utils.mjs";
+import {
   collectGovernedChangedFiles,
+  findLatestMatchingTestRun,
   findLatestReviewPacket,
   packetHasRequiredSections,
+  parseMarkdownSections,
+  readJsonIfExists,
+  repoRoot,
+  resolveReviewPacket,
 } from "./review_packet_utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..", "..");
 const matrixPath = path.join(__dirname, "test_matrix.json");
 const testRunsDir = path.join(repoRoot, "docs", "project_memory", "test_runs");
 
@@ -19,13 +34,19 @@ function nowStamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
+function parseArgs(argv = process.argv) {
+  return {
+    taskId: parseTaskIdArg(argv),
+  };
+}
+
 function runCommand(command, args = [], options = {}) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     env: { ...process.env },
     shell: options.shell ?? false,
     encoding: "utf8",
-    maxBuffer: 1024 * 1024 * 20,
+    maxBuffer: 1024 * 1024 * 40,
   });
   return {
     ok: (result.status ?? 1) === 0,
@@ -35,15 +56,26 @@ function runCommand(command, args = [], options = {}) {
   };
 }
 
+function commandWithTaskId(commandLine, taskId = "") {
+  if (!taskId) return commandLine;
+  if (/npm run (test:persona-gate|test:student-bots|test:tutor-bots|test:persona-browser-gate|test:browser:[^\s]+|test:review-packet:semantic|test:gatekeeper:v3|review:packet:v3)\b/i.test(commandLine)) {
+    return `${commandLine} -- --task-id ${taskId}`;
+  }
+  if (/node (tools\/codex\/validate_review_packet_semantics\.mjs|tools\/codex\/generate_review_packet\.mjs|scripts\/ops\/browser_persona_gate_auditor\.mjs|scripts\/ops\/persona_gate_auditor\.mjs|scripts\/ops\/browser_journeys\/run_browser_journeys\.mjs)\b/i.test(commandLine)) {
+    return `${commandLine} --task-id ${taskId}`;
+  }
+  return commandLine;
+}
+
 function runShell(commandLine) {
   return runCommand(commandLine, [], { shell: true });
 }
 
 function testExecutionPriority(test) {
   const command = String(test?.command || "");
-  if (/test:persona-browser-gate/i.test(command)) return 30;
-  if (/test:browser:/i.test(command)) return 20;
-  if (/test:review-packet:semantic/i.test(command)) return 25;
+  if (/test:persona-browser-gate/i.test(command)) return 40;
+  if (/test:review-packet:semantic/i.test(command)) return 35;
+  if (/test:browser:/i.test(command)) return 30;
   return 10;
 }
 
@@ -58,17 +90,14 @@ function matchesRule(file, match) {
   return false;
 }
 
-async function fileExists(relPath) {
+async function fileExists(maybePath) {
+  if (!maybePath) return false;
   try {
-    await fs.access(path.join(repoRoot, relPath));
+    await fs.access(path.isAbsolute(maybePath) ? maybePath : path.join(repoRoot, maybePath));
     return true;
   } catch {
     return false;
   }
-}
-
-async function ensureDir(absPath) {
-  await fs.mkdir(absPath, { recursive: true });
 }
 
 function parseVerifyOutput(stdout) {
@@ -84,14 +113,22 @@ function parseVerifyOutput(stdout) {
   };
 }
 
-async function findLatestMatchingFile(dirAbsPath, predicate) {
+async function findTaskManualQa(taskId = "") {
+  if (!taskId) return null;
+  const taskPaths = getTaskEvidencePaths(taskId);
+  if (await fileExists(taskPaths.manualQaPath)) {
+    return { absPath: taskPaths.manualQaPath, name: path.basename(taskPaths.manualQaPath) };
+  }
+  return null;
+}
+
+async function findLatestManualQa() {
   try {
-    const entries = await fs.readdir(dirAbsPath, { withFileTypes: true });
+    const entries = await fs.readdir(testRunsDir, { withFileTypes: true });
     const files = [];
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const absPath = path.join(dirAbsPath, entry.name);
-      if (!predicate(entry.name, absPath)) continue;
+      if (!entry.isFile() || !/_manualQA\.md$/i.test(entry.name)) continue;
+      const absPath = path.join(testRunsDir, entry.name);
       const stats = await fs.stat(absPath);
       files.push({ absPath, name: entry.name, mtimeMs: stats.mtimeMs });
     }
@@ -102,16 +139,26 @@ async function findLatestMatchingFile(dirAbsPath, predicate) {
   }
 }
 
-async function readJsonReport(relPath) {
-  try {
-    const raw = await fs.readFile(path.join(repoRoot, relPath), "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function extractAssumptionsAndRisks(packetText = "") {
+  const sections = parseMarkdownSections(packetText);
+  const assumptions = String(sections.get("assumptions") || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^-+\s*/, "").trim())
+    .filter(Boolean);
+  const knownRisks = String(sections.get("known risks") || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^-+\s*/, "").trim())
+    .filter(Boolean);
+  return { assumptions, knownRisks };
 }
 
 async function main() {
+  const args = parseArgs();
+  const taskId = args.taskId || "";
+  if (taskId) {
+    await ensureTaskEvidenceDirs(taskId);
+  }
+
   const matrix = JSON.parse(await fs.readFile(matrixPath, "utf8"));
   const changedFiles = await collectGovernedChangedFiles();
   const matchedRules = matrix.rules
@@ -133,26 +180,58 @@ async function main() {
   }
   tests.sort((a, b) => testExecutionPriority(a) - testExecutionPriority(b));
 
-  const verifyRes = runCommand("powershell", [
-    "-NoProfile",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    "scripts/ops/codex_testing/codex_verify.ps1",
-    "-TaskName",
-    "gatekeeper-fast",
-    "-Suite",
-    "fast",
-  ]);
+  const reviewPacketRequired =
+    changedFiles.length >= Number(matrix.always?.substantialTaskMinChangedFiles || 5) ||
+    matchedRules.some((rule) => rule.proof?.reviewPacketRequired);
+  const manualQaRequired = matchedRules.some((rule) => rule.proof?.manualQaRequired);
+  const browserJourneysRequired = tests.some((test) => /test:browser:/i.test(test.command));
+  const browserPersonaRequired = tests.some((test) => /test:persona-browser-gate/i.test(test.command));
+  const evidenceMode = taskId ? "task-scoped" : "fallback";
+
+  if (taskId) {
+    await updateTaskManifest(taskId, {
+      ...defaultTaskManifest(taskId),
+      changedFiles,
+        expectedTests: [
+          {
+            label: "codex_verify_fast",
+            command: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ops/codex_testing/codex_verify.ps1 -TaskName gatekeeper-fast -Suite fast${
+              taskId ? ` -TaskId ${taskId}` : ""
+            }`,
+          },
+          ...tests.map((test) => ({ label: test.label, command: commandWithTaskId(test.command, taskId) })),
+        ],
+      });
+    }
+
+  const verifyTaskName = taskId ? `${taskId}-gatekeeper-fast` : "gatekeeper-fast";
+    const verifyRes = runCommand("powershell", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "scripts/ops/codex_testing/codex_verify.ps1",
+      "-TaskName",
+      verifyTaskName,
+      "-Suite",
+      "fast",
+      ...(taskId ? ["-TaskId", taskId] : []),
+    ]);
   const verifyMeta = parseVerifyOutput(verifyRes.stdout);
 
   const executedTests = [];
-  for (const test of tests) {
-    const res = runShell(test.command);
-    const outputPresent = test.expectedReport ? await fileExists(test.expectedReport) : true;
+    for (const test of tests) {
+      const command = commandWithTaskId(test.command, taskId);
+      const res = runShell(command);
+      const usedTaskScopedCommand = command !== test.command;
+      const outputPresent = test.expectedReport
+        ? await fileExists(taskId && usedTaskScopedCommand && test.expectedReport.startsWith(".project_memory/ops/out/")
+            ? test.expectedReport.replace(".project_memory/ops/out/", `.project_memory/ops/out/${taskId}/`)
+            : test.expectedReport)
+        : true;
     executedTests.push({
       label: test.label,
-      command: test.command,
+      command,
       severity: test.severity || "targeted",
       fromRule: test.fromRule,
       ok: res.ok,
@@ -164,24 +243,30 @@ async function main() {
     });
   }
 
-  const manualQaRequired = matchedRules.some((rule) => rule.proof?.manualQaRequired);
-  const reviewPacketRequired =
-    changedFiles.length >= Number(matrix.always?.substantialTaskMinChangedFiles || 5) ||
-    matchedRules.some((rule) => rule.proof?.reviewPacketRequired);
-  const browserJourneysRequired = tests.some((test) => /test:browser:/i.test(test.command));
-  const browserPersonaRequired = tests.some((test) => /test:persona-browser-gate/i.test(test.command));
-
-  const latestManualQa = await findLatestMatchingFile(testRunsDir, (name) => /_manualQA\.md$/i.test(name));
-  const latestPacket = await findLatestReviewPacket();
-  const latestPacketText = latestPacket ? await fs.readFile(latestPacket.absPath, "utf8") : "";
-  const latestPacketSectionsOk = latestPacket ? packetHasRequiredSections(latestPacketText, reviewPacketRequired) : false;
+  const latestManualQa = taskId ? await findTaskManualQa(taskId) : await findLatestManualQa();
+  const reviewPacketEntry = taskId ? await resolveReviewPacket(taskId) : await findLatestReviewPacket();
+  const reviewPacketText = reviewPacketEntry ? await fs.readFile(reviewPacketEntry.absPath, "utf8") : "";
+  const reviewPacketSectionsOk = reviewPacketEntry ? packetHasRequiredSections(reviewPacketText, reviewPacketRequired) : false;
+  const semanticCommand = taskId
+    ? [process.execPath, ["tools/codex/validate_review_packet_semantics.mjs", "--task-id", taskId]]
+    : [process.execPath, ["tools/codex/validate_review_packet_semantics.mjs"]];
   const semanticValidationResult =
-    latestPacket && reviewPacketRequired
-      ? runCommand(process.execPath, ["tools/codex/validate_review_packet_semantics.mjs", "--file", latestPacket.absPath])
+    reviewPacketEntry && reviewPacketRequired
+      ? runCommand(semanticCommand[0], semanticCommand[1])
       : null;
-  const semanticValidationReport = reviewPacketRequired
-    ? await readJsonReport(".project_memory/ops/out/review_packet_semantic_validation.json")
-    : null;
+  const semanticValidationReport = taskId
+    ? await readJsonIfExists(`.project_memory/ops/out/${taskId}/review_packet_semantic_validation.json`)
+    : await readJsonIfExists(".project_memory/ops/out/review_packet_semantic_validation.json");
+
+  const personaGateSummary = taskId
+    ? (await readJsonIfExists(`.project_memory/ops/out/${taskId}/persona_gate_audit.json`))?.summary || null
+    : (await readJsonIfExists(".project_memory/ops/out/persona_gate_audit.json"))?.summary || null;
+  const browserJourneySummary = taskId
+    ? (await readJsonIfExists(`.project_memory/ops/out/${taskId}/browser_journey_gate_audit.json`))?.summary || null
+    : (await readJsonIfExists(".project_memory/ops/out/browser_journey_gate_audit.json"))?.summary || null;
+  const browserPersonaSummary = taskId
+    ? (await readJsonIfExists(`.project_memory/ops/out/${taskId}/browser_persona_gate_audit.json`))?.summary || null
+    : (await readJsonIfExists(".project_memory/ops/out/browser_persona_gate_audit.json"))?.summary || null;
 
   const proof = {
     verify: {
@@ -197,32 +282,26 @@ async function main() {
     },
     reviewPacket: {
       required: reviewPacketRequired,
-      ok: reviewPacketRequired ? Boolean(latestPacket && latestPacketSectionsOk) : true,
-      path: latestPacket?.absPath || null,
-      sectionsOk: latestPacketSectionsOk,
-      semanticOk: reviewPacketRequired
-        ? Boolean(
-            semanticValidationResult?.ok &&
-              semanticValidationReport?.summary?.verdict === "PASS"
-          )
-        : true,
+      ok: reviewPacketRequired ? Boolean(reviewPacketEntry && reviewPacketSectionsOk) : true,
+      path: reviewPacketEntry?.absPath || null,
+      sectionsOk: reviewPacketSectionsOk,
+      semanticOk:
+        reviewPacketRequired && semanticValidationReport
+          ? semanticValidationReport.summary?.verdict === "PASS"
+          : !reviewPacketRequired,
       semanticReport:
         reviewPacketRequired && semanticValidationReport
-          ? path.join(repoRoot, ".project_memory", "ops", "out", "review_packet_semantic_validation.json")
+          ? taskId
+            ? path.join(repoRoot, ".project_memory", "ops", "out", taskId, "review_packet_semantic_validation.json")
+            : path.join(repoRoot, ".project_memory", "ops", "out", "review_packet_semantic_validation.json")
           : null,
     },
   };
 
-  const personaGateSummary = (await readJsonReport(".project_memory/ops/out/persona_gate_audit.json"))?.summary || null;
-  const browserJourneySummary =
-    (await readJsonReport(".project_memory/ops/out/browser_journey_gate_audit.json")) || null;
-  const browserPersonaSummary =
-    (await readJsonReport(".project_memory/ops/out/browser_persona_gate_audit.json")) || null;
-
   const failedTargetedTests = executedTests.filter((test) => !test.ok || !test.outputPresent);
   const severeRegression = Boolean(
     (personaGateSummary && Number(personaGateSummary.p0 || 0) > 0) ||
-      (browserPersonaSummary?.summary && Number(browserPersonaSummary.summary.p0 || 0) > 0)
+      (browserPersonaSummary && Number(browserPersonaSummary.p0 || 0) > 0)
   );
 
   let verdict = "ACCEPT";
@@ -238,95 +317,145 @@ async function main() {
     !proof.manualQa.ok ||
     !proof.reviewPacket.ok ||
     !proof.reviewPacket.semanticOk ||
-    (browserJourneysRequired && !browserJourneySummary?.summary) ||
-    (browserPersonaRequired && !browserPersonaSummary?.summary)
+    (browserJourneysRequired && !browserJourneySummary) ||
+    (browserPersonaRequired && !browserPersonaSummary) ||
+    (taskId && !reviewPacketEntry && reviewPacketRequired)
   ) {
     verdict = "REVISE";
     if (failedTargetedTests.length > 0) reasons.push("One or more required targeted checks failed or did not emit expected outputs.");
     if (!proof.manualQa.ok) reasons.push("Required manual QA note is missing.");
     if (!proof.reviewPacket.ok) reasons.push("Required review packet is missing or incomplete.");
     if (!proof.reviewPacket.semanticOk) reasons.push("Review packet semantic validation failed.");
-    if (browserJourneysRequired && !browserJourneySummary?.summary) reasons.push("Required browser journey summary is missing.");
-    if (browserPersonaRequired && !browserPersonaSummary?.summary) reasons.push("Required browser persona summary is missing.");
+    if (browserJourneysRequired && !browserJourneySummary) reasons.push("Required browser journey summary is missing.");
+    if (browserPersonaRequired && !browserPersonaSummary) reasons.push("Required browser persona summary is missing.");
+    if (taskId && !reviewPacketEntry && reviewPacketRequired) reasons.push("Task-scoped review packet is missing.");
   } else {
     reasons.push("All mandatory core and targeted checks passed, and required proof artifacts are present.");
   }
 
-  const stamp = nowStamp();
-  await ensureDir(testRunsDir);
-  const jsonPath = path.join(testRunsDir, `${stamp}_codex-gatekeeper.json`);
-  const mdPath = path.join(testRunsDir, `${stamp}_codex-gatekeeper.md`);
+  const { assumptions, knownRisks } = extractAssumptionsAndRisks(reviewPacketText);
+  if (taskId) {
+    await updateTaskManifest(taskId, {
+      changedFiles,
+        executedTests: [
+          {
+            label: "codex_verify_fast",
+            command: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ops/codex_testing/codex_verify.ps1 -TaskName ${verifyTaskName} -Suite fast${
+              taskId ? ` -TaskId ${taskId}` : ""
+            }`,
+            ok: proof.verify.ok,
+          },
+        ...executedTests,
+      ],
+      proofArtifacts: {
+        codexVerifyLog: normalizeRepoPath(proof.verify.logPath || ""),
+        codexVerifySummary: normalizeRepoPath(proof.verify.summaryPath || ""),
+        codexVerifyStatus: proof.verify.finalStatus || "UNKNOWN",
+        reviewPacket: normalizeRepoPath(proof.reviewPacket.path || ""),
+        reviewPacketSemantic: normalizeRepoPath(proof.reviewPacket.semanticReport || ""),
+        manualQa: normalizeRepoPath(proof.manualQa.path || ""),
+        browserJourneyAudit: browserJourneysRequired ? `.project_memory/ops/out/${taskId}/browser_journey_gate_audit.json` : "",
+        browserPersonaAudit: browserPersonaRequired ? `.project_memory/ops/out/${taskId}/browser_persona_gate_audit.json` : "",
+        personaGateAudit: `.project_memory/ops/out/${taskId}/persona_gate_audit.json`,
+      },
+      reviewPacketPath: normalizeRepoPath(proof.reviewPacket.path || ""),
+      manualQaPath: normalizeRepoPath(proof.manualQa.path || ""),
+      gatekeeperVerdict: verdict,
+      gatekeeperReasons: reasons,
+      assumptions,
+      residualRisks: knownRisks,
+    });
+  }
 
-  const report = {
+  const stamp = nowStamp();
+  const gatekeeperReport = {
     generatedAt: new Date().toISOString(),
+    taskId: taskId || null,
+    evidenceMode,
+    evidenceBundle: taskId
+      ? {
+          manifestPath: getTaskEvidencePaths(taskId).manifestPath,
+          taskRunDir: getTaskEvidencePaths(taskId).taskRunDir,
+          opsTaskOutDir: getTaskEvidencePaths(taskId).opsTaskOutDir,
+          reviewPacketPath: getTaskEvidencePaths(taskId).reviewPacketMdPath,
+        }
+      : null,
     changedFiles,
     matchedRules: matchedRules.map((rule) => ({ id: rule.id, changedFiles: rule.changedFiles })),
     verify: proof.verify,
     tests: executedTests,
     proof,
     personaGateSummary,
-    browserJourneySummary: browserJourneySummary?.summary || null,
-    browserPersonaSummary: browserPersonaSummary?.summary || null,
+    browserJourneySummary,
+    browserPersonaSummary,
     decision: {
       verdict,
       reasons,
     },
   };
 
-  const md = [
+  const mdLines = [
     "# Codex Gatekeeper",
     "",
     `- Verdict: **${verdict}**`,
-    `- Generated: ${report.generatedAt}`,
+    `- Mode: ${evidenceMode}`,
+    `- Task id: ${taskId || "fallback"}`,
+    `- Generated: ${gatekeeperReport.generatedAt}`,
     "",
-    "## Changed files",
-    ...changedFiles.map((file) => `- ${file}`),
-    "",
-    "## Matched rules",
-    ...matchedRules.map((rule) => `- ${rule.id}: ${rule.changedFiles.join(", ")}`),
-    "",
-    "## Core verify",
-    `- Final status: ${proof.verify.finalStatus || "UNKNOWN"}`,
-    `- Summary path: ${proof.verify.summaryPath || "missing"}`,
-    `- Log path: ${proof.verify.logPath || "missing"}`,
-    "",
-    "## Targeted tests",
-    ...executedTests.map((test) => `- ${test.label}: ${test.ok && test.outputPresent ? "PASS" : "FAIL"} via ${test.command}`),
-    "",
-    "## Proof",
-    `- Manual QA required: ${manualQaRequired}`,
-    `- Manual QA path: ${proof.manualQa.path || "missing"}`,
-    `- Review packet required: ${reviewPacketRequired}`,
-    `- Review packet path: ${proof.reviewPacket.path || "missing"}`,
-    `- Review packet sections OK: ${proof.reviewPacket.sectionsOk}`,
-    `- Review packet semantic OK: ${proof.reviewPacket.semanticOk}`,
-    `- Review packet semantic report: ${proof.reviewPacket.semanticReport || "missing"}`,
-    `- Browser journeys required: ${browserJourneysRequired}`,
-    `- Browser journey summary: ${browserJourneySummary ? JSON.stringify(browserJourneySummary.summary) : "missing"}`,
-    `- Browser persona summary: ${browserPersonaSummary ? JSON.stringify(browserPersonaSummary.summary) : "missing"}`,
-    "",
-    "## Decision",
-    ...reasons.map((reason) => `- ${reason}`),
-  ].join("\n");
+    "## Evidence bundle",
+  ];
+  if (taskId) {
+    mdLines.push(`- Manifest: ${getTaskEvidencePaths(taskId).manifestPath}`);
+    mdLines.push(`- Task run dir: ${getTaskEvidencePaths(taskId).taskRunDir}`);
+    mdLines.push(`- Task ops out dir: ${getTaskEvidencePaths(taskId).opsTaskOutDir}`);
+    mdLines.push(`- Review packet: ${proof.reviewPacket.path || "missing"}`);
+  } else {
+    mdLines.push("- Fallback mode: using latest matching artifacts because no --task-id was provided.");
+  }
+  mdLines.push("", "## Changed files", ...changedFiles.map((file) => `- ${file}`), "", "## Matched rules", ...matchedRules.map((rule) => `- ${rule.id}: ${rule.changedFiles.join(", ")}`), "", "## Core verify", `- Final status: ${proof.verify.finalStatus || "UNKNOWN"}`, `- Summary path: ${proof.verify.summaryPath || "missing"}`, `- Log path: ${proof.verify.logPath || "missing"}`, "", "## Targeted tests", ...executedTests.map((test) => `- ${test.label}: ${test.ok && test.outputPresent ? "PASS" : "FAIL"} via ${test.command}`), "", "## Proof", `- Manual QA path: ${proof.manualQa.path || "missing"}`, `- Review packet path: ${proof.reviewPacket.path || "missing"}`, `- Review packet sections OK: ${proof.reviewPacket.sectionsOk}`, `- Review packet semantic OK: ${proof.reviewPacket.semanticOk}`, `- Review packet semantic report: ${proof.reviewPacket.semanticReport || "missing"}`, `- Browser journey summary: ${browserJourneySummary ? JSON.stringify(browserJourneySummary) : "missing"}`, `- Browser persona summary: ${browserPersonaSummary ? JSON.stringify(browserPersonaSummary) : "missing"}`, "", "## Decision", ...reasons.map((reason) => `- ${reason}`));
 
-  await fs.writeFile(jsonPath, JSON.stringify(report, null, 2), "utf8");
-  await fs.writeFile(mdPath, md, "utf8");
+  let jsonPath;
+  let mdPath;
+  if (taskId) {
+    jsonPath = path.join(getTaskEvidencePaths(taskId).taskRunDir, `${taskId}_codex-gatekeeper.json`);
+    mdPath = path.join(getTaskEvidencePaths(taskId).taskRunDir, `${taskId}_codex-gatekeeper.md`);
+    await ensureTaskEvidenceDirs(taskId);
+  } else {
+    jsonPath = path.join(testRunsDir, `${stamp}_codex-gatekeeper.json`);
+    mdPath = path.join(testRunsDir, `${stamp}_codex-gatekeeper.md`);
+  }
+
+  await fs.writeFile(jsonPath, JSON.stringify(gatekeeperReport, null, 2), "utf8");
+  await fs.writeFile(mdPath, mdLines.join("\n"), "utf8");
 
   console.log(`GATEKEEPER_DECISION: ${verdict}`);
   console.log(`GATEKEEPER_MD: ${mdPath}`);
   console.log(`GATEKEEPER_JSON: ${jsonPath}`);
 
-  if (verdict === "REJECT") {
+  if (verdict !== "ACCEPT") {
     process.exitCode = 1;
-    return;
-  }
-  if (verdict === "REVISE") {
-    process.exitCode = 1;
-    return;
   }
 }
 
-main().catch((error) => {
-  console.error(String(error?.stack || error));
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(async (error) => {
+    const taskId = parseTaskIdArg(process.argv) || taskIdFromTaskName("gatekeeper-error");
+    await ensureTaskEvidenceDirs(taskId);
+    const errorPath = path.join(getTaskEvidencePaths(taskId).taskRunDir, `${taskId}_codex-gatekeeper.json`);
+    await fs.writeFile(
+      errorPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          taskId,
+          error: String(error?.stack || error),
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    console.error(String(error?.stack || error));
+    process.exitCode = 1;
+  });
+}

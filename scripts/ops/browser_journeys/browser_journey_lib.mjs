@@ -3,10 +3,17 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
+import {
+  getTaskEvidencePaths,
+  normalizeRepoPath,
+  opsOutDir,
+  parseTaskIdArg,
+  repoRoot,
+  writeTaskScopedJsonReport,
+} from "../../../tools/codex/task_evidence_utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const repoRoot = path.resolve(__dirname, "..", "..", "..");
-export const outDir = path.join(repoRoot, ".project_memory", "ops", "out");
+export const outDir = opsOutDir;
 export const baseUrl = process.env.LT_BROWSER_BASE_URL || "http://127.0.0.1:4175";
 export const apiBaseUrl = process.env.LT_BROWSER_API_URL || "http://127.0.0.1:3001";
 
@@ -74,6 +81,10 @@ export async function ensureOutDir() {
   await fs.mkdir(outDir, { recursive: true });
 }
 
+export function currentBrowserTaskId(argv = process.argv) {
+  return parseTaskIdArg(argv);
+}
+
 export function makeJourneyCheck(name, ok, details, severity = "P2") {
   return {
     name,
@@ -83,12 +94,15 @@ export function makeJourneyCheck(name, ok, details, severity = "P2") {
   };
 }
 
-export async function writeJourneyReport({ id, area, title, startUrl, checks, meta = {} }) {
+export async function writeJourneyReport({ id, area, title, startUrl, checks, meta = {}, taskId = "", scenarioId = "", studentState = "", artifacts = [] }) {
   await ensureOutDir();
   const failedChecks = checks.filter((check) => !check.ok);
   const report = {
     generatedAt: new Date().toISOString(),
+    taskId: taskId || null,
     id,
+    scenarioId: scenarioId || null,
+    studentState: studentState || null,
     area,
     title,
     startUrl,
@@ -102,12 +116,13 @@ export async function writeJourneyReport({ id, area, title, startUrl, checks, me
       p2: failedChecks.filter((check) => check.severity === "P2").length,
     },
     checks,
+    artifacts,
     meta,
   };
 
-  const outPath = path.join(outDir, `browser_${id}.json`);
-  await fs.writeFile(outPath, JSON.stringify(report, null, 2), "utf8");
-  return { report, outPath };
+  const fileName = scenarioId ? `browser_${id}__${scenarioId}.json` : `browser_${id}.json`;
+  const { primaryPath } = await writeTaskScopedJsonReport(fileName, report, taskId);
+  return { report, outPath: primaryPath };
 }
 
 export async function startJourneyStack() {
@@ -205,8 +220,9 @@ export async function waitForPageSettle(page) {
   await page.waitForTimeout(500);
 }
 
-export async function openAuthenticatedPath(page, targetPath) {
-  const targetUrl = targetPath.startsWith("http") ? targetPath : `${baseUrl}${targetPath}`;
+export async function openAuthenticatedPath(page, targetPath, options = {}) {
+  const rootUrl = options.baseUrl || baseUrl;
+  const targetUrl = targetPath.startsWith("http") ? targetPath : `${rootUrl}${targetPath}`;
   await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   await waitForPageSettle(page);
   const continued = await continueLocalSessionIfNeeded(page);
@@ -219,6 +235,48 @@ export async function openAuthenticatedPath(page, targetPath) {
 
 export async function bodyText(page) {
   return String(await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
+}
+
+export async function captureJourneyScreenshot(page, { taskId = "", journeyId = "", scenarioId = "", label = "surface" } = {}) {
+  const fileName = `browser_${journeyId}${scenarioId ? `__${scenarioId}` : ""}__${label}.png`;
+  const targetPath = taskId
+    ? path.join(getTaskEvidencePaths(taskId).opsTaskOutDir, fileName)
+    : path.join(outDir, fileName);
+  await fs.mkdir(path.dirname(targetPath), { recursive: true });
+  await page.screenshot({ path: targetPath, fullPage: false });
+  return normalizeRepoPath(targetPath);
+}
+
+export async function collectSurfaceSignals(page) {
+  return page.evaluate(() => {
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const text = clean(document.body?.innerText || "");
+    const elements = Array.from(document.querySelectorAll("button, a, [role='button']"));
+    const visible = elements
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        const label = clean(element.textContent || element.getAttribute("aria-label") || "");
+        const inView = rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0;
+        return {
+          label,
+          inView,
+        };
+      })
+      .filter((entry) => entry.inView && entry.label);
+    const keyVisibleCtas = Array.from(new Set(visible.map((entry) => entry.label))).slice(0, 8);
+    const primaryCtaCount = keyVisibleCtas.length;
+    const guidedCueVisible = /start here|guided start|recommended order|study flow|step-by-step/i.test(text);
+    const helpCueVisible = /ask mentor|get help|hint \/ next step|explain|check my solution/i.test(text);
+    return {
+      primaryCtaCount,
+      keyVisibleCtas,
+      guidedCueVisible,
+      helpCueVisible,
+      visibleDecisionCount: primaryCtaCount,
+      looksCluttered: primaryCtaCount >= 10,
+      bodySnippet: text.slice(0, 900),
+    };
+  });
 }
 
 export async function isVisible(locator, timeoutMs = 8000) {

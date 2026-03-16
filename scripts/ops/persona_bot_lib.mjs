@@ -4,10 +4,25 @@ import os from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 import { spawnSync } from "node:child_process";
+import {
+  getTaskEvidencePaths,
+  opsOutDir as globalOpsOutDir,
+  parseTaskIdArg,
+  repoRoot,
+  writeTaskScopedJsonReport,
+} from "../../tools/codex/task_evidence_utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const repoRoot = path.resolve(__dirname, "..", "..");
-export const outDir = path.join(repoRoot, ".project_memory", "ops", "out");
+export { repoRoot };
+export const outDir = globalOpsOutDir;
+
+export function currentTaskId(argv = process.argv) {
+  return parseTaskIdArg(argv);
+}
+
+export function resolveOutDir(taskId = currentTaskId()) {
+  return taskId ? getTaskEvidencePaths(taskId).opsTaskOutDir : outDir;
+}
 
 export function makeCheck(name, ok, details = "", severity = "P2", remediation = "") {
   return {
@@ -19,8 +34,8 @@ export function makeCheck(name, ok, details = "", severity = "P2", remediation =
   };
 }
 
-export async function ensureOutDir() {
-  await fs.mkdir(outDir, { recursive: true });
+export async function ensureOutDir(taskId = currentTaskId()) {
+  await fs.mkdir(resolveOutDir(taskId), { recursive: true });
 }
 
 export async function readText(relPath) {
@@ -53,8 +68,8 @@ export function runNodeScript(relPath, args = []) {
   };
 }
 
-export async function readJsonOutput(fileName) {
-  const absPath = path.join(outDir, fileName);
+export async function readJsonOutput(fileName, taskId = currentTaskId()) {
+  const absPath = path.join(resolveOutDir(taskId), fileName);
   const raw = await fs.readFile(absPath, "utf8");
   return JSON.parse(raw);
 }
@@ -104,7 +119,8 @@ export async function loadTutorRegistry() {
 }
 
 export async function finalizeBotReport({ reportFileName, bot, checks, extra = {} }) {
-  await ensureOutDir();
+  const taskId = currentTaskId();
+  await ensureOutDir(taskId);
   const failedChecks = checks.filter((check) => !check.ok);
   const severityCounts = {
     P0: failedChecks.filter((check) => check.severity === "P0").length,
@@ -126,8 +142,8 @@ export async function finalizeBotReport({ reportFileName, bot, checks, extra = {
     ...extra,
   };
 
-  const absPath = path.join(outDir, reportFileName);
-  await fs.writeFile(absPath, JSON.stringify(report, null, 2), "utf8");
+  const { primaryPath } = await writeTaskScopedJsonReport(reportFileName, report, taskId);
+  const absPath = primaryPath;
 
   if (failedChecks.length > 0) {
     console.error(`${bot.id}: FAIL (${failedChecks.length}/${checks.length})`);

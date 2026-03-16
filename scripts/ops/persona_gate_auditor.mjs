@@ -1,7 +1,14 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readJsonOutput, runNodeScript, outDir, repoRoot } from "./persona_bot_lib.mjs";
+import {
+  currentTaskId,
+  outDir,
+  readJsonOutput,
+  repoRoot,
+  runNodeScript,
+} from "./persona_bot_lib.mjs";
+import { writeTaskScopedJsonReport } from "../../tools/codex/task_evidence_utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +37,11 @@ const studentBots = [
     id: "doubt_heavy_student",
     script: "scripts/ops/student_bots/doubt_heavy_student_bot.mjs",
     report: "student_doubt_heavy_acceptance.json",
+  },
+  {
+    id: "advanced_value_seeking_student",
+    script: "scripts/ops/student_bots/advanced_value_seeking_student_bot.mjs",
+    report: "student_advanced_value_seeking_acceptance.json",
   },
 ];
 
@@ -84,15 +96,17 @@ function summarizeSeverity(failures) {
 
 async function main() {
   const mode = parseMode();
+  const taskId = currentTaskId();
   const selectedBots = mode === "student" ? studentBots : mode === "tutor" ? tutorBots : [...studentBots, ...tutorBots];
 
   const runs = [];
   const botReports = [];
   for (const bot of selectedBots) {
-    const res = runNodeScript(bot.script);
+    const args = taskId ? ["--task-id", taskId] : [];
+    const res = runNodeScript(bot.script, args);
     runs.push({ id: bot.id, script: bot.script, ok: res.ok, code: res.code });
     try {
-      const report = await readJsonOutput(bot.report);
+      const report = await readJsonOutput(bot.report, taskId);
       botReports.push(report);
     } catch (error) {
       botReports.push({
@@ -145,9 +159,9 @@ async function main() {
   };
 
   await fs.mkdir(outDir, { recursive: true });
-  const outPath = path.join(outDir, outFileNameForMode(mode));
   const report = {
     generatedAt: new Date().toISOString(),
+    taskId: taskId || null,
     mode,
     runs,
     summary,
@@ -160,7 +174,8 @@ async function main() {
     })),
     failures,
   };
-  await fs.writeFile(outPath, JSON.stringify(report, null, 2), "utf8");
+  const { primaryPath } = await writeTaskScopedJsonReport(outFileNameForMode(mode), report, taskId);
+  const outPath = primaryPath;
 
   console.log(`persona_gate_auditor mode=${mode} bots=${summary.botsRun} failed=${summary.failedBots} p0=${summary.p0} p1=${summary.p1} p2=${summary.p2}`);
   console.log(`report=${path.relative(repoRoot, outPath).replaceAll("\\", "/")}`);

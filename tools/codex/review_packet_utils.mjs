@@ -1,34 +1,28 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const repoRoot = path.resolve(__dirname, "..", "..");
-export const reviewPacketDir = path.join(repoRoot, "docs", "project_memory", "review_packets");
-export const testRunsDir = path.join(repoRoot, "docs", "project_memory", "test_runs");
-export const outDir = path.join(repoRoot, ".project_memory", "ops", "out");
+import {
+  getTaskEvidencePaths,
+  normalizeRepoPath,
+  opsOutDir as outDir,
+  parseTaskIdArg,
+  readTaskManifest,
+  repoRoot,
+  reviewPacketDir,
+  testRunsDir,
+} from "./task_evidence_utils.mjs";
 const boundaryPolicyPath = path.join(repoRoot, "docs", "project_memory", "governance", "repo_boundary_policy.json");
-
-function normalizePathLike(filePath) {
-  const normalized = String(filePath || "").replaceAll("\\", "/").trim();
-  const repoRootNormalized = repoRoot.replaceAll("\\", "/");
-  if (normalized.startsWith(repoRootNormalized + "/")) {
-    return normalized.slice(repoRootNormalized.length + 1);
-  }
-  return normalized.replace(/^\.\//, "");
-}
 
 export async function ensureOutDir() {
   await fs.mkdir(outDir, { recursive: true });
 }
 
 function toRule(rule) {
-  return normalizePathLike(rule).toLowerCase();
+  return normalizeRepoPath(rule).toLowerCase();
 }
 
 function matchesRule(filePath, rule) {
-  const file = normalizePathLike(filePath).toLowerCase();
+  const file = normalizeRepoPath(filePath).toLowerCase();
   const matchRule = toRule(rule);
   if (!matchRule) return false;
   if (matchRule.endsWith("/")) return file.startsWith(matchRule);
@@ -75,6 +69,24 @@ export async function findLatestReviewPacket() {
   } catch {
     return null;
   }
+}
+
+export async function findTaskReviewPacket(taskId = "") {
+  if (!taskId) return null;
+  const paths = getTaskEvidencePaths(taskId);
+  try {
+    await fs.access(paths.reviewPacketMdPath);
+    return { absPath: paths.reviewPacketMdPath, name: path.basename(paths.reviewPacketMdPath) };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveReviewPacket(taskId = "") {
+  if (taskId) {
+    return (await findTaskReviewPacket(taskId)) || (await findLatestReviewPacket());
+  }
+  return findLatestReviewPacket();
 }
 
 export function parseMarkdownSections(text) {
@@ -128,7 +140,7 @@ export function extractPathishTokens(text) {
   for (const regex of [backtickRegex, markdownLinkRegex, plainPathRegex]) {
     let match;
     while ((match = regex.exec(text)) !== null) {
-      const candidate = normalizePathLike(match[1] || match[0]);
+      const candidate = normalizeRepoPath(match[1] || match[0]);
       if (candidate.includes("/")) tokens.add(candidate);
     }
   }
@@ -153,14 +165,14 @@ export function collectChangedFiles() {
   const files = new Set();
 
   for (const line of String(diffRes.stdout || "").split(/\r?\n/)) {
-    const file = normalizePathLike(line);
+    const file = normalizeRepoPath(line);
     if (file) files.add(file);
   }
 
   for (const rawLine of String(statusRes.stdout || "").split(/\r?\n/)) {
     if (!rawLine.trim()) continue;
     const payload = rawLine.slice(3).trim();
-    const file = normalizePathLike(payload.includes("->") ? payload.split("->").pop().trim() : payload);
+    const file = normalizeRepoPath(payload.includes("->") ? payload.split("->").pop().trim() : payload);
     if (file) files.add(file);
   }
 
@@ -200,5 +212,16 @@ export async function readJsonIfExists(relPath) {
 }
 
 export function normalizePacketPath(filePath) {
-  return normalizePathLike(filePath);
+  return normalizeRepoPath(filePath);
 }
+
+export async function resolveTaskManifest(taskId = "") {
+  if (!taskId) return null;
+  return readTaskManifest(taskId);
+}
+
+export function parseReviewTaskId(argv = process.argv) {
+  return parseTaskIdArg(argv);
+}
+
+export { outDir, repoRoot, reviewPacketDir, testRunsDir };

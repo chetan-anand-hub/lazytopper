@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-03-16T05:19:58.638Z",
+  "taskId": "quality-gate-v3-task-scoped-evidence",
+  "summary": "Quality Gate V3 task-scopes review evidence, upgrades browser coverage to scenario-aware journeys, adds an advanced value-seeking student persona, and binds packet validation to manifest-backed proof.",
+  "changedFiles": [
+    "docs/project_memory/review_packets/README.md",
+    "package.json",
+    "scripts/ops/browser_journeys/browser_journey_lib.mjs",
+    "scripts/ops/browser_journeys/journeys/board_readiness_journey.mjs",
+    "scripts/ops/browser_journeys/journeys/mentor_kindness_and_recovery_journey.mjs",
+    "scripts/ops/browser_journeys/journeys/practice_help_escalation_journey.mjs",
+    "scripts/ops/browser_journeys/journeys/topichub_guided_entry_journey.mjs",
+    "scripts/ops/browser_journeys/journeys/triangles_human_tutor_browser_journey.mjs",
+    "scripts/ops/browser_journeys/run_browser_journeys.mjs",
+    "scripts/ops/browser_journeys/scenario_matrix.json",
+    "scripts/ops/browser_persona_gate_auditor.mjs",
+    "scripts/ops/codex_testing/codex_verify.ps1",
+    "scripts/ops/persona_bot_lib.mjs",
+    "scripts/ops/persona_gate_auditor.mjs",
+    "scripts/ops/student_bots/advanced_value_seeking_student_bot.mjs",
+    "tools/codex/codex_gatekeeper.mjs",
+    "tools/codex/generate_review_packet.mjs",
+    "tools/codex/review_packet_utils.mjs",
+    "tools/codex/task_evidence_utils.mjs",
+    "tools/codex/validate_review_packet_semantics.mjs"
+  ],
+  "testsRun": [
+    {
+      "label": "codex_verify_fast",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ops/codex_testing/codex_verify.ps1 -TaskName quality-gate-v3-task-scoped-evidence -Suite fast -TaskId quality-gate-v3-task-scoped-evidence",
+      "ok": true
+    },
+    {
+      "label": "persona_gate",
+      "command": "npm run test:persona-gate -- --task-id quality-gate-v3-task-scoped-evidence",
+      "ok": true,
+      "reportPath": ".project_memory/ops/out/quality-gate-v3-task-scoped-evidence/persona_gate_audit.json"
+    },
+    {
+      "label": "browser_journeys",
+      "command": "npm run test:browser:journeys -- --task-id quality-gate-v3-task-scoped-evidence",
+      "ok": true,
+      "reportPath": ".project_memory/ops/out/quality-gate-v3-task-scoped-evidence/browser_journey_gate_audit.json"
+    },
+    {
+      "label": "browser_persona_gate",
+      "command": "npm run test:persona-browser-gate -- --task-id quality-gate-v3-task-scoped-evidence",
+      "ok": true,
+      "reportPath": ".project_memory/ops/out/quality-gate-v3-task-scoped-evidence/browser_persona_gate_audit.json"
+    },
+    {
+      "label": "review_packet_semantic",
+      "command": "npm run test:review-packet:semantic -- --task-id quality-gate-v3-task-scoped-evidence",
+      "ok": true,
+      "reportPath": ".project_memory/ops/out/quality-gate-v3-task-scoped-evidence/review_packet_semantic_validation.json"
+    }
+  ],
+  "passFail": [
+    "- `codex_verify`: PASS",
+    "- `codex verify`: PASS",
+    "- `persona gate`: PASS",
+    "- `browser journey`: PASS",
+    "- `browser persona`: PASS",
+    "- `review packet semantic validation`: PASS"
+  ],
+  "manualQaPath": "docs/project_memory/test_runs/quality-gate-v3-task-scoped-evidence/quality-gate-v3-task-scoped-evidence_manualQA.md",
+  "assumptions": [
+    "Task-scoped evidence is now the primary approval path whenever a task id is supplied to the gate scripts.",
+    "Existing V1/V2 commands remain valid entrypoints, with V3 behavior activated through task-scoped flags and bundle-aware utilities."
+  ],
+  "knownRisks": [
+    "Browser journeys remain high-value smoke coverage, not exhaustive end-to-end coverage across every chapter and device state.",
+    "Review-packet semantics are now evidence-linked, but nuanced pedagogy and final reviewer judgment still remain human responsibilities."
+  ],
+  "reviewerEntryPoint": "Manifest -> gatekeeper -> task-scoped browser/persona/semantic reports in .project_memory/ops/out/quality-gate-v3-task-scoped-evidence"
+}

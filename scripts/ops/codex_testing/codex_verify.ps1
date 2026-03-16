@@ -5,7 +5,9 @@ param(
   [ValidateSet("fast", "full")]
   [string]$Suite = "fast",
 
-  [string[]]$Extra
+  [string[]]$Extra,
+
+  [string]$TaskId
 )
 
 Set-StrictMode -Version Latest
@@ -90,8 +92,19 @@ if (-not (Test-Path -LiteralPath $testRunsDir)) {
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $safeTaskName = Get-SafeName -Raw $TaskName
-$logPath = Join-Path $testRunsDir ("{0}_{1}.log" -f $timestamp, $safeTaskName)
-$summaryPath = Join-Path $testRunsDir ("{0}_{1}_summary.md" -f $timestamp, $safeTaskName)
+$safeTaskId = Get-SafeName -Raw $TaskId
+
+if (-not [string]::IsNullOrWhiteSpace($safeTaskId)) {
+  $taskRunDir = Join-Path $testRunsDir $safeTaskId
+  if (-not (Test-Path -LiteralPath $taskRunDir)) {
+    New-Item -ItemType Directory -Path $taskRunDir -Force | Out-Null
+  }
+  $logPath = Join-Path $taskRunDir ("{0}_verify.log" -f $safeTaskId)
+  $summaryPath = Join-Path $taskRunDir ("{0}_verify_summary.md" -f $safeTaskId)
+} else {
+  $logPath = Join-Path $testRunsDir ("{0}_{1}.log" -f $timestamp, $safeTaskName)
+  $summaryPath = Join-Path $testRunsDir ("{0}_{1}_summary.md" -f $timestamp, $safeTaskName)
+}
 
 $commands = New-Object System.Collections.Generic.List[string]
 $commands.Add("node -v") | Out-Null
@@ -122,6 +135,9 @@ if ($Extra) {
 
 Write-LogLine -Path $logPath -Line ("CODEX VERIFY")
 Write-LogLine -Path $logPath -Line ("TaskName: " + $TaskName)
+if (-not [string]::IsNullOrWhiteSpace($safeTaskId)) {
+  Write-LogLine -Path $logPath -Line ("TaskId  : " + $safeTaskId)
+}
 Write-LogLine -Path $logPath -Line ("Suite   : " + $Suite)
 Write-LogLine -Path $logPath -Line ("Repo    : " + $repoRoot)
 Write-LogLine -Path $logPath -Line ("Started : " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"))
@@ -143,6 +159,9 @@ $summary = New-Object System.Collections.Generic.List[string]
 $summary.Add("# CODEX Verify Summary") | Out-Null
 $summary.Add("") | Out-Null
 $summary.Add("- Task: $TaskName") | Out-Null
+if (-not [string]::IsNullOrWhiteSpace($safeTaskId)) {
+  $summary.Add("- Task Id: $safeTaskId") | Out-Null
+}
 $summary.Add("- Suite: $Suite") | Out-Null
 $summary.Add("- Timestamp: $timestamp") | Out-Null
 $summary.Add("- Log File: $logPath") | Out-Null

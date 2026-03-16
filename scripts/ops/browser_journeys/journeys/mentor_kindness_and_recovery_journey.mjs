@@ -1,10 +1,17 @@
-import { bodyText, isVisible, makeJourneyCheck, openAuthenticatedPath } from "../browser_journey_lib.mjs";
+import {
+  bodyText,
+  captureJourneyScreenshot,
+  collectSurfaceSignals,
+  isVisible,
+  makeJourneyCheck,
+  openAuthenticatedPath,
+} from "../browser_journey_lib.mjs";
 
 export const journey = {
   id: "mentor_kindness_and_recovery_journey",
   area: "mentor",
   title: "Mentor kindness and recovery journey",
-  async run({ browser }) {
+  async run({ browser, scenario = {}, taskId = "" }) {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.route("**/api/mentor", async (route) => {
@@ -16,7 +23,7 @@ export const journey = {
     });
     const startUrl = await openAuthenticatedPath(
       page,
-      "/practice/10/Maths?topic=trigonometry&count=3&journeyMentor=hint"
+      scenario.startingPath || "/practice/10/Maths?topic=trigonometry&count=3&journeyMentor=hint"
     );
     const checks = [];
 
@@ -42,6 +49,7 @@ export const journey = {
         }, { timeout: 12000 })
         .catch(() => {});
       const drawerText = await drawer.innerText().catch(() => "");
+      const signals = await collectSurfaceSignals(page);
       checks.push(
         makeJourneyCheck(
           "fallback_reply_is_constructive",
@@ -67,11 +75,28 @@ export const journey = {
           "P1"
         )
       );
+      checks.push(
+        makeJourneyCheck(
+          "help_controls_remain_low_friction",
+          signals.primaryCtaCount <= 8,
+          `Mentor recovery should not overwhelm the student with too many visible decisions. Count=${signals.primaryCtaCount}.`,
+          "P2"
+        )
+      );
+      const screenshotPath = await captureJourneyScreenshot(page, {
+        taskId,
+        journeyId: "mentor_kindness_and_recovery_journey",
+        scenarioId: scenario.scenarioId,
+        label: "mentor",
+      }).catch(() => "");
       return {
         startUrl,
         checks,
+        artifacts: screenshotPath ? [{ type: "screenshot", path: screenshotPath }] : [],
         meta: {
           finalUrl: page.url(),
+          keyVisibleCtas: signals.keyVisibleCtas,
+          primaryCtaCount: signals.primaryCtaCount,
           bodySnippet: (await bodyText(page)).slice(0, 800),
         },
       };
