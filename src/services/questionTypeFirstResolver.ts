@@ -1,10 +1,12 @@
 import { resolveCanonicalTopicKey } from "../data/syllabus/topicAliasMap";
+import { trianglesQuestionFamilies } from "../data/contentStrategy/triangles";
 import {
   trigonometryLearningObjects,
   trigonometryQuestionTagIndex,
   trigonometryQuestionTypeTiles,
 } from "../data/contentStrategy/trigonometry";
 import type {
+  QuestionFamilyOverlay,
   LearningObject,
   QuestionMeta,
   QuestionTypeTile,
@@ -144,4 +146,23 @@ export function getFocusIdsForTile(rawTopicKey: string, tile: QuestionTypeTile):
   }
 
   return ordered;
+}
+
+export function getQuestionFamiliesForTopic(rawTopicKey: string): QuestionFamilyOverlay[] {
+  const canonicalTopicKey = resolveCanonicalTopicForStrategy(rawTopicKey);
+  if (canonicalTopicKey === "triangles") return trianglesQuestionFamilies;
+  return [];
+}
+
+export function getQuestionFamilyById(
+  rawTopicKey: string,
+  familyId: string
+): QuestionFamilyOverlay | null {
+  const targetId = String(familyId || "").trim();
+  if (!targetId) return null;
+  return (
+    getQuestionFamiliesForTopic(rawTopicKey).find(
+      (family) => String(family.familyId || "").trim() === targetId
+    ) || null
+  );
 }

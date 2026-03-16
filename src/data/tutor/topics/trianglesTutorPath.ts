@@ -4,7 +4,7 @@ export const trianglesTutorPath: ChapterTutorPath = {
   topicKey: "triangles",
   canonicalTopicKey: "triangles",
   subject: "Maths",
-  status: "deep",
+  status: "partial",
   studentJourney: [
     {
       id: "tri-start",
@@ -235,16 +235,16 @@ export const trianglesTutorPath: ChapterTutorPath = {
   },
   qtfSupport: {
     status: "none",
-    note: "Triangles has no runtime QTF overlay, no tile strip, and no chapter-specific canonical pack yet. The tutor path must stay honest about that.",
+    note: "Triangles now has a visible chapter-family router in TopicHub, but it still does not have a full QTF tile system or a chapter-specific canonical pack.",
   },
   gapFlags: [
-    "no-qtf-overlay-or-tile-routing-yet",
+    "no-full-qtf-tile-routing-or-canonical-pack-yet",
     "no-triangles-canonical-pack-in-canonicalquestionbank",
     "assessed-scope-and-enrichment-scope-are-not-the-same",
     "chapter-assets-live-across-topic-hub-mentor-bsre-and-final-json-paths",
   ],
   nextExpansionNotes: [
-    "Triangles is now a deep runtime chapter even without QTF; the next lift should be overlay + focused bank depth.",
+    "Triangles now has a stronger runtime runway plus chapter-family routing, but it should still be treated as partial until focused bank depth is added.",
     "Any expansion must respect scopePolicy before copying Pythagoras or area-ratio content into assessed-core flows.",
     "Keep mentor assets referenced, not duplicated, until the chapter gets its own overlay and pack.",
   ],

@@ -34,13 +34,18 @@ import SharedTutorDrawerV2, {
 } from "../components/tutor/TutorDrawerV2";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import type { MentorDiagramSpec } from "../types/mentor";
-import type { QuestionTypeTile } from "../data/contentStrategy/types";
+import type {
+  QuestionFamilyOverlay,
+  QuestionTypeTile,
+} from "../data/contentStrategy/types";
 import {
   navigateToPractice,
+  type PracticeDifficultyPreset,
   type PracticeSectionFilter,
 } from "../navigation/practiceNavigation";
 import {
   getFocusIdsForTile,
+  getQuestionFamiliesForTopic,
   getStrategyPackForTopic,
   resolveCanonicalTopicForStrategy,
 } from "../services/questionTypeFirstResolver";
@@ -926,6 +931,7 @@ export default function TopicHub() {
   const [grindNodeId, setGrindNodeId] = useState<string>("" );
   const [tutorTab, setTutorTab] = useState<TutorTab>("teach");
   const [tutorNodeIndex, setTutorNodeIndex] = useState(0);
+  const [selectedTrianglesFamilyId, setSelectedTrianglesFamilyId] = useState("");
   const teachAutoOpenKeyRef = useRef<string>("");
 
   const closeMentorDrawer = () => {
@@ -1930,6 +1936,11 @@ const showInZombie = (sectionId: string) => {
       tab?: TopicTabKey;
       subtopicHint?: string;
       sectionFilter?: PracticeSectionFilter;
+      focusBankIds?: string[];
+      strictFocus?: boolean;
+      recommendedCount?: number;
+      difficultyPreset?: PracticeDifficultyPreset;
+      source?: string;
     }) => {
       const nodeId = String(opts.nodeId || "").trim();
       const nodeTitle = nodeId ? guidedNodeTitleById[nodeId] || nodeId : "";
@@ -1957,7 +1968,11 @@ const showInZombie = (sectionId: string) => {
         backLabel: "Back to TopicHub",
         subtopicHint: opts.subtopicHint || fallbackHint,
         sectionFilter,
-        source: "topic_hub",
+        focusBankIds: opts.focusBankIds,
+        strictFocus: Boolean(opts.strictFocus),
+        recommendedCount: opts.recommendedCount,
+        difficultyPreset: opts.difficultyPreset,
+        source: opts.source || "topic_hub",
       });
     },
     [
@@ -1973,6 +1988,72 @@ const showInZombie = (sectionId: string) => {
       title,
       topicKey,
     ]
+  );
+
+  const trianglesQuestionFamilies = useMemo(
+    () => (isTrianglesTopic ? getQuestionFamiliesForTopic(topicKey) : []),
+    [isTrianglesTopic, topicKey]
+  );
+
+  useEffect(() => {
+    if (!trianglesQuestionFamilies.length) {
+      if (selectedTrianglesFamilyId) setSelectedTrianglesFamilyId("");
+      return;
+    }
+    const stillPresent = trianglesQuestionFamilies.some(
+      (family) => family.familyId === selectedTrianglesFamilyId
+    );
+    if (!stillPresent) {
+      setSelectedTrianglesFamilyId(trianglesQuestionFamilies[0].familyId);
+    }
+  }, [selectedTrianglesFamilyId, trianglesQuestionFamilies]);
+
+  const selectedTrianglesFamily = useMemo(
+    () =>
+      trianglesQuestionFamilies.find(
+        (family) => family.familyId === selectedTrianglesFamilyId
+      ) || trianglesQuestionFamilies[0] || null,
+    [selectedTrianglesFamilyId, trianglesQuestionFamilies]
+  );
+
+  const openPracticeFromTrianglesFamily = useCallback(
+    (family: QuestionFamilyOverlay) => {
+      const nodeId = String(family.tutorNodeId || "").trim();
+      const focusBankIds = Array.isArray(family.focusBankIds)
+        ? family.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
+        : undefined;
+      openPracticeFromTopicHub({
+        tab: "learn",
+        nodeId: nodeId || undefined,
+        subtopicHint: family.practiceHint,
+        sectionFilter: family.sectionFilter as PracticeSectionFilter | undefined,
+        focusBankIds,
+        strictFocus: Boolean(focusBankIds && focusBankIds.length > 0),
+        recommendedCount: focusBankIds && focusBankIds.length > 0 ? 8 : 10,
+        difficultyPreset: "All",
+        source: "triangles_qtf_overlay",
+      });
+    },
+    [openPracticeFromTopicHub]
+  );
+
+  const openMentorForTrianglesFamily = useCallback(
+    (family: QuestionFamilyOverlay) => {
+      openMentorDrawer({
+        title: `Triangles • ${family.studentLabel}`,
+        question: family.mentorPrompt,
+        solveStyle: family.mentorSolveStyle || "socratic",
+        section: family.sectionFilter,
+        requestedMode: family.mentorModeHint as RequestedMentorMode | undefined,
+        theoremFocus: [family.theoremFamily, family.skillFamily],
+        itemId: family.familyId,
+        itemTitle: family.studentLabel,
+        itemText: family.tutorMeaning,
+        contextText: `Triangles family router: ${family.studentLabel}`,
+        anchor: `triangles:qtf:${family.familyId}`,
+      });
+    },
+    [openMentorDrawer]
   );
 
   const openPracticeFromQTypeTile = useCallback(
@@ -2050,8 +2131,8 @@ const showInZombie = (sectionId: string) => {
         "I am stuck in Triangles. Check my theorem choice, correspondence order, and conclusion line in CBSE board style. Keep it stepwise and marks-friendly.",
       mentorTitle: "Triangles • Check my proof",
       sourceNote:
-        path?.qtfSupport?.status === "none"
-          ? "Practice is coming from the live prediction/HPQ runtime, not a separate Triangles QTF pack."
+        trianglesQuestionFamilies.length > 0
+          ? "The family router is now chapter-specific, but practice still draws from the live prediction/runtime pool rather than a separate Triangles canonical pack."
           : "",
     };
   }, [
@@ -2063,6 +2144,7 @@ const showInZombie = (sectionId: string) => {
     mapProofFocusToNodeId,
     runtimeTopicConfig.boardExamplesSummary,
     runtimeTopicConfig.heroTagline,
+    trianglesQuestionFamilies.length,
   ]);
 
   const onTutorNodeProgress = useCallback(
@@ -2539,6 +2621,252 @@ const showInZombie = (sectionId: string) => {
                   ))}
                 </div>
               </div>
+
+              {selectedTrianglesFamily ? (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontWeight: 900, fontSize: 14 }}>
+                    What kind of Triangles problem is this?
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, opacity: 0.76 }}>
+                    Pick the family first. That reduces theorem-choice panic for weak students and gives strong students a faster route into the right practice.
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {trianglesQuestionFamilies.map((family) => {
+                      const active = family.familyId === selectedTrianglesFamily.familyId;
+                      return (
+                        <button
+                          key={family.familyId}
+                          type="button"
+                          className="lt-pill"
+                          onClick={() => setSelectedTrianglesFamilyId(family.familyId)}
+                          style={{
+                            padding: "7px 10px",
+                            background: active ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
+                            color: active ? "#fff" : "rgba(15,23,42,0.9)",
+                            borderColor: active ? "rgba(15,23,42,0.92)" : "rgba(15,23,42,0.18)",
+                          }}
+                        >
+                          {family.studentLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1.2fr) minmax(250px, 0.8fr)",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        borderRadius: 16,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(15,23,42,0.12)",
+                        background: "rgba(255,255,255,0.86)",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 900,
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "rgba(15,23,42,0.92)",
+                            color: "#fff",
+                          }}
+                        >
+                          {selectedTrianglesFamily.theoremFamily}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 900,
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "rgba(255,255,255,0.95)",
+                            border: "1px solid rgba(15,23,42,0.16)",
+                          }}
+                        >
+                          {selectedTrianglesFamily.skillFamily}
+                        </span>
+                        {selectedTrianglesFamily.focusBankIds?.length ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 900,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              background: "rgba(255,255,255,0.95)",
+                              border: "1px solid rgba(15,23,42,0.16)",
+                            }}
+                          >
+                            {selectedTrianglesFamily.focusBankIds.length} focused questions now
+                          </span>
+                        ) : null}
+                      </div>
+                      <div style={{ marginTop: 8, fontWeight: 900, fontSize: 16 }}>
+                        {selectedTrianglesFamily.studentLabel}
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.84, lineHeight: 1.58 }}>
+                        {selectedTrianglesFamily.tutorMeaning}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 10,
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                          gap: 10,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                            Weak-student cue
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                            {selectedTrianglesFamily.weakStudentCue}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                            Advanced shortcut
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                            {selectedTrianglesFamily.advancedStudentShortcut}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                            Common confusion
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                            {selectedTrianglesFamily.commonConfusion}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                            Next best action
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                            {selectedTrianglesFamily.recommendedNextAction}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 10,
+                          borderRadius: 12,
+                          padding: "10px 10px",
+                          background: "rgba(248,250,252,0.9)",
+                          border: "1px solid rgba(15,23,42,0.1)",
+                        }}
+                      >
+                        <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                          Board payoff
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                          {selectedTrianglesFamily.boardPayoff}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="lt-pill"
+                          onClick={() => openPracticeFromTrianglesFamily(selectedTrianglesFamily)}
+                        >
+                          Practice this family
+                        </button>
+                        <button
+                          type="button"
+                          className="lt-pill"
+                          onClick={() => {
+                            setActiveTab("learn");
+                            openTutorDrawer({
+                              tab: "teach",
+                              nodeId: selectedTrianglesFamily.tutorNodeId || trianglesRuntimeStrip.firstTutorNodeId,
+                            });
+                          }}
+                        >
+                          Tutor first
+                        </button>
+                        <button
+                          type="button"
+                          className="lt-pill"
+                          onClick={() => openMentorForTrianglesFamily(selectedTrianglesFamily)}
+                        >
+                          Ask mentor on this family
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        borderRadius: 16,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(15,23,42,0.12)",
+                        background: "rgba(255,255,255,0.84)",
+                      }}
+                    >
+                      {selectedTrianglesFamily.diagram ? (
+                        <DiagramBlock diagram={selectedTrianglesFamily.diagram} />
+                      ) : null}
+                      <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {selectedTrianglesFamily.diagramRequired ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 900,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              background: "rgba(255,255,255,0.95)",
+                              border: "1px solid rgba(15,23,42,0.16)",
+                            }}
+                          >
+                            figure first
+                          </span>
+                        ) : null}
+                        {selectedTrianglesFamily.recommendedDiagramType ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 900,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              background: "rgba(255,255,255,0.95)",
+                              border: "1px solid rgba(15,23,42,0.16)",
+                            }}
+                          >
+                            {selectedTrianglesFamily.recommendedDiagramType}
+                          </span>
+                        ) : null}
+                        {selectedTrianglesFamily.visualPriority ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 900,
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                              background: "rgba(255,255,255,0.95)",
+                              border: "1px solid rgba(15,23,42,0.16)",
+                            }}
+                          >
+                            {selectedTrianglesFamily.visualPriority} priority
+                          </span>
+                        ) : null}
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.76, lineHeight: 1.55 }}>
+                        Pick the family, see the figure, then either practice it or ask for help before the confusion spreads.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div
                 style={{

@@ -1,0 +1,1 @@
+export { trianglesQuestionFamilies } from "./trianglesQuestionFamilies";
