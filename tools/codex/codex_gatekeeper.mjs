@@ -2,12 +2,16 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  collectGovernedChangedFiles,
+  findLatestReviewPacket,
+  packetHasRequiredSections,
+} from "./review_packet_utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
 const matrixPath = path.join(__dirname, "test_matrix.json");
 const testRunsDir = path.join(repoRoot, "docs", "project_memory", "test_runs");
-const reviewPacketDir = path.join(repoRoot, "docs", "project_memory", "review_packets");
 
 function nowStamp() {
   const d = new Date();
@@ -35,26 +39,12 @@ function runShell(commandLine) {
   return runCommand(commandLine, [], { shell: true });
 }
 
-function parseChangedFiles() {
-  const diffRes = runCommand("git", ["diff", "--name-only", "HEAD"]);
-  const statusRes = runCommand("git", ["status", "--porcelain"]);
-  const files = new Set();
-
-  for (const line of diffRes.stdout.split(/\r?\n/)) {
-    const file = line.trim();
-    if (file) files.add(file.replaceAll("\\", "/"));
-  }
-
-  for (const rawLine of statusRes.stdout.split(/\r?\n/)) {
-    const line = rawLine.trimEnd();
-    if (!line) continue;
-    const payload = line.slice(3).trim();
-    if (!payload) continue;
-    const file = payload.includes("->") ? payload.split("->").pop().trim() : payload;
-    if (file) files.add(file.replaceAll("\\", "/"));
-  }
-
-  return Array.from(files).sort();
+function testExecutionPriority(test) {
+  const command = String(test?.command || "");
+  if (/test:persona-browser-gate/i.test(command)) return 30;
+  if (/test:browser:/i.test(command)) return 20;
+  if (/test:review-packet:semantic/i.test(command)) return 25;
+  return 10;
 }
 
 function matchesRule(file, match) {
@@ -112,23 +102,18 @@ async function findLatestMatchingFile(dirAbsPath, predicate) {
   }
 }
 
-function packetHasRequiredSections(text) {
-  const required = [
-    "## Task summary",
-    "## Changed files",
-    "## Tests run",
-    "## Pass/fail",
-    "## Manual QA path",
-    "## Assumptions",
-    "## Known risks",
-    "## Reviewer checklist",
-  ];
-  return required.every((heading) => text.includes(heading));
+async function readJsonReport(relPath) {
+  try {
+    const raw = await fs.readFile(path.join(repoRoot, relPath), "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
   const matrix = JSON.parse(await fs.readFile(matrixPath, "utf8"));
-  const changedFiles = parseChangedFiles();
+  const changedFiles = await collectGovernedChangedFiles();
   const matchedRules = matrix.rules
     .map((rule) => ({
       ...rule,
@@ -146,6 +131,7 @@ async function main() {
       tests.push({ ...test, fromRule: rule.id });
     }
   }
+  tests.sort((a, b) => testExecutionPriority(a) - testExecutionPriority(b));
 
   const verifyRes = runCommand("powershell", [
     "-NoProfile",
@@ -182,11 +168,20 @@ async function main() {
   const reviewPacketRequired =
     changedFiles.length >= Number(matrix.always?.substantialTaskMinChangedFiles || 5) ||
     matchedRules.some((rule) => rule.proof?.reviewPacketRequired);
+  const browserJourneysRequired = tests.some((test) => /test:browser:/i.test(test.command));
+  const browserPersonaRequired = tests.some((test) => /test:persona-browser-gate/i.test(test.command));
 
   const latestManualQa = await findLatestMatchingFile(testRunsDir, (name) => /_manualQA\.md$/i.test(name));
-  const latestPacket = await findLatestMatchingFile(reviewPacketDir, (name) => /\.md$/i.test(name) && name !== "README.md");
+  const latestPacket = await findLatestReviewPacket();
   const latestPacketText = latestPacket ? await fs.readFile(latestPacket.absPath, "utf8") : "";
-  const latestPacketSectionsOk = latestPacket ? packetHasRequiredSections(latestPacketText) : false;
+  const latestPacketSectionsOk = latestPacket ? packetHasRequiredSections(latestPacketText, reviewPacketRequired) : false;
+  const semanticValidationResult =
+    latestPacket && reviewPacketRequired
+      ? runCommand(process.execPath, ["tools/codex/validate_review_packet_semantics.mjs", "--file", latestPacket.absPath])
+      : null;
+  const semanticValidationReport = reviewPacketRequired
+    ? await readJsonReport(".project_memory/ops/out/review_packet_semantic_validation.json")
+    : null;
 
   const proof = {
     verify: {
@@ -205,21 +200,30 @@ async function main() {
       ok: reviewPacketRequired ? Boolean(latestPacket && latestPacketSectionsOk) : true,
       path: latestPacket?.absPath || null,
       sectionsOk: latestPacketSectionsOk,
+      semanticOk: reviewPacketRequired
+        ? Boolean(
+            semanticValidationResult?.ok &&
+              semanticValidationReport?.summary?.verdict === "PASS"
+          )
+        : true,
+      semanticReport:
+        reviewPacketRequired && semanticValidationReport
+          ? path.join(repoRoot, ".project_memory", "ops", "out", "review_packet_semantic_validation.json")
+          : null,
     },
   };
 
-  let personaGateSummary = null;
-  if (await fileExists(".project_memory/ops/out/persona_gate_audit.json")) {
-    try {
-      const raw = await fs.readFile(path.join(repoRoot, ".project_memory/ops/out/persona_gate_audit.json"), "utf8");
-      personaGateSummary = JSON.parse(raw)?.summary || null;
-    } catch {
-      personaGateSummary = null;
-    }
-  }
+  const personaGateSummary = (await readJsonReport(".project_memory/ops/out/persona_gate_audit.json"))?.summary || null;
+  const browserJourneySummary =
+    (await readJsonReport(".project_memory/ops/out/browser_journey_gate_audit.json")) || null;
+  const browserPersonaSummary =
+    (await readJsonReport(".project_memory/ops/out/browser_persona_gate_audit.json")) || null;
 
   const failedTargetedTests = executedTests.filter((test) => !test.ok || !test.outputPresent);
-  const severeRegression = Boolean(personaGateSummary && Number(personaGateSummary.p0 || 0) > 0);
+  const severeRegression = Boolean(
+    (personaGateSummary && Number(personaGateSummary.p0 || 0) > 0) ||
+      (browserPersonaSummary?.summary && Number(browserPersonaSummary.summary.p0 || 0) > 0)
+  );
 
   let verdict = "ACCEPT";
   const reasons = [];
@@ -229,11 +233,21 @@ async function main() {
   } else if (severeRegression) {
     verdict = "REJECT";
     reasons.push("Persona gate reported P0 failures.");
-  } else if (failedTargetedTests.length > 0 || !proof.manualQa.ok || !proof.reviewPacket.ok) {
+  } else if (
+    failedTargetedTests.length > 0 ||
+    !proof.manualQa.ok ||
+    !proof.reviewPacket.ok ||
+    !proof.reviewPacket.semanticOk ||
+    (browserJourneysRequired && !browserJourneySummary?.summary) ||
+    (browserPersonaRequired && !browserPersonaSummary?.summary)
+  ) {
     verdict = "REVISE";
     if (failedTargetedTests.length > 0) reasons.push("One or more required targeted checks failed or did not emit expected outputs.");
     if (!proof.manualQa.ok) reasons.push("Required manual QA note is missing.");
     if (!proof.reviewPacket.ok) reasons.push("Required review packet is missing or incomplete.");
+    if (!proof.reviewPacket.semanticOk) reasons.push("Review packet semantic validation failed.");
+    if (browserJourneysRequired && !browserJourneySummary?.summary) reasons.push("Required browser journey summary is missing.");
+    if (browserPersonaRequired && !browserPersonaSummary?.summary) reasons.push("Required browser persona summary is missing.");
   } else {
     reasons.push("All mandatory core and targeted checks passed, and required proof artifacts are present.");
   }
@@ -251,6 +265,8 @@ async function main() {
     tests: executedTests,
     proof,
     personaGateSummary,
+    browserJourneySummary: browserJourneySummary?.summary || null,
+    browserPersonaSummary: browserPersonaSummary?.summary || null,
     decision: {
       verdict,
       reasons,
@@ -283,6 +299,11 @@ async function main() {
     `- Review packet required: ${reviewPacketRequired}`,
     `- Review packet path: ${proof.reviewPacket.path || "missing"}`,
     `- Review packet sections OK: ${proof.reviewPacket.sectionsOk}`,
+    `- Review packet semantic OK: ${proof.reviewPacket.semanticOk}`,
+    `- Review packet semantic report: ${proof.reviewPacket.semanticReport || "missing"}`,
+    `- Browser journeys required: ${browserJourneysRequired}`,
+    `- Browser journey summary: ${browserJourneySummary ? JSON.stringify(browserJourneySummary.summary) : "missing"}`,
+    `- Browser persona summary: ${browserPersonaSummary ? JSON.stringify(browserPersonaSummary.summary) : "missing"}`,
     "",
     "## Decision",
     ...reasons.map((reason) => `- ${reason}`),

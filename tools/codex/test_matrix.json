@@ -33,6 +33,18 @@
           "command": "npm run test:persona-gate",
           "severity": "targeted",
           "expectedReport": ".project_memory/ops/out/persona_gate_audit.json"
+        },
+        {
+          "label": "browser_topichub_journey",
+          "command": "npm run test:browser:topichub",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "browser_persona_gate",
+          "command": "npm run test:persona-browser-gate",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_persona_gate_audit.json"
         }
       ],
       "proof": {
@@ -69,6 +81,18 @@
           "command": "npm run test:persona-gate",
           "severity": "targeted",
           "expectedReport": ".project_memory/ops/out/persona_gate_audit.json"
+        },
+        {
+          "label": "browser_practice_journey",
+          "command": "npm run test:browser:practice",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "browser_persona_gate",
+          "command": "npm run test:persona-browser-gate",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_persona_gate_audit.json"
         }
       ],
       "proof": {
@@ -107,6 +131,18 @@
           "label": "mentor_image_support",
           "command": "node scripts/ops/codex_testing/test_mentor_image_support.cjs",
           "severity": "targeted"
+        },
+        {
+          "label": "browser_mentor_journey",
+          "command": "npm run test:browser:mentor",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "browser_persona_gate",
+          "command": "npm run test:persona-browser-gate",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_persona_gate_audit.json"
         }
       ],
       "proof": {
@@ -178,6 +214,18 @@
           "command": "npm run test:persona-gate",
           "severity": "targeted",
           "expectedReport": ".project_memory/ops/out/persona_gate_audit.json"
+        },
+        {
+          "label": "browser_triangles_journey",
+          "command": "npm run test:browser:triangles",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "review_packet_semantic",
+          "command": "npm run test:review-packet:semantic",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/review_packet_semantic_validation.json"
         }
       ],
       "proof": {
@@ -205,6 +253,24 @@
           "command": "npm run test:persona-gate",
           "severity": "targeted",
           "expectedReport": ".project_memory/ops/out/persona_gate_audit.json"
+        },
+        {
+          "label": "browser_journeys",
+          "command": "npm run test:browser:journeys",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "browser_persona_gate",
+          "command": "npm run test:persona-browser-gate",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_persona_gate_audit.json"
+        },
+        {
+          "label": "review_packet_semantic",
+          "command": "npm run test:review-packet:semantic",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/review_packet_semantic_validation.json"
         }
       ],
       "proof": {
@@ -217,6 +283,8 @@
       "match": {
         "prefixes": [
           "tools/codex/",
+          "scripts/ops/browser_journeys/",
+          "scripts/ops/browser_persona_gate_auditor.mjs",
           "scripts/ops/student_bots/",
           "scripts/ops/tutor_bots/",
           "scripts/ops/persona_bot_lib.mjs",
@@ -238,6 +306,24 @@
           "command": "npm run test:persona-gate",
           "severity": "targeted",
           "expectedReport": ".project_memory/ops/out/persona_gate_audit.json"
+        },
+        {
+          "label": "browser_journeys",
+          "command": "npm run test:browser:journeys",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_journey_gate_audit.json"
+        },
+        {
+          "label": "browser_persona_gate",
+          "command": "npm run test:persona-browser-gate",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/browser_persona_gate_audit.json"
+        },
+        {
+          "label": "review_packet_semantic",
+          "command": "npm run test:review-packet:semantic",
+          "severity": "targeted",
+          "expectedReport": ".project_memory/ops/out/review_packet_semantic_validation.json"
         }
       ],
       "proof": {
