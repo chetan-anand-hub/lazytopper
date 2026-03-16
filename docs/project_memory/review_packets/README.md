@@ -1,13 +1,19 @@
 # Codex Review Packet Standard
 
-Every substantial Codex task should now prefer a task-scoped packet and evidence bundle using:
-`<task-id>_review.md` and `<task-id>_review.json`
+This README is tracked as stable reviewer guidance.
+
+Generated packet instances are local-only:
+- `docs/project_memory/review_packets/<task-id>_review.md`
+- `docs/project_memory/review_packets/<task-id>_review.json`
+- older timestamped packet instances in this folder
+
+Do not commit generated packet instances by default. Commit only stable instructions, contracts, and optional reusable templates under `docs/project_memory/review_packets/templates/`.
 
 Task-scoped evidence bundle:
 - `docs/project_memory/test_runs/<task-id>/manifest.json`
 - `docs/project_memory/test_runs/<task-id>/...task-scoped proof artifacts...`
-- `docs/project_memory/review_packets/<task-id>_review.md`
-- `docs/project_memory/review_packets/<task-id>_review.json`
+- generated local packet instance: `docs/project_memory/review_packets/<task-id>_review.md`
+- generated local packet instance: `docs/project_memory/review_packets/<task-id>_review.json`
 - `.project_memory/ops/out/<task-id>/...machine-readable reports...`
 
 Required review packet sections:
@@ -27,6 +33,7 @@ Purpose:
 - give reviewers one deterministic entry point
 - bind claims to one exact task-scoped evidence bundle
 - capture assumptions and residual risks before lane-wise commit/push
+- keep reusable review instructions tracked while leaving task-run evidence local-only
 
 Validation layers:
 - Structural validation checks the required headings exist.
@@ -36,6 +43,7 @@ Manifest-driven approval:
 - `manifest.json` is the primary evidence contract for V3 review.
 - Gatekeeper should prefer task-scoped evidence whenever `--task-id` is provided.
 - Latest-artifact fallback remains only for older tasks and should be treated as weaker evidence.
+- `docs/project_memory/test_runs/**`, `docs/project_memory/strategy_reports/**`, generated packet instances in this folder, and `.project_memory/**` are generated evidence and should remain local-only unless deliberately promoted elsewhere.
 
 When browser journeys are required:
 - TopicHub, Practice, Mentor, and tutor-path changes should carry browser journey proof.

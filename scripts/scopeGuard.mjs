@@ -100,7 +100,10 @@ function main() {
   const staged = listFiles("git diff --name-only --cached");
   const unstaged = listFiles("git diff --name-only");
   const untracked = listFiles("git ls-files --others --exclude-standard");
+  const stagedDeleted = listFiles("git diff --name-only --diff-filter=D --cached");
+  const unstagedDeleted = listFiles("git diff --name-only --diff-filter=D");
   const all = Array.from(new Set([...staged, ...unstaged, ...untracked]));
+  const deletedFiles = new Set([...stagedDeleted, ...unstagedDeleted]);
 
   if (!all.length) {
     console.log(`SCOPE_GUARD_OK (mode=${mode}, no changes)`);
@@ -121,8 +124,12 @@ function main() {
   }
 
   const hardBoundaryViolations = [
-    ...laneBuckets.generatedEvidence.map((file) => ({ lane: "generatedEvidence", file })),
-    ...laneBuckets.localOnly.map((file) => ({ lane: "localOnly", file })),
+    ...laneBuckets.generatedEvidence
+      .filter((file) => !deletedFiles.has(file))
+      .map((file) => ({ lane: "generatedEvidence", file })),
+    ...laneBuckets.localOnly
+      .filter((file) => !deletedFiles.has(file))
+      .map((file) => ({ lane: "localOnly", file })),
     ...laneBuckets.unknown.map((file) => ({ lane: "unknown", file })),
   ];
 

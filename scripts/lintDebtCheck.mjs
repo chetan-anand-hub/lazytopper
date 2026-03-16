@@ -11,6 +11,8 @@ const EXCLUDED_DEBT_DIR_PREFIXES = [
   "_handover_evidence/",
   "_codex_output/",
   ".codex_runs/",
+  "docs/project_memory/test_runs/",
+  "docs/project_memory/strategy_reports/",
   "reports/",
 ];
 

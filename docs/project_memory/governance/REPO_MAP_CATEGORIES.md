@@ -31,6 +31,11 @@ Report date: February 1, 2026
 
 Confirmed ignored by `.gitignore`:
 - `.project_memory/`
+- `docs/project_memory/test_runs/`
+- `docs/project_memory/strategy_reports/`
+- generated `docs/project_memory/review_packets/*_review.md`
+- generated `docs/project_memory/review_packets/*_review.json`
+- timestamped generated packet instances under `docs/project_memory/review_packets/`
 - `.codex_runs/`
 - `RUN_*/` and `**/RUN_*/`
 - `docs/ops/out/`
@@ -43,3 +48,7 @@ Confirmed ignored by `.gitignore`:
 
 Local-only tooling (per-worktree exclude):
 - `tools/.local_ops/` (enforced by `scripts/ops/bootstrap_local_ops.ps1`)
+
+Stable tracked review guidance:
+- `docs/project_memory/review_packets/README.md`
+- optional tracked templates/contracts under `docs/project_memory/review_packets/templates/`
