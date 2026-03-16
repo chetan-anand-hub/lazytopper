@@ -565,6 +565,7 @@ const PracticePage: React.FC = () => {
   const qp = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const topicParam = qp.get("topic") || "Generic";
   const topicKeyParam = qp.get("topicKey");
+  const journeyMentorMode = String(qp.get("journeyMentor") || "").trim().toLowerCase();
 
   // Navigation state for Back button + label
   const navState = (location.state as any) || {};
@@ -627,6 +628,7 @@ const PracticePage: React.FC = () => {
   }, [practiceFilters, qp]);
 
   const didInitFromUrlRef = useRef(false);
+  const didAutoOpenJourneyMentorRef = useRef(false);
 
   const [subtopicHint, setSubtopicHint] = useState<string | undefined>(
     () => initialPracticeDefaults.subtopicHint
@@ -935,6 +937,21 @@ const packTopicKey = useMemo(() => {
     },
     [getQuestionStrategyDetails]
   );
+
+  useEffect(() => {
+    if (didAutoOpenJourneyMentorRef.current) return;
+    if (!journeyMentorMode || filteredQuestions.length === 0) return;
+    const firstQuestion = filteredQuestions[0];
+    const entryMode =
+      journeyMentorMode === "check_cbse"
+        ? "check_cbse"
+        : journeyMentorMode === "hint"
+          ? "hint"
+          : "auto";
+    setActiveQuestionId(String(firstQuestion.id));
+    openMentorForQuestion(firstQuestion, 0, entryMode);
+    didAutoOpenJourneyMentorRef.current = true;
+  }, [filteredQuestions, journeyMentorMode, openMentorForQuestion]);
 
   const title = useMemo(() => {
     if (!topicParam || topicParam === "Generic") {
@@ -1258,6 +1275,7 @@ const packTopicKey = useMemo(() => {
 
         {isWhyThisQuestionEnabled && (
           <section
+            data-testid="practice-why-panel"
             style={{
               marginBottom: 12,
               borderRadius: 16,
@@ -1268,6 +1286,7 @@ const packTopicKey = useMemo(() => {
             }}
           >
             <button
+              data-testid="practice-why-panel-toggle"
               type="button"
               onClick={() => setIsWhyPanelOpen((prev) => !prev)}
               style={{
@@ -1446,6 +1465,8 @@ const packTopicKey = useMemo(() => {
                 return (
                   <article
                     key={q.id}
+                    data-testid="practice-question-card"
+                    data-question-id={String(q.id)}
                     onClick={() => setActiveQuestionId(String(q.id))}
                     style={{
                       borderRadius: 18,
@@ -1547,6 +1568,7 @@ const packTopicKey = useMemo(() => {
                       }}
                     >
                       <button
+                        data-testid="practice-mentor-cta"
                         type="button"
                         onClick={() => {
                           setActiveQuestionId(String(q.id));
@@ -1605,6 +1627,7 @@ const packTopicKey = useMemo(() => {
                     >
                       <details>
                         <summary
+                          data-testid="practice-mentor-help-toggle"
                           style={{
                             borderRadius: 999,
                             padding: "5px 12px",
@@ -1633,6 +1656,7 @@ const packTopicKey = useMemo(() => {
                           }}
                         >
                           <button
+                            data-testid="practice-board-steps-cta"
                             type="button"
                             onClick={(event) => {
                               setActiveQuestionId(String(q.id));
@@ -2147,6 +2171,8 @@ function MentorSolveDrawer(props: {
       onClick={onClose}
     >
       <div
+        data-testid="practice-mentor-drawer"
+        data-mentor-intent={resolvedIntent}
         style={{
           width: "min(920px, 100%)",
           maxHeight: "92vh",
@@ -2222,6 +2248,7 @@ function MentorSolveDrawer(props: {
 
             return (
               <div
+                data-testid="practice-board-steps-panel"
                 style={{
                   marginBottom: 12,
                   padding: 12,
@@ -2490,8 +2517,6 @@ function MentorSolveDrawer(props: {
 }
 
 export default PracticePage;
-
-
 
 
 

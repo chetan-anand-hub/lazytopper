@@ -45,9 +45,13 @@ type AuthContextType = {
 const LOCAL_AUTH_KEY = "lazytopper.auth.local.v1";
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function shouldAutoAnonBootstrap(): boolean {
+function shouldUseDeterministicE2EAuth(): boolean {
   const explicit = String(import.meta.env.VITE_E2E_AUTO_ANON_AUTH || "").trim().toLowerCase();
-  if (explicit === "1" || explicit === "true" || explicit === "yes") return true;
+  return explicit === "1" || explicit === "true" || explicit === "yes";
+}
+
+function shouldAutoAnonBootstrap(): boolean {
+  if (shouldUseDeterministicE2EAuth()) return true;
   const isAutomation =
     typeof navigator !== "undefined" &&
     typeof navigator.webdriver === "boolean" &&
@@ -88,6 +92,16 @@ function writeLocalSession(user: AuthUser | null): void {
   }
 }
 
+function createLocalDevUser(): AuthUser {
+  return {
+    uid: "local-dev-user",
+    email: null,
+    phoneNumber: null,
+    displayName: "Local Student",
+    isLocalSession: true,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
     if (firebaseConfigured) return null;
@@ -120,6 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (next) => {
       if (!next && shouldAutoAnonBootstrap() && !autoAnonAttemptedRef.current) {
         autoAnonAttemptedRef.current = true;
+        if (shouldUseDeterministicE2EAuth()) {
+          const localUser = createLocalDevUser();
+          setUser(localUser);
+          writeLocalSession(localUser);
+          setLoading(false);
+          return;
+        }
         setUser(null);
         setLoading(true);
         void signInAnonymously(auth).catch(() => {
@@ -210,13 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const continueLocalSession = () => {
-    const localUser: AuthUser = {
-      uid: "local-dev-user",
-      email: null,
-      phoneNumber: null,
-      displayName: "Local Student",
-      isLocalSession: true,
-    };
+    const localUser = createLocalDevUser();
     setUser(localUser);
     setActiveProgressUser(localUser.uid);
     writeLocalSession(localUser);

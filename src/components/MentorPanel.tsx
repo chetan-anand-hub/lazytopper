@@ -948,7 +948,12 @@ Give me hint level ${targetLevel} only (keep it short).`
 
 
   return (
-    <div className="mentor-panel">
+    <div
+      className="mentor-panel"
+      data-testid="mentor-panel"
+      data-mentor-intent={intent}
+      data-advanced-mode={usingAdvancedMode ? "true" : "false"}
+    >
       {/* HEADER */}
       <div className="mentor-panel__header">
         <div className="mentor-panel__header-text">
@@ -972,7 +977,7 @@ Give me hint level ${targetLevel} only (keep it short).`
         </div>
       </div>
       {/* Student-first action chips. */}
-      <div className="mentor-panel__modes">
+      <div className="mentor-panel__modes" data-testid="mentor-student-actions">
         {STUDENT_ACTIONS.map(({ key, label }) => (
           <button
             key={key}
@@ -1014,6 +1019,7 @@ Give me hint level ${targetLevel} only (keep it short).`
       </div>
       {showSolutionImageUpload && (
         <div
+          data-testid="mentor-check-cbse-helper"
           style={{
             marginTop: -4,
             marginBottom: 10,
@@ -1245,4 +1251,3 @@ Give me hint level ${targetLevel} only (keep it short).`
     </div>
   );
 };
-

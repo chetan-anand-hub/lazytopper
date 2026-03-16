@@ -2208,6 +2208,7 @@ const showInZombie = (sectionId: string) => {
           strategyPack?.tiles?.length &&
           (isLearn || isGrind) ? (
             <section
+              data-testid="topichub-qtype-tiles"
               style={{
                 borderRadius: 18,
                 padding: "12px 12px",
