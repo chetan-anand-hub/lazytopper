@@ -1,13 +1,17 @@
 import { useState } from "react";
+import type { LazytopperDiagramBlock } from "../diagrams/diagramIntelligence";
+import { buildDiagramBlockFromLegacy } from "../diagrams/diagramInterop";
 import type { MentorDiagramSpec } from "../types/mentor";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
 import { DiagramRenderer } from "./diagrams/DiagramRenderer";
+import { DiagramCanvas } from "./diagrams/DiagramCanvas";
 import { DiagramSvg } from "../tutor/diagram/DiagramSvg";
 import { isDiagramSpec } from "../tutor/diagram/diagramTypes";
 
 type DiagramLabels = Record<string, string>;
 
 type Props = {
+  diagram?: LazytopperDiagramBlock | null;
   diagramType?: string | null;
   diagramLabels?: DiagramLabels | string[] | null;
   diagramSpec?: MentorDiagramSpec | DiagramSpec | null;
@@ -209,6 +213,7 @@ function DiagramPlaceholder({ labels }: { labels: DiagramLabels }) {
 }
 
 export function DiagramBlock({
+  diagram,
   diagramType,
   diagramLabels,
   diagramSpec,
@@ -216,6 +221,17 @@ export function DiagramBlock({
   note,
 }: Props) {
   const [zoomed, setZoomed] = useState(false);
+  const normalizedDiagram =
+    diagram ||
+    buildDiagramBlockFromLegacy({
+      diagramType,
+      diagramLabels: diagramLabels as Record<string, string> | string[] | null,
+      diagramSpec,
+      title,
+      caption: note,
+      accessibilityLabel: title,
+      diagramIntent: "visualize_question",
+    });
   const type = normalizeDiagramType(diagramType);
   const labels = normalizeLabels(diagramLabels);
   const isSimilarity =
@@ -255,7 +271,13 @@ export function DiagramBlock({
         </button>
       </div>
       <div style={{ maxWidth: zoomed ? 520 : 360, margin: "0 auto" }}>
-      {diagramSpec ? (
+      {normalizedDiagram ? (
+        <DiagramCanvas
+          diagram={normalizedDiagram}
+          maxWidth={zoomed ? 520 : 360}
+          compact={!zoomed}
+        />
+      ) : diagramSpec ? (
         isDiagramSpec(diagramSpec) ? (
           <DiagramSvg spec={diagramSpec} />
         ) : (
@@ -281,9 +303,11 @@ export function DiagramBlock({
         <DiagramPlaceholder labels={labels} />
       )}
       </div>
-      <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
-        {note || `Type: ${type}`}
-      </div>
+      {!normalizedDiagram || note ? (
+        <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
+          {note || `Type: ${type}`}
+        </div>
+      ) : null}
     </div>
   );
 }

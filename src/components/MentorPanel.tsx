@@ -7,9 +7,11 @@ import React, { useEffect, useRef, useState } from "react";
 // import avoids unused variable errors and mismatched argument counts.
 // import { saveStrategyPlan } from "../services/planStorage";
 import { callMentor } from "../ai/aiClient";
+import { buildDiagramBlockFromLegacy } from "../diagrams/diagramInterop";
 import { getHintVariant } from "../services/abFlags";
 import { logActivity } from "../services/sessionLogger";
 import { HumanGradeCoachView } from "./mentor/HumanGradeCoachView";
+import { DiagramBlock } from "./DiagramBlock";
 import { isRecord } from "../types/mentor";
 import type {
   MentorMode,
@@ -24,6 +26,7 @@ import type {
 } from "../types/MentorRequest";
 import type { MentorPayload } from "../ai/aiClient";
 import type { MentorImageMimeType, TutorBlock } from "../types/mentor";
+import type { LazytopperDiagramBlock } from "../diagrams/diagramIntelligence";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
 import {
   createMentorImageAttachment,
@@ -274,6 +277,42 @@ function getTutorText(structured: MentorStructured | undefined): string {
     return text || rawText || "";
   }
   return "";
+}
+
+function extractStructuredDiagram(
+  structured: MentorStructured | undefined,
+  fallbackTitle = "Mentor diagram"
+): LazytopperDiagramBlock | null {
+  if (!isRecord(structured)) return null;
+
+  const directBlock = structured.diagramBlock;
+  if (isRecord(directBlock) && typeof directBlock.diagramType === "string" && directBlock.spec) {
+    return directBlock as unknown as LazytopperDiagramBlock;
+  }
+
+  const tutor = getTutorObject(structured);
+  const tutorDiagramBlock = tutor && isRecord(tutor.diagramBlock) ? tutor.diagramBlock : null;
+  if (
+    isRecord(tutorDiagramBlock) &&
+    typeof tutorDiagramBlock.diagramType === "string" &&
+    tutorDiagramBlock.spec
+  ) {
+    return tutorDiagramBlock as unknown as LazytopperDiagramBlock;
+  }
+
+  return buildDiagramBlockFromLegacy({
+    diagramType:
+      (typeof structured.diagramType === "string" ? structured.diagramType : "") ||
+      (tutor && typeof tutor.diagramType === "string" ? tutor.diagramType : ""),
+    diagramLabels:
+      (structured.diagramLabels as Record<string, string> | string[] | null) ||
+      (tutor?.diagramLabels as Record<string, string> | string[] | null) ||
+      null,
+    diagramSpec: structured.diagram || structured.diagramSpec || tutor?.diagram || tutor?.diagramSpec,
+    title: fallbackTitle,
+    accessibilityLabel: fallbackTitle,
+    diagramIntent: "mentor_support",
+  });
 }
 
 function formatBoardSteps(obj: unknown): string {
@@ -1169,27 +1208,41 @@ Give me hint level ${targetLevel} only (keep it short).`
         {/* If there are any chat messages, render them as a conversation thread. */}
         {messages.length > 0 &&
           messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={
-                "mentor-panel__message " +
-                (msg.role === "user"
-                  ? "mentor-panel__message--user"
-                  : "mentor-panel__message--assistant")
-              }
-            >
-              <div className="mentor-panel__bubble">
-                {sanitizeMentorOutput(msg.content).split("\n").map((line, i) => (
-                  <p key={i}>{line}</p>
-                ))}
-              </div>
-              {msg.role === "assistant"
-                ? (() => {
-                    const coachProps = buildCoachViewProps(msg, idx);
-                    return coachProps ? <HumanGradeCoachView {...coachProps} /> : null;
-                  })()
-                : null}
-            </div>
+            (() => {
+              const messageDiagram =
+                msg.role === "assistant"
+                  ? extractStructuredDiagram(msg.structured, `${msg.mode || "mentor"} diagram`)
+                  : null;
+
+              return (
+                <div
+                  key={idx}
+                  className={
+                    "mentor-panel__message " +
+                    (msg.role === "user"
+                      ? "mentor-panel__message--user"
+                      : "mentor-panel__message--assistant")
+                  }
+                >
+                  <div className="mentor-panel__bubble">
+                    {sanitizeMentorOutput(msg.content).split("\n").map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                  {messageDiagram ? (
+                    <div style={{ marginTop: 10 }}>
+                      <DiagramBlock diagram={messageDiagram} />
+                    </div>
+                  ) : null}
+                  {msg.role === "assistant"
+                    ? (() => {
+                        const coachProps = buildCoachViewProps(msg, idx);
+                        return coachProps ? <HumanGradeCoachView {...coachProps} /> : null;
+                      })()
+                    : null}
+                </div>
+              );
+            })()
           ))}
         {/* If no conversation yet and we're in plan mode with a plan preview, show the plan preview bubble. */}
         {messages.length === 0 && planPreview && resolvedMode === "plan" && (

@@ -17,6 +17,7 @@ export type DiagramPoint = {
   y: number;
   label?: string;
   labelOffset?: { x: number; y: number };
+  highlight?: boolean;
 };
 
 export type DiagramEdge = {
@@ -35,6 +36,22 @@ export type DiagramAngleMark = {
   highlight?: boolean;
 };
 
+export type DiagramRightAngleMark = {
+  at: string;
+  alongA: string;
+  alongB: string;
+  size?: number;
+  highlight?: boolean;
+};
+
+export type DiagramArrow = {
+  from: string;
+  to: string;
+  label?: string;
+  dashed?: boolean;
+  highlight?: boolean;
+};
+
 export type DiagramSpec = {
   kind: "tutor_diagram_v1";
   width: number;
@@ -44,6 +61,8 @@ export type DiagramSpec = {
   points: DiagramPoint[];
   edges: DiagramEdge[];
   angleMarks?: DiagramAngleMark[];
+  rightAngleMarks?: DiagramRightAngleMark[];
+  arrows?: DiagramArrow[];
   theme?: Partial<DiagramTheme>;
 };
 

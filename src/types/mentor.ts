@@ -42,6 +42,7 @@ export type MentorMode =
   | 'learn_mindmap';
 
 export type MentorImageMimeType = 'image/jpeg' | 'image/png';
+export type { LazytopperDiagramBlock } from "../diagrams/diagramIntelligence";
 
 export type UnknownRecord = Record<string, unknown>;
 
@@ -405,6 +406,8 @@ export interface SolveWithMeStructured {
 
   /** Optional diagram spec for visual explanation (frontend renders). */
   diagram?: MentorDiagramSpec;
+  /** Optional runtime-ready diagram block for direct frontend rendering. */
+  diagramBlock?: import("../diagrams/diagramIntelligence").LazytopperDiagramBlock;
   /** Optional anchors for stable highlighting in the diagram renderer. */
   anchors?: MentorDiagramAnchor[];
   /** Optional step→highlight mapping to sync with tutor steps. */
@@ -435,6 +438,8 @@ export interface BoardStepsStructured {
 
   /** Optional diagram spec for visual explanation (frontend renders). */
   diagram?: MentorDiagramSpec;
+  /** Optional runtime-ready diagram block for direct frontend rendering. */
+  diagramBlock?: import("../diagrams/diagramIntelligence").LazytopperDiagramBlock;
   /** Optional anchors for stable highlighting in the diagram renderer. */
   anchors?: MentorDiagramAnchor[];
   /** Optional step→highlight mapping to sync with tutor steps. */
@@ -463,6 +468,7 @@ export interface LearnTeachStructured {
   diagramType?: string;
   diagramLabels?: Record<string, string>;
   diagram?: MentorDiagramSpec;
+  diagramBlock?: import("../diagrams/diagramIntelligence").LazytopperDiagramBlock;
   anchors?: MentorDiagramAnchor[];
   diagramSteps?: MentorDiagramStepLink[];
 }
@@ -481,6 +487,7 @@ export interface LearnProofStructured {
   diagramType?: string;
   diagramLabels?: Record<string, string>;
   diagram?: MentorDiagramSpec;
+  diagramBlock?: import("../diagrams/diagramIntelligence").LazytopperDiagramBlock;
   anchors?: MentorDiagramAnchor[];
   diagramSteps?: MentorDiagramStepLink[];
 }
@@ -496,6 +503,7 @@ export interface LearnMindmapStructured {
   diagramType?: string;
   diagramLabels?: Record<string, string>;
   diagram?: MentorDiagramSpec;
+  diagramBlock?: import("../diagrams/diagramIntelligence").LazytopperDiagramBlock;
   anchors?: MentorDiagramAnchor[];
   diagramSteps?: MentorDiagramStepLink[];
 }

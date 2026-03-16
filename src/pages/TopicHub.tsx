@@ -18,6 +18,13 @@ import type { TopicHubV2Content, V2Definition, V2Example, Misconception, Compete
 import { PredictionCore } from "../data/predictionCore";
 import { generatePracticeSet } from "../data/practiceSetGenerator";
 import { useVibeMode } from "../context/vibeModeContext";
+import { trianglesRuntimeVisuals } from "../data/diagrams/trianglesRuntimeVisuals";
+import {
+  buildParallelLinesDiagram,
+  buildRightTriangleDiagram,
+  buildSimilarityDiagram,
+  buildTriangleDiagram,
+} from "../diagrams/geometryBuilders";
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
@@ -1705,6 +1712,39 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
     if (f.includes("sss")) return "gSSS";
     return "gQ1";
   }, []);
+  const buildTrianglesProofDiagram = useCallback((focus?: string) => {
+    const f = String(focus || "").toLowerCase();
+    if (f.includes("bpt")) {
+      return buildParallelLinesDiagram({
+        title: "BPT proof figure",
+        caption: "Call out the parallel line before writing the ratio step.",
+        diagramIntent: "visualize_question",
+        accessibilityLabel: "BPT proof diagram",
+      });
+    }
+    if (f.includes("pyth")) {
+      return buildRightTriangleDiagram({
+        title: "Right triangle proof figure",
+        caption: "Use Pythagoras only after the right angle is fixed in the figure.",
+        diagramIntent: "visualize_question",
+        accessibilityLabel: "Right triangle proof diagram",
+      });
+    }
+    if (f.includes("area") || f.includes("cpst") || f.includes("similar")) {
+      return buildSimilarityDiagram({
+        title: "Similarity proof figure",
+        caption: "Match the corresponding vertices first, then write the criterion.",
+        diagramIntent: "visualize_question",
+        accessibilityLabel: "Similarity proof diagram",
+      });
+    }
+    return buildTriangleDiagram({
+      title: "Proof setup figure",
+      caption: "Label the triangles cleanly before you begin the board solution.",
+      diagramIntent: "visualize_question",
+      accessibilityLabel: "Triangles proof setup diagram",
+    });
+  }, []);
 
   const closeTutorDrawer = useCallback(() => {
     setTutorDrawerOpen(false);
@@ -2439,6 +2479,67 @@ const showInZombie = (sectionId: string) => {
                 ))}
               </div>
 
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 900, fontSize: 14 }}>See the figure before you solve</div>
+                <div style={{ marginTop: 4, fontSize: 12, opacity: 0.76 }}>
+                  Diagram-dependent ideas should show the setup explicitly, not expect the student to imagine it.
+                </div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {trianglesRuntimeVisuals.map((visual) => (
+                    <div
+                      key={visual.id}
+                      style={{
+                        borderRadius: 16,
+                        padding: "12px 12px",
+                        border: "1px solid rgba(15,23,42,0.12)",
+                        background: "rgba(255,255,255,0.84)",
+                      }}
+                    >
+                      <DiagramBlock diagram={visual.diagram} />
+                      <div style={{ marginTop: 8, fontWeight: 900, fontSize: 13 }}>
+                        {visual.title}
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, lineHeight: 1.5 }}>
+                        {visual.description}
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 900,
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "rgba(255,255,255,0.95)",
+                            border: "1px solid rgba(15,23,42,0.16)",
+                          }}
+                        >
+                          {visual.recommendedDiagramType}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 900,
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "rgba(255,255,255,0.95)",
+                            border: "1px solid rgba(15,23,42,0.16)",
+                          }}
+                        >
+                          {visual.visualPriority} priority
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div
                 style={{
                   marginTop: 14,
@@ -2844,6 +2945,9 @@ const showInZombie = (sectionId: string) => {
                       <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.5 }}>{t.description}</div>
                       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
                         Marks: {t.marks} | Focus: {t.focus.replace("_", " ")}
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        <DiagramBlock diagram={buildTrianglesProofDiagram(t.focus)} />
                       </div>
                       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button
