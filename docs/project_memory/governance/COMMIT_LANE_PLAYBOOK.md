@@ -13,12 +13,25 @@
 - Track reusable review/QA infrastructure, not task-run artifacts:
   - track `tools/codex/`, `scripts/ops/`, stable governance docs, `docs/project_memory/review_packets/README.md`, and stable templates/contracts.
   - do not track generated packet instances, test-run summaries, strategy reports, or `.project_memory/` outputs.
+- `package.json` stays product by default, except script-wrapper-only changes that expose tooling commands; those may ride with the tooling lane.
 
 ## Pre-Commit Routine
 1. `git status --short`
 2. `npm run scope:guard -- --mode product` for product commits, or `npm run scope:guard` for tooling commits.
 3. Product lane gates: `npm run lint:debt:check` and relevant acceptance tests.
 4. Tooling lane gate: `npm run test:repo-boundary`.
+
+## Validation Loop
+- Student-facing product tasks should use this default loop:
+  1. `npm run test:software-bot`
+  2. `npm run test:persona-gate`
+  3. `npm run test:persona-browser-gate`
+  4. the most relevant targeted browser journey, if one exists
+- Tooling tasks that change review/test infrastructure should still run:
+  1. `npm run scope:guard`
+  2. `npm run test:repo-boundary`
+  3. the new software-testing bot in the most relevant mode (`fast` or `product`)
+- Generated evidence stays local-only even when these checks write JSON reports.
 
 ## Push Rule
 1. Push only after lane-specific checks pass.

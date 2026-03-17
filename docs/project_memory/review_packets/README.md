@@ -35,6 +35,18 @@ Purpose:
 - capture assumptions and residual risks before lane-wise commit/push
 - keep reusable review instructions tracked while leaving task-run evidence local-only
 
+Mandatory validation loop for future product tasks:
+1. `npm run test:software-bot`
+2. `npm run test:persona-gate`
+3. `npm run test:persona-browser-gate`
+4. the most relevant targeted browser journey if the touched surface already has one
+
+Software-testing bot scope:
+- `test:software-bot` is the technical/runtime counterpart to the persona gates.
+- It is responsible for deterministic build/runtime/journey/governance correctness signals.
+- It does not replace persona or pedagogy review; it complements them.
+- It is honest about web-now coverage vs mobile-later structure.
+
 Validation layers:
 - Structural validation checks the required headings exist.
 - Semantic validation checks the packet is genuinely useful and truthful. It must align with the task manifest, changed files, executed tests, manual QA file, and proof artifacts.

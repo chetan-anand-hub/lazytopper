@@ -34,6 +34,42 @@ function listFiles(cmd) {
   }
 }
 
+function readJsonSafe(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+let packageJsonScriptsOnlyChangeCache;
+function packageJsonHasOnlyScriptChanges() {
+  if (typeof packageJsonScriptsOnlyChangeCache === "boolean") {
+    return packageJsonScriptsOnlyChangeCache;
+  }
+
+  try {
+    const current = readJsonSafe(path.join(ROOT, "package.json"));
+    const headText = execSync("git show HEAD:package.json", { encoding: "utf8" });
+    const previous = JSON.parse(headText);
+    if (!current || !previous) {
+      packageJsonScriptsOnlyChangeCache = false;
+      return packageJsonScriptsOnlyChangeCache;
+    }
+
+    const keys = Array.from(new Set([...Object.keys(current), ...Object.keys(previous)]));
+    const changedTopLevelKeys = keys.filter(
+      (key) => JSON.stringify(current[key]) !== JSON.stringify(previous[key])
+    );
+    packageJsonScriptsOnlyChangeCache =
+      changedTopLevelKeys.length > 0 && changedTopLevelKeys.every((key) => key === "scripts");
+    return packageJsonScriptsOnlyChangeCache;
+  } catch {
+    packageJsonScriptsOnlyChangeCache = false;
+    return packageJsonScriptsOnlyChangeCache;
+  }
+}
+
 function readPolicy() {
   if (!fs.existsSync(POLICY_PATH)) {
     throw new Error(`scopeGuard: missing policy file at ${normalizePath(POLICY_PATH)}`);
@@ -70,6 +106,9 @@ function inLane(filePath, rules) {
 function classifyFile(filePath, lanes) {
   if (inLane(filePath, lanes.generatedEvidence)) return "generatedEvidence";
   if (inLane(filePath, lanes.localOnly)) return "localOnly";
+  if (normalizePath(filePath) === "package.json" && packageJsonHasOnlyScriptChanges()) {
+    return "trackedTooling";
+  }
   if (inLane(filePath, lanes.product)) return "product";
   if (inLane(filePath, lanes.trackedTooling)) return "trackedTooling";
   return "unknown";
