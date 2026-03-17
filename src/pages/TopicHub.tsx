@@ -2163,7 +2163,7 @@ const showInZombie = (sectionId: string) => {
       mentorTitle: "Triangles • Check my proof",
       sourceNote:
         trianglesQuestionFamilies.length > 0
-          ? "The family router now resolves into a Triangles-specific focus bank, so practice is no longer only a generic runtime pull. Depth is still lighter than the Trigonometry pack path, but the routing is now theorem-family aware."
+          ? "The family router now resolves into a Triangles-specific focus bank backed by a chapter pack with Section A-E coverage and a competency-heavy mix. Depth is still lighter than the Trigonometry pack path, but the routing is now theorem-family aware."
           : "",
     };
   }, [

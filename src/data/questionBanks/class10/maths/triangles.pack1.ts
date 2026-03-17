@@ -34,6 +34,7 @@ type TrianglesQuestionSpec = {
   subtopic?: string;
   bloomSkill?: BloomLevel;
   strategyHint?: string;
+  formatOverride?: QuestionFormat;
   options?: readonly string[];
 };
 
@@ -147,7 +148,7 @@ function makeTrianglesQuestion(spec: TrianglesQuestionSpec): TrianglesPackQuesti
     section: spec.cbseFormat,
     cbseFormat: spec.cbseFormat,
     marks: MARKS_BY_SECTION[spec.cbseFormat],
-    format: FORMAT_BY_SECTION[spec.cbseFormat],
+    format: spec.formatOverride ?? FORMAT_BY_SECTION[spec.cbseFormat],
     difficulty: spec.difficulty,
     bloomSkill: spec.bloomSkill ?? defaultBloom(spec.skillFamily),
     questionText: spec.questionText,
@@ -275,6 +276,110 @@ const sectionAQuestions = [
       },
     ]
   ),
+  ...buildGroup(
+    {
+      cbseFormat: "A",
+      skillFamily: "Theorem Choice",
+      loIds: ["LO_TRI_01_READ_FIGURE_FIRST", "LO_TRI_03_BPT_PARALLEL_FLOW"],
+      difficulty: "Easy",
+    },
+    [
+      {
+        questionId: "2026-TRI-P1-A-008",
+        questionText:
+          "If a line segment joins the midpoints of two sides of a triangle, then it is:",
+        options: [
+          "parallel to the third side",
+          "equal to the third side",
+          "perpendicular to the third side",
+          "a median of the triangle",
+        ],
+        answer: "parallel to the third side",
+        working: ["By the midpoint theorem, the segment joining the midpoints of two sides is parallel to the third side."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-009",
+        questionText:
+          "If the areas of two similar triangles are in the ratio 16 : 25, then the ratio of their corresponding sides is:",
+        options: ["4 : 5", "16 : 25", "8 : 10", "5 : 4"],
+        answer: "4 : 5",
+        working: ["The ratio of corresponding sides is the square root of the area ratio."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-010",
+        questionText:
+          "A student notices DE parallel to BC in Delta ABC. Which should be the first written board line?",
+        options: [
+          "Since DE is parallel to BC, use BPT.",
+          "AD/DB = AE/EC directly.",
+          "Delta ADE = Delta ABC.",
+          "Area ratio is 1:4.",
+        ],
+        answer: "Since DE is parallel to BC, use BPT.",
+        working: ["The parallel-line condition must be stated before the ratio relation."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-011",
+        questionText:
+          "Assertion (A): If two sides of one triangle are proportional to two sides of another triangle, the triangles are similar.\nReason (R): SAS similarity needs the included angles to be equal along with proportional corresponding sides.",
+        answer:
+          "Assertion is false but Reason is true.",
+        working: [
+          "Proportional sides alone are not enough for SAS similarity.",
+          "The included angles must also be equal.",
+        ],
+        formatOverride: "Assertion-Reasoning",
+      },
+      {
+        questionId: "2026-TRI-P1-A-012",
+        questionText:
+          "At the same time of day, a 1.5 m pole casts a 2 m shadow and a tree casts an 8 m shadow. Which chapter idea helps compare their heights first?",
+        options: ["Similarity of triangles", "Converse BPT", "Midpoint theorem", "Pythagoras converse"],
+        answer: "Similarity of triangles",
+        working: ["Same sun angle gives similar right triangles, so corresponding heights and shadows are proportional."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-013",
+        questionText:
+          "If Delta ABC is similar to Delta DEF, then AB/DE equals:",
+        options: ["BC/EF", "DE/AB", "AC/DF only", "angle B/angle E"],
+        answer: "BC/EF",
+        working: ["In similar triangles, corresponding sides are in the same ratio."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-014",
+        questionText:
+          "Assertion (A): If DE is parallel to BC in Delta ABC, then AD/AB = AE/AC.\nReason (R): Triangles ADE and ABC are similar by AA similarity.",
+        answer:
+          "Both Assertion and Reason are true and Reason is the correct explanation of Assertion.",
+        working: [
+          "Parallel lines create equal corresponding angles.",
+          "That proves Delta ADE is similar to Delta ABC, which gives the proportional side relation.",
+        ],
+        formatOverride: "Assertion-Reasoning",
+      },
+      {
+        questionId: "2026-TRI-P1-A-015",
+        questionText:
+          "A triangular warning board is enlarged so that each side becomes twice the original length. The new area will be:",
+        options: ["twice", "three times", "four times", "eight times"],
+        answer: "four times",
+        working: ["Area of similar figures changes as the square of the side scale factor, so 2^2 = 4."],
+      },
+      {
+        questionId: "2026-TRI-P1-A-016",
+        questionText:
+          "Assertion (A): If two triangles are similar, then their perimeters are in the same ratio as their corresponding sides.\nReason (R): The ratio of areas of similar triangles is equal to the ratio of corresponding sides.",
+        answer:
+          "Assertion is true but Reason is false.",
+        working: [
+          "Perimeter ratio does equal the ratio of corresponding sides for similar triangles.",
+          "But area ratio equals the square of the side ratio, not the side ratio itself.",
+        ],
+        formatOverride: "Assertion-Reasoning",
+      },
+    ]
+  ),
 ];
 
 const sectionBQuestions = [
@@ -375,6 +480,47 @@ const sectionBQuestions = [
           "Area ratio = (2/3)^2 = 4/9.",
           "So 16/Area of larger triangle = 4/9.",
           "Hence area of larger triangle = 16 x 9/4 = 36 cm^2.",
+        ],
+      },
+    ]
+  ),
+  ...buildGroup(
+    {
+      cbseFormat: "B",
+      skillFamily: "Similarity",
+      loIds: ["LO_TRI_02_SIMILARITY_CORRESPONDENCE", "LO_TRI_04_PROOF_FLOW"],
+      difficulty: "Medium",
+    },
+    [
+      {
+        questionId: "2026-TRI-P1-B-007",
+        questionText:
+          "A school model uses a triangular frame with side scale 3 : 5 compared to the real frame. If a side of the real frame is 20 cm, find the corresponding side in the model.",
+        answer: "12 cm",
+        working: [
+          "Model : real = 3 : 5.",
+          "So corresponding side in model = 20 x 3/5 = 12 cm.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-B-008",
+        questionText:
+          "In Delta ABC, DE is parallel to BC. If AB = 15 cm, AD = 9 cm and AC = 20 cm, find AE.",
+        answer: "AE = 12 cm.",
+        working: [
+          "By similarity, AD/AB = AE/AC.",
+          "Substitute 9/15 = AE/20.",
+          "Therefore AE = 12 cm.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-B-009",
+        questionText:
+          "A student writes Delta ABC ~ Delta DFE when the corresponding sides used are AB/DF = AC/DE. What should the student fix first?",
+        answer: "The order of vertices in the similarity statement.",
+        working: [
+          "The correspondence in the similarity statement must match the side pairs used.",
+          "Wrong order gives wrong CPST relations and loses marks.",
         ],
       },
     ]
@@ -500,6 +646,54 @@ const sectionCQuestions = [
       },
     ]
   ),
+  ...buildGroup(
+    {
+      cbseFormat: "C",
+      skillFamily: "Similarity",
+      loIds: ["LO_TRI_02_SIMILARITY_CORRESPONDENCE", "LO_TRI_04_PROOF_FLOW"],
+      difficulty: "Medium",
+    },
+    [
+      {
+        questionId: "2026-TRI-P1-C-007",
+        questionText:
+          "In Delta ABC and Delta PQR, angle A = angle P, angle B = angle Q and AB = 6 cm, BC = 8 cm, PQ = 9 cm. Find QR.",
+        answer: "QR = 12 cm.",
+        finalAnswer: "QR = 12 cm.",
+        working: [
+          "Since two corresponding angles are equal, Delta ABC is similar to Delta PQR by AA similarity.",
+          "Therefore AB/PQ = BC/QR.",
+          "Substitute 6/9 = 8/QR.",
+          "Hence QR = 12 cm.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-C-008",
+        questionText:
+          "A triangular warning sign and its enlarged highway sign are similar. If their corresponding sides are in the ratio 3 : 7, find the ratio of their perimeters and the ratio of their areas.",
+        answer: "Perimeter ratio = 3 : 7 and area ratio = 9 : 49.",
+        finalAnswer: "Perimeter ratio = 3 : 7 and area ratio = 9 : 49.",
+        working: [
+          "For similar triangles, perimeter ratio equals the ratio of corresponding sides.",
+          "So perimeter ratio = 3 : 7.",
+          "Area ratio equals the square of the side ratio.",
+          "Hence area ratio = 9 : 49.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-C-009",
+        questionText:
+          "In Delta ABC, a line through D on AB and E on AC satisfies AD/DB = AE/EC = 2/3. Prove that the line through D and E is parallel to BC and state the theorem used.",
+        answer: "DE is parallel to BC by the converse of the Basic Proportionality Theorem.",
+        finalAnswer: "DE is parallel to BC by converse BPT.",
+        working: [
+          "Given AD/DB = AE/EC.",
+          "The two sides AB and AC are divided in the same ratio.",
+          "By the converse of the Basic Proportionality Theorem, the line through D and E is parallel to BC.",
+        ],
+      },
+    ]
+  ),
 ];
 
 const sectionDQuestions = [
@@ -599,6 +793,32 @@ const sectionDQuestions = [
       },
     ]
   ),
+  ...buildGroup(
+    {
+      cbseFormat: "D",
+      skillFamily: "Proof",
+      loIds: ["LO_TRI_04_PROOF_FLOW", "LO_TRI_05_AREA_RATIO", "LO_TRI_06_BOARD_AUDIT"],
+      difficulty: "Hard",
+    },
+    [
+      {
+        questionId: "2026-TRI-P1-D-005",
+        questionText:
+          "In Delta ABC, D lies on BC such that AD bisects angle A. If AB/AC = BD/DC, prove that Delta ABD is similar to Delta ACD and hence show that AD^2 = BD x DC.",
+        answer:
+          "Delta ABD is similar to Delta ACD and therefore AD^2 = BD x DC.",
+        finalAnswer:
+          "Delta ABD is similar to Delta ACD and hence AD^2 = BD x DC.",
+        working: [
+          "Given AB/AC = BD/DC and angle BAD = angle DAC because AD bisects angle A.",
+          "Thus the two pairs of corresponding sides are proportional and the included angles are equal.",
+          "Therefore Delta ABD is similar to Delta ACD by SAS similarity.",
+          "From similarity, AD/DC = BD/AD.",
+          "Cross-multiplying gives AD^2 = BD x DC.",
+        ],
+      },
+    ]
+  ),
 ];
 
 const sectionEQuestions = [
@@ -648,6 +868,91 @@ const sectionEQuestions = [
           "Now apply 3/2 = 4.5/EC.",
           "So EC = (4.5 x 2)/3 = 3 cm.",
           "A common deduction is writing the ratio without first stating that DE is parallel to BC.",
+        ],
+      },
+    ]
+  ),
+  ...buildGroup(
+    {
+      cbseFormat: "E",
+      skillFamily: "Similarity",
+      loIds: ["LO_TRI_02_SIMILARITY_CORRESPONDENCE", "LO_TRI_04_PROOF_FLOW", "LO_TRI_01_READ_FIGURE_FIRST"],
+      difficulty: "Hard",
+    },
+    [
+      {
+        questionId: "2026-TRI-P1-E-003",
+        questionText:
+          "Case Study: A 1.8 m student and a school flagpole cast shadows of 2.4 m and 12 m respectively at the same time.\n(i) Which Triangles idea lets you compare the heights first?\n(ii) Find the height of the flagpole.\n(iii) State one reason why the comparison is valid.",
+        answer:
+          "(i) Similarity of triangles. (ii) Height of the flagpole = 9 m. (iii) The sun's rays are effectively parallel at the same time, so the right triangles are similar.",
+        finalAnswer:
+          "(i) Similarity of triangles (ii) 9 m (iii) Same sun angle gives similar triangles.",
+        working: [
+          "The student and the flagpole form similar right triangles with their shadows.",
+          "So height/shadow ratio is equal: 1.8/2.4 = h/12.",
+          "Hence h = 12 x 1.8/2.4 = 9 m.",
+          "The comparison is valid because the sun's rays are taken as parallel at the same time.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-E-004",
+        questionText:
+          "Case Study: A triangular banner is enlarged for the annual day stage. The side ratio of the small banner to the large banner is 4 : 7 and the area of the small banner is 96 cm^2.\n(i) Find the ratio of their perimeters.\n(ii) Find the ratio of their areas.\n(iii) Find the area of the large banner.",
+        answer:
+          "(i) 4 : 7 (ii) 16 : 49 (iii) 294 cm^2",
+        finalAnswer:
+          "(i) 4 : 7 (ii) 16 : 49 (iii) 294 cm^2",
+        working: [
+          "For similar triangles, the ratio of perimeters equals the ratio of corresponding sides.",
+          "So perimeter ratio = 4 : 7.",
+          "Area ratio = (4/7)^2 = 16 : 49.",
+          "Thus 96 / Area of large banner = 16 / 49, so the area of the large banner is 294 cm^2.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-E-005",
+        questionText:
+          "Case Study: In a triangular park Delta ABC, a walking path DE is marked parallel to BC, where D lies on AB and E lies on AC. A survey note says AD = 5 m, DB = 3 m and AE = 7.5 m.\n(i) Name the theorem used to connect the side segments.\n(ii) Find EC.\n(iii) Write the first board line that should appear before the ratio step.",
+        answer:
+          "(i) Basic Proportionality Theorem. (ii) EC = 4.5 m. (iii) Since DE is parallel to BC, by BPT, AD/DB = AE/EC.",
+        finalAnswer:
+          "(i) BPT (ii) EC = 4.5 m (iii) Since DE is parallel to BC, by BPT, AD/DB = AE/EC.",
+        working: [
+          "Because DE is parallel to BC, the Basic Proportionality Theorem applies.",
+          "Use 5/3 = 7.5/EC.",
+          "So EC = 7.5 x 3/5 = 4.5 m.",
+          "The theorem line must start with the parallel-line condition before the ratio is written.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-E-006",
+        questionText:
+          "Case Study: A drone camera captures two triangular roof sections that are similar. The side ratio of the smaller roof to the larger roof is 5 : 8 and the perimeter of the smaller roof triangle is 45 m.\n(i) Find the perimeter of the larger roof triangle.\n(ii) Find the ratio of their areas.\n(iii) If the area of the smaller roof triangle is 125 m^2, find the area of the larger roof triangle.",
+        answer:
+          "(i) 72 m (ii) 25 : 64 (iii) 320 m^2",
+        finalAnswer:
+          "(i) 72 m (ii) 25 : 64 (iii) 320 m^2",
+        working: [
+          "For similar triangles, perimeter ratio equals the ratio of corresponding sides.",
+          "So larger perimeter = 45 x 8/5 = 72 m.",
+          "Area ratio = (5/8)^2 = 25 : 64.",
+          "Thus 125 / Area of larger roof triangle = 25 / 64, so the larger area is 320 m^2.",
+        ],
+      },
+      {
+        questionId: "2026-TRI-P1-E-007",
+        questionText:
+          "Case Study: A student draws Delta ABC with DE parallel to BC and claims Delta ADE is similar to Delta ABC. The measured lengths are AD = 6 cm, AB = 10 cm and BC = 15 cm.\n(i) State the reason why the two triangles are similar.\n(ii) Find DE.\n(iii) Write one board-check point that the student must not skip while presenting the proof.",
+        answer:
+          "(i) AA similarity because DE is parallel to BC. (ii) DE = 9 cm. (iii) The student must not skip the theorem/criterion line or the final conclusion line.",
+        finalAnswer:
+          "(i) AA similarity (ii) DE = 9 cm (iii) Do not skip the criterion line or final conclusion.",
+        working: [
+          "Since DE is parallel to BC, corresponding angles are equal, so Delta ADE is similar to Delta ABC by AA.",
+          "Then DE/BC = AD/AB = 6/10.",
+          "Hence DE = 15 x 6/10 = 9 cm.",
+          "For board presentation, the criterion line and the conclusion line are both essential.",
         ],
       },
     ]

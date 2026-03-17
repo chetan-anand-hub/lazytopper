@@ -224,8 +224,8 @@ export const trianglesTutorPath: ChapterTutorPath = {
     topicHubEnrichment: "authoritative",
     predictedQuestions: "authoritative",
     highlyProbableQuestions: "authoritative",
-    qtfOverlay: "not-yet-available",
-    canonicalQuestionBank: "not-yet-available",
+    qtfOverlay: "supporting",
+    canonicalQuestionBank: "supporting",
     mentorAssets: "authoritative",
   },
   mentorSupport: {
@@ -234,17 +234,17 @@ export const trianglesTutorPath: ChapterTutorPath = {
     note: "Triangles already has the strongest chapter-specific mentor stack in the repo: teach contracts, guided/grind mindmaps, BSRE rubrics, final board-step assets, and backend routing.",
   },
   qtfSupport: {
-    status: "none",
-    note: "Triangles now has a visible chapter-family router in TopicHub, but it still does not have a full QTF tile system or a chapter-specific canonical pack.",
+    status: "partial",
+    note: "Triangles now has a real family-first QTF overlay, a chapter-specific canonical pack, and focused practice routing. It still uses the family router instead of the full Trigonometry-style generic tile strip.",
   },
   gapFlags: [
-    "no-full-qtf-tile-routing-or-canonical-pack-yet",
-    "no-triangles-canonical-pack-in-canonicalquestionbank",
+    "triangles-qtf-is-family-first-not-a-full-generic-tile-strip",
+    "triangles-pack-depth-is-still-lighter-than-trigonometry",
     "assessed-scope-and-enrichment-scope-are-not-the-same",
     "chapter-assets-live-across-topic-hub-mentor-bsre-and-final-json-paths",
   ],
   nextExpansionNotes: [
-    "Triangles now has a stronger runtime runway plus chapter-family routing, but it should still be treated as partial until focused bank depth is added.",
+    "Triangles now has focused bank depth and family-aware routing, but it should still be treated as partial until the chapter reaches Trigonometry-level volume and tile breadth.",
     "Any expansion must respect scopePolicy before copying Pythagoras or area-ratio content into assessed-core flows.",
     "Keep mentor assets referenced, not duplicated, until the chapter gets its own overlay and pack.",
   ],
