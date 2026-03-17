@@ -49,6 +49,342 @@ function extractAttemptText(payload, messages, attemptLoop) {
   return '';
 }
 
+function getLatestUserText(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (!msg || String(msg.role || '').toLowerCase() !== 'user') continue;
+    const text = String(msg.content || '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function normalizeStudentProfile(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  if (raw === 'anxious') return 'anxious';
+  if (raw === 'weak_foundation' || raw === 'weak-foundation' || raw === 'weak') return 'weak_foundation';
+  if (raw === 'boards_focused' || raw === 'boards-focused' || raw === 'board') return 'boards_focused';
+  if (raw === 'doubt_heavy' || raw === 'doubt-heavy' || raw === 'doubt') return 'doubt_heavy';
+  if (raw === 'advanced_value_seeking' || raw === 'advanced-value-seeking' || raw === 'advanced') {
+    return 'advanced_value_seeking';
+  }
+  return '';
+}
+
+function inferStudentProfile(payload, messages, mode) {
+  const explicit = normalizeStudentProfile(
+    payload?.studentProfile || payload?.student_profile || payload?.studentStateProfile
+  );
+  if (explicit) return explicit;
+
+  const intent = String(payload?.studentIntent || '').trim().toLowerCase();
+  const solveStyle = String(payload?.solveStyle || '').trim().toLowerCase();
+  const text = [
+    getLatestUserText(messages),
+    payload?.studentQuestion,
+    payload?.questionText,
+    payload?.contextText,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/(panic|anxious|overwhelm|scared|blank out|stuck badly)/i.test(text)) return 'anxious';
+  if (/(shortcut|fastest|quickest|high[- ]value|efficient|just the key step)/i.test(text)) {
+    return 'advanced_value_seeking';
+  }
+  if (intent === 'check_cbse' || solveStyle === 'board' || mode === 'board_steps_ms') {
+    return 'boards_focused';
+  }
+  if (intent === 'explain' || mode === 'learn_teach' || mode === 'learn_mindmap') {
+    return /(why|how|confused|doubt)/i.test(text) ? 'doubt_heavy' : 'weak_foundation';
+  }
+  if (/(why|how|doubt|reason)/i.test(text)) return 'doubt_heavy';
+  return 'weak_foundation';
+}
+
+function inferHelpMode(payload, mode, messages) {
+  const explicit = String(payload?.mentorHelpMode || payload?.helpMode || payload?.quickAction || '').trim().toLowerCase();
+  if (explicit) return explicit;
+  const userText = getLatestUserText(messages).toLowerCase();
+  if (/show (the )?(figure|diagram)/i.test(userText)) return 'show_figure';
+  if (/full solve|complete solution|full solution|just answer/i.test(userText)) return 'full_solve';
+  if (mode === 'board_steps_ms') return 'proof_check';
+  if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'explain') return 'explain';
+  if (mode === 'learn_proof') return 'proof_check';
+  if (/next step/i.test(userText)) return 'next_step';
+  return 'hint';
+}
+
+function inferFamilyContext(payload) {
+  const topicKey = pickString(payload?.topicKey, payload?.chapter || '').toLowerCase();
+  const familyIdSeed = pickString(
+    payload?.questionFamilyId,
+    payload?.familyId || payload?.itemId || ''
+  );
+  const familyLabelSeed = pickString(
+    payload?.questionFamilyLabel,
+    payload?.familyLabel || payload?.itemTitle || payload?.practiceNextLabel || ''
+  );
+  const qtypeId = pickString(payload?.questionTypeId, payload?.qtypeId || '');
+  const theoremFocus = Array.isArray(payload?.theoremFocus)
+    ? normalizeStringList(payload.theoremFocus)
+    : normalizeStringList([payload?.theoremFocus]);
+  const haystack = [
+    topicKey,
+    payload?.questionText,
+    payload?.studentQuestion,
+    payload?.contextText,
+    familyLabelSeed,
+    theoremFocus.join(' '),
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  let familyId = familyIdSeed;
+  let familyLabel = familyLabelSeed;
+
+  if (topicKey.includes('triangles')) {
+    if (!familyId && /area\s*ratio|area of similar/i.test(haystack)) {
+      familyId = 'TRI_FAMILY_AREA_RATIO';
+      familyLabel = 'Area-ratio consequences';
+    } else if (!familyId && /(bpt|parallel|converse bpt)/i.test(haystack)) {
+      familyId = 'TRI_FAMILY_BPT_PARALLEL';
+      familyLabel = 'BPT / parallel-line inference';
+    } else if (!familyId && /(proof|justify|given|to prove|conclusion|criterion line)/i.test(haystack)) {
+      familyId = 'TRI_FAMILY_PROOF_STRUCTURE';
+      familyLabel = 'Proof structure and justification';
+    } else if (!familyId && /(aa|sas|sss|similar|correspondence)/i.test(haystack)) {
+      familyId = 'TRI_FAMILY_SIMILARITY_CHOICE';
+      familyLabel = 'Similarity rule choice';
+    } else if (!familyId) {
+      familyId = 'TRI_FAMILY_THEOREM_CHOICE';
+      familyLabel = 'Which theorem fits first?';
+    }
+  }
+
+  const focusQuestionIds = normalizeStringList(
+    payload?.suggestedPracticeIds || payload?.focusQuestionIds || payload?.focusBankIds
+  );
+  const sectionFilter = pickString(
+    payload?.practiceSectionFilter,
+    payload?.section || payload?.cardSection || ''
+  );
+  const chapterStep = pickString(
+    payload?.chapterStep,
+    familyId === 'TRI_FAMILY_BOARD_CHECK'
+      ? 'board-check'
+      : familyId === 'TRI_FAMILY_PROOF_STRUCTURE'
+        ? 'proof-repair'
+        : familyId === 'TRI_FAMILY_BPT_PARALLEL'
+          ? 'bpt-practice'
+          : familyId === 'TRI_FAMILY_AREA_RATIO'
+            ? 'area-ratio-practice'
+            : familyId === 'TRI_FAMILY_SIMILARITY_CHOICE'
+              ? 'similarity-choice'
+              : 'figure-first'
+  );
+  const diagramNeeded =
+    Boolean(payload?.diagramRequired) ||
+    /triangle|figure|diagram|parallel|similar|correspond|proof/i.test(haystack);
+  const recommendedDiagramType = pickString(
+    payload?.recommendedDiagramType,
+    diagramNeeded
+      ? familyId === 'TRI_FAMILY_BPT_PARALLEL'
+        ? 'geometry_parallel_lines'
+        : familyId === 'TRI_FAMILY_AREA_RATIO' || familyId === 'TRI_FAMILY_SIMILARITY_CHOICE'
+          ? 'geometry_similarity'
+          : 'geometry_triangle'
+      : ''
+  );
+
+  return {
+    topicKey,
+    familyId,
+    familyLabel,
+    qtypeId,
+    theoremFocus,
+    focusQuestionIds,
+    sectionFilter,
+    chapterStep,
+    diagramNeeded,
+    recommendedDiagramType,
+  };
+}
+
+function inferConfusionType(payload, attemptLoop, mode, familyContext) {
+  const status = String(attemptLoop?.diagnosis?.status || '').toLowerCase();
+  const mistakeTags = normalizeStringList(attemptLoop?.diagnosis?.mistake_tags).join(' ').toLowerCase();
+  if (mode === 'board_steps_ms' || String(payload?.studentIntent || '').toLowerCase() === 'check_cbse') {
+    return 'board_answer_weakness';
+  }
+  if (familyContext.diagramNeeded && /(no_working|figure|diagram|parallel)/i.test(mistakeTags)) {
+    return 'diagram_interpretation_issue';
+  }
+  if (familyContext.familyId === 'TRI_FAMILY_PROOF_STRUCTURE' || familyContext.familyId === 'TRI_FAMILY_BOARD_CHECK') {
+    return 'proof_structure_confusion';
+  }
+  if (
+    familyContext.familyId === 'TRI_FAMILY_THEOREM_CHOICE' ||
+    familyContext.familyId === 'TRI_FAMILY_SIMILARITY_CHOICE' ||
+    familyContext.familyId === 'TRI_FAMILY_BPT_PARALLEL'
+  ) {
+    return 'theorem_choice_confusion';
+  }
+  if (status === 'incorrect' && /(algebra|calculation|arithmetic)/i.test(mistakeTags)) {
+    return 'calculation_mistake';
+  }
+  if (mode === 'learn_teach' || mode === 'learn_mindmap' || mode === 'explain') {
+    return 'concept_confusion';
+  }
+  return 'next_step_unclear';
+}
+
+function buildSummaryLine(profile, familyContext, confusionType) {
+  const profileLead =
+    profile === 'anxious'
+      ? 'Keep the next move small and calm.'
+      : profile === 'boards_focused'
+        ? 'Prioritize mark-safe writing.'
+        : profile === 'advanced_value_seeking'
+          ? 'Use the fastest correct route.'
+          : profile === 'doubt_heavy'
+            ? 'Clarify the reason before the rule.'
+            : 'Lock the concept before speed.';
+  const familyLead = familyContext.familyLabel ? `Family: ${familyContext.familyLabel}.` : '';
+  const bottleneckLead = confusionType ? `Bottleneck: ${String(confusionType).replace(/_/g, ' ')}.` : '';
+  return [profileLead, familyLead, bottleneckLead].filter(Boolean).join(' ');
+}
+
+function buildBoardTipBlock(payload, familyContext) {
+  const marks = Number(payload?.marks || payload?.totalMarks || payload?.total_marks || 0);
+  const questionStyle = pickString(
+    payload?.cardSection,
+    payload?.section || (Number.isFinite(marks) && marks > 0 ? `${marks}-mark style` : '')
+  );
+  let summary = 'Name the theorem/criterion before the key relation, then close with the exact target line.';
+  let markCutRisk = 'Missing theorem/criterion naming or a weak conclusion line can cost board marks.';
+
+  if (familyContext.familyId === 'TRI_FAMILY_BPT_PARALLEL') {
+    summary = 'Write the parallel-line condition first, then apply BPT/converse BPT on the next line.';
+    markCutRisk = 'Writing ratios before stating the parallel trigger often loses method marks.';
+  } else if (familyContext.familyId === 'TRI_FAMILY_AREA_RATIO') {
+    summary = 'Prove similarity first, then square the side ratio explicitly before writing the area ratio.';
+    markCutRisk = 'Forgetting the square or skipping the similarity step loses marks quickly.';
+  } else if (familyContext.familyId === 'TRI_FAMILY_SIMILARITY_CHOICE') {
+    summary = 'Keep the triangle order fixed before using AA, SAS, or SSS.';
+    markCutRisk = 'Wrong correspondence order can spoil the entire proof or ratio line.';
+  }
+
+  return {
+    title: 'Board-smart note',
+    summary,
+    mark_cut_risk: markCutRisk,
+    question_style: questionStyle || 'board-style question',
+  };
+}
+
+function buildCommonMistakeBlock(familyContext, confusionType) {
+  let summary = 'Jumping to the answer before naming the trigger or theorem.';
+  let fix = 'First identify the figure trigger, then write one justified line.';
+  let markRisk = 'This weakens the opening method step.';
+
+  if (confusionType === 'proof_structure_confusion') {
+    summary = 'Skipping the theorem line or the final conclusion in a proof.';
+    fix = 'Write Given -> Theorem/Criterion -> Justified relation -> Therefore/Hence.';
+    markRisk = 'Board checking often deducts for missing structure even when the maths is close.';
+  } else if (familyContext.familyId === 'TRI_FAMILY_BPT_PARALLEL') {
+    summary = 'Applying BPT without first proving or using the parallel condition.';
+    fix = 'State the parallel line clearly before writing any proportional segments.';
+    markRisk = 'The ratio line can be treated as unjustified.';
+  } else if (familyContext.familyId === 'TRI_FAMILY_AREA_RATIO') {
+    summary = 'Using side ratio directly instead of squaring it for area ratio.';
+    fix = 'After similarity, square the corresponding side ratio explicitly.';
+    markRisk = 'Final answer becomes numerically wrong.';
+  }
+
+  return {
+    title: 'Common mistake',
+    summary,
+    fix,
+    mark_risk: markRisk,
+  };
+}
+
+function buildPracticeNextBlock(payload, familyContext) {
+  const focusQuestionIds = normalizeStringList(
+    payload?.suggestedPracticeIds || payload?.focusQuestionIds || payload?.focusBankIds
+  );
+  if (!familyContext.familyLabel && focusQuestionIds.length === 0) return null;
+  return {
+    cta: pickString(payload?.practiceNextCta, 'Practice this family'),
+    topic_key: pickString(payload?.topicKey, payload?.chapter || ''),
+    family_id: familyContext.familyId || '',
+    family_label: familyContext.familyLabel || '',
+    qtype_id: familyContext.qtypeId || '',
+    chapter_step: familyContext.chapterStep || '',
+    reason: pickString(
+      payload?.practiceNextReason,
+      familyContext.familyLabel
+        ? `Stay in ${familyContext.familyLabel} for one more question before switching topics.`
+        : 'Do one closely related question next.'
+    ),
+    section_filter: familyContext.sectionFilter || '',
+    focus_question_ids: focusQuestionIds,
+  };
+}
+
+function buildAdaptiveStyleBlock(profile) {
+  if (profile === 'anxious') {
+    return {
+      profile,
+      tone: 'calm and non-shaming',
+      depth: 'small steps',
+      pacing: 'hint-first',
+      rationale: 'Reduce overload, keep the next action obvious, and avoid answer dumping.',
+    };
+  }
+  if (profile === 'boards_focused') {
+    return {
+      profile,
+      tone: 'examiner-aware',
+      depth: 'board-step discipline',
+      pacing: 'direct but structured',
+      rationale: 'Show where marks are earned or lost, not just whether the maths is valid.',
+    };
+  }
+  if (profile === 'advanced_value_seeking') {
+    return {
+      profile,
+      tone: 'direct and high-signal',
+      depth: 'shortcut plus insight',
+      pacing: 'fast route',
+      rationale: 'Respect speed and reasoning depth while still keeping the route exam-safe.',
+    };
+  }
+  if (profile === 'doubt_heavy') {
+    return {
+      profile,
+      tone: 'reason-first',
+      depth: 'clarify why',
+      pacing: 'checkpoint style',
+      rationale: 'Handle misconception pressure by explaining why the step works before moving on.',
+    };
+  }
+  return {
+    profile: 'weak_foundation',
+    tone: 'simple and supportive',
+    depth: 'concept-first',
+    pacing: 'scaffolded',
+    rationale: 'Use simpler language, one theorem at a time, then move to application.',
+  };
+}
+
 function pickBlock(tutorObj, structuredDraft, key) {
   const nested = tutorObj && typeof tutorObj === 'object' ? tutorObj[key] : null;
   if (nested && typeof nested === 'object') return nested;
@@ -57,9 +393,13 @@ function pickBlock(tutorObj, structuredDraft, key) {
   return {};
 }
 
-function buildDiagnosisBlock(tutorObj, structuredDraft, attemptLoop) {
+function buildDiagnosisBlock(tutorObj, structuredDraft, attemptLoop, payload, messages, mode) {
   const base = pickBlock(tutorObj, structuredDraft, 'diagnosis');
   const loopDiagnosis = attemptLoop?.diagnosis || {};
+  const familyContext = inferFamilyContext(payload);
+  const studentProfile = inferStudentProfile(payload, messages, mode);
+  const helpMode = inferHelpMode(payload, mode, messages);
+  const confusionType = inferConfusionType(payload, attemptLoop, mode, familyContext);
   const mistakeTags = Array.isArray(base.mistake_tags)
     ? base.mistake_tags
     : normalizeStringList(loopDiagnosis.mistake_tags);
@@ -78,6 +418,23 @@ function buildDiagnosisBlock(tutorObj, structuredDraft, attemptLoop) {
     mistake_tags: mistakeTags,
     misconception_summary: misconceptionSummary,
     confidence,
+    chapter: pickString(base.chapter, familyContext.topicKey),
+    family_id: pickString(base.family_id, familyContext.familyId),
+    family_label: pickString(base.family_label, familyContext.familyLabel),
+    qtype_id: pickString(base.qtype_id, familyContext.qtypeId),
+    theorem_focus:
+      Array.isArray(base.theorem_focus) && base.theorem_focus.length
+        ? base.theorem_focus
+        : familyContext.theoremFocus,
+    confusion_type: pickString(base.confusion_type, confusionType),
+    help_mode: pickString(base.help_mode, helpMode),
+    student_profile: pickString(base.student_profile, studentProfile),
+    diagram_needed:
+      typeof base.diagram_needed === 'boolean' ? base.diagram_needed : familyContext.diagramNeeded,
+    summary_line: pickString(
+      base.summary_line,
+      buildSummaryLine(studentProfile, familyContext, confusionType)
+    ),
   };
 }
 
@@ -252,6 +609,7 @@ function buildBoardStepsBlock(mode, tutorObj, structuredDraft, payload, attemptL
 
 function buildNextBlock(tutorObj, structuredDraft, payload, attemptLoop, attemptText) {
   const base = pickBlock(tutorObj, structuredDraft, 'next');
+  const familyContext = inferFamilyContext(payload);
   const status = String(attemptLoop?.diagnosis?.status || '').toLowerCase() || 'unclear';
   const mistakeTags = normalizeStringList(attemptLoop?.diagnosis?.mistake_tags);
   const rubric =
@@ -284,6 +642,19 @@ function buildNextBlock(tutorObj, structuredDraft, payload, attemptLoop, attempt
     ...base,
     micro_drill: microDrill,
     revision_hook: revisionHook,
+    chapter_step: pickString(base.chapter_step, familyContext.chapterStep),
+    practice_next_label: pickString(
+      base.practice_next_label,
+      familyContext.familyLabel || 'Stay in this family'
+    ),
+    practice_next_reason: pickString(
+      base.practice_next_reason,
+      familyContext.familyLabel
+        ? `After this explanation, do one more ${familyContext.familyLabel} question.`
+        : 'Do one closely related practice question next.'
+    ),
+    practice_next_section: pickString(base.practice_next_section, familyContext.sectionFilter),
+    practice_next_qtype_id: pickString(base.practice_next_qtype_id, familyContext.qtypeId),
   };
   if (Array.isArray(suggestedPracticeIds) && suggestedPracticeIds.length) {
     nextBlock.suggested_practice_ids = suggestedPracticeIds;
@@ -306,12 +677,28 @@ function orchestrateTutorResponse({ mode, payload, messages, structuredDraft }) 
   const attemptLoop =
     structuredDraft.attempt_loop || structuredDraft.attemptLoop || tutorObj.attempt_loop || tutorObj.attemptLoop || null;
   const attemptText = extractAttemptText(payload, messages, attemptLoop);
+  const familyContext = inferFamilyContext(payload);
+  const studentProfile = inferStudentProfile(payload, messages, mode);
 
-  tutorObj.diagnosis = buildDiagnosisBlock(tutorObj, structuredDraft, attemptLoop);
+  tutorObj.diagnosis = buildDiagnosisBlock(
+    tutorObj,
+    structuredDraft,
+    attemptLoop,
+    payload,
+    messages,
+    mode
+  );
   tutorObj.socratic = buildSocraticBlock(mode, tutorObj, structuredDraft, attemptLoop);
   tutorObj.hint_ladder = buildHintLadderBlock(payload, tutorObj, structuredDraft, attemptLoop, attemptText);
   tutorObj.board_steps_ms = buildBoardStepsBlock(mode, tutorObj, structuredDraft, payload, attemptLoop);
   tutorObj.next = buildNextBlock(tutorObj, structuredDraft, payload, attemptLoop, attemptText);
+  tutorObj.board_tip = buildBoardTipBlock(payload, familyContext);
+  tutorObj.common_mistake = buildCommonMistakeBlock(
+    familyContext,
+    tutorObj?.diagnosis?.confusion_type
+  );
+  tutorObj.practice_next = buildPracticeNextBlock(payload, familyContext);
+  tutorObj.adaptive_style = buildAdaptiveStyleBlock(studentProfile);
 
   return { ...base, tutor: tutorObj };
 }

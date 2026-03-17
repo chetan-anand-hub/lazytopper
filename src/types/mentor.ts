@@ -345,10 +345,45 @@ export type MentorStructured = {
   [k: string]: unknown;
 };
 
+export type MentorStudentProfile =
+  | "anxious"
+  | "weak_foundation"
+  | "boards_focused"
+  | "doubt_heavy"
+  | "advanced_value_seeking";
+
+export type MentorConfusionType =
+  | "theorem_choice_confusion"
+  | "concept_confusion"
+  | "proof_structure_confusion"
+  | "calculation_mistake"
+  | "diagram_interpretation_issue"
+  | "board_answer_weakness"
+  | "next_step_unclear";
+
+export type MentorHelpMode =
+  | "hint"
+  | "next_step"
+  | "explain"
+  | "full_solve"
+  | "proof_check"
+  | "show_figure"
+  | "practice_route";
+
 export interface MentorTutorDiagnosis {
   mistake_tags?: string[];
   misconception_summary?: string;
   confidence?: "low" | "med" | "high" | string;
+  chapter?: string;
+  family_id?: string;
+  family_label?: string;
+  qtype_id?: string;
+  theorem_focus?: string[];
+  confusion_type?: MentorConfusionType | string;
+  help_mode?: MentorHelpMode | string;
+  student_profile?: MentorStudentProfile | string;
+  diagram_needed?: boolean;
+  summary_line?: string;
 }
 
 export interface MentorTutorSocratic {
@@ -369,10 +404,49 @@ export interface MentorTutorBoardSteps {
   examiner_note?: string;
 }
 
+export interface MentorTutorBoardTip {
+  title?: string;
+  summary?: string;
+  mark_cut_risk?: string;
+  question_style?: string;
+}
+
+export interface MentorTutorCommonMistake {
+  title?: string;
+  summary?: string;
+  fix?: string;
+  mark_risk?: string;
+}
+
+export interface MentorTutorPracticeNext {
+  cta?: string;
+  topic_key?: string;
+  family_id?: string;
+  family_label?: string;
+  qtype_id?: string;
+  chapter_step?: string;
+  reason?: string;
+  section_filter?: string;
+  focus_question_ids?: string[];
+}
+
+export interface MentorTutorAdaptiveStyle {
+  profile?: MentorStudentProfile | string;
+  tone?: string;
+  depth?: string;
+  pacing?: string;
+  rationale?: string;
+}
+
 export interface MentorTutorNext {
   micro_drill?: string;
   revision_hook?: string;
   suggested_practice_ids?: string[];
+  chapter_step?: string;
+  practice_next_label?: string;
+  practice_next_reason?: string;
+  practice_next_section?: string;
+  practice_next_qtype_id?: string;
 }
 
 export interface MentorTutorObject {
@@ -384,6 +458,14 @@ export interface MentorTutorObject {
   hint_ladder?: MentorTutorHintLadder;
   board_steps_ms?: MentorTutorBoardSteps;
   next?: MentorTutorNext;
+  board_tip?: MentorTutorBoardTip;
+  common_mistake?: MentorTutorCommonMistake;
+  practice_next?: MentorTutorPracticeNext;
+  adaptive_style?: MentorTutorAdaptiveStyle;
+  diagramRequired?: boolean;
+  diagramType?: string;
+  diagramSpec?: unknown;
+  diagramLabels?: Record<string, string> | string[];
 }
 
 

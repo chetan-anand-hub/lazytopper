@@ -27,9 +27,18 @@ export interface PageContext {
   subject: "Maths" | "Science";
   chapter?: string;
   topic?: string;
+  topicKey?: string;
   questionId?: string;
   marks?: number;
   difficulty?: "Easy" | "Medium" | "Hard";
+  questionFamilyId?: string;
+  questionFamilyLabel?: string;
+  questionTypeId?: string;
+  chapterStep?: string;
+  practiceSectionFilter?: "A" | "B" | "C" | "D" | "E";
+  suggestedPracticeIds?: string[];
+  theoremFocus?: string[];
+  recommendedDiagramType?: string;
 }
 
 export interface StudentState {
@@ -52,6 +61,12 @@ export interface StudentState {
   weakChapters?: string[];
   confidenceLevel?: "low" | "medium" | "high";
   mood?: "stressed" | "okay" | "confident" | "burnt-out" | "anxious";
+  studentProfile?:
+    | "anxious"
+    | "weak_foundation"
+    | "boards_focused"
+    | "doubt_heavy"
+    | "advanced_value_seeking";
 }
 
 export interface MentorMessage {

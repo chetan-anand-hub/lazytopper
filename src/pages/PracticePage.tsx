@@ -1,7 +1,7 @@
 // src/pages/PracticePage.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { type PracticeQuestion } from "../data/predictionDataService";
 import { generatePracticeSet, inferBoardPatternFromQuestion, normalizeBoardPattern } from "../data/practiceSetGenerator";
@@ -15,14 +15,21 @@ import {
 import { generateMoreLikeThis } from "../ai/aiClient";
 import boardSteps_2025_26 from "../data/boardSteps";
 import { QuestionVisualAid } from "../components/question/QuestionVisualAid";
+import { DiagramBlock } from "../components/DiagramBlock";
+import { HumanGradeCoachView } from "../components/mentor/HumanGradeCoachView";
 import JourneyStrip from "../components/ux/JourneyStrip";
 import ReturnContextBar from "../components/ux/ReturnContextBar";
+import {
+  navigateToPractice,
+  type PracticeSectionFilter,
+} from "../navigation/practiceNavigation";
 import {
   canUseMentorServer,
   isMentorNetworkFailure,
   markMentorServerUnavailable,
 } from "../services/mentorServerGate";
 import {
+  getQuestionFamiliesForTopic,
   getQuestionMeta,
   getStrategyPackForTopic,
   isStrategyEnabledForTopic,
@@ -31,14 +38,25 @@ import {
 import { trackUxEvent } from "../services/uxTelemetry";
 import { getTrigRubric } from "../data/contentStrategy/trigonometry/trigonometryRubrics";
 import { getTrianglesRubric } from "../data/contentStrategy/triangles";
-import type { LearningObject, QuestionMeta } from "../data/contentStrategy/types";
+import type {
+  LearningObject,
+  QuestionFamilyOverlay,
+  QuestionMeta,
+} from "../data/contentStrategy/types";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
+import type { MentorStructured } from "../types/mentor";
 import {
   createMentorImageAttachment,
   getMentorImageErrorMessage,
   revokeMentorImagePreview,
   type MentorImageAttachment,
 } from "../utils/mentorImage";
+import {
+  extractMentorDiagramBlock,
+  getMentorTutorObject,
+  getMentorTutorText,
+  parseMentorStructuredText,
+} from "../utils/mentorStructured";
 type SubjectKey = "Maths" | "Science";
 type DifficultyChoice = "All" | "Easy" | "Medium" | "Hard";
 
@@ -727,6 +745,14 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
   defaultIntent?: StudentMentorIntent;
   strategyContextHeader?: string;
   rubricContextHeader?: string;
+  questionFamilyId?: string;
+  questionFamilyLabel?: string;
+  questionTypeId?: string;
+  chapterStep?: string;
+  practiceSectionFilter?: PracticeSectionFilter;
+  suggestedPracticeIds?: string[];
+  theoremFocus?: string[];
+  recommendedDiagramType?: string;
 } | null>(null);
 
 
@@ -782,6 +808,42 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
       };
     },
     [isWhyThisQuestionEnabled, strategyPack, strategyCanonicalTopicKey]
+  );
+  const strategyFamilies = useMemo(
+    () => getQuestionFamiliesForTopic(strategyCanonicalTopicKey),
+    [strategyCanonicalTopicKey]
+  );
+  const resolveQuestionFamily = useCallback(
+    (question: PracticeQuestion | null, details: QuestionStrategyDetails | null): QuestionFamilyOverlay | null => {
+      if (!question || strategyFamilies.length === 0) return null;
+      const questionId = String(question.id || "").trim();
+      if (!questionId) return null;
+
+      const exactFocusMatch =
+        strategyFamilies.find((family) =>
+          Array.isArray(family.focusBankIds) &&
+          family.focusBankIds.map((id) => String(id || "").trim()).includes(questionId)
+        ) || null;
+      if (exactFocusMatch) return exactFocusMatch;
+
+      const skillFamily = String(details?.meta.skillFamily || "").trim().toLowerCase();
+      if (skillFamily) {
+        const bySkill =
+          strategyFamilies.find(
+            (family) => String(family.skillFamily || "").trim().toLowerCase() === skillFamily
+          ) || null;
+        if (bySkill) return bySkill;
+      }
+
+      if (/proof/i.test(skillFamily)) {
+        return (
+          strategyFamilies.find((family) => family.familyId === "TRI_FAMILY_PROOF_STRUCTURE") ||
+          null
+        );
+      }
+      return null;
+    },
+    [strategyFamilies]
   );
 
   // Two topic identifiers are used:
@@ -916,6 +978,7 @@ const packTopicKey = useMemo(() => {
       trigger?: EventTarget | null
     ) => {
       const strategyDetails = getQuestionStrategyDetails(q);
+      const family = resolveQuestionFamily(q, strategyDetails);
       const autoIntent = deriveMentorDefaultIntent(strategyDetails?.meta || null);
       const defaultIntent =
         entryMode === "auto"
@@ -936,6 +999,16 @@ const packTopicKey = useMemo(() => {
           defaultIntent,
           strategyCanonicalTopicKey
         ),
+        questionFamilyId: family?.familyId,
+        questionFamilyLabel: family?.studentLabel || strategyDetails?.meta.skillFamily,
+        questionTypeId: family?.qtypeId,
+        chapterStep: family?.tutorNodeId || undefined,
+        practiceSectionFilter:
+          family?.sectionFilter ||
+          ((String((q as any).section || "").toUpperCase() as PracticeSectionFilter | "") || undefined),
+        suggestedPracticeIds: family?.focusBankIds,
+        theoremFocus: family ? [family.theoremFamily, family.skillFamily] : undefined,
+        recommendedDiagramType: family?.recommendedDiagramType,
       });
       setMentorSolveStyle(defaultIntent === "check_cbse" ? "board" : "socratic");
       setMentorDrawerOpen(true);
@@ -946,7 +1019,7 @@ const packTopicKey = useMemo(() => {
         }
       }
     },
-    [getQuestionStrategyDetails]
+    [getQuestionStrategyDetails, resolveQuestionFamily, strategyCanonicalTopicKey]
   );
 
   useEffect(() => {
@@ -1734,7 +1807,12 @@ const packTopicKey = useMemo(() => {
   );
 };
 
-type MentorChatMsg = { role: "user" | "assistant" | "system"; content: string };
+type MentorChatMsg = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  structured?: MentorStructured;
+};
+type MentorHybridReply = { text: string; structured?: MentorStructured };
 const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
 
 function MentorSolveDrawer(props: {
@@ -1749,6 +1827,14 @@ function MentorSolveDrawer(props: {
     defaultIntent?: StudentMentorIntent;
     strategyContextHeader?: string;
     rubricContextHeader?: string;
+    questionFamilyId?: string;
+    questionFamilyLabel?: string;
+    questionTypeId?: string;
+    chapterStep?: string;
+    practiceSectionFilter?: PracticeSectionFilter;
+    suggestedPracticeIds?: string[];
+    theoremFocus?: string[];
+    recommendedDiagramType?: string;
   } | null;
   solveStyle: "socratic" | "board";
   grade: number;
@@ -1756,6 +1842,7 @@ function MentorSolveDrawer(props: {
   topicKey: string;
 }) {
   const { open, onClose, seed, solveStyle, grade, subjectTitle, topicKey } = props;
+  const navigate = useNavigate();
   void grade;
   void topicKey;
 
@@ -1852,25 +1939,14 @@ function MentorSolveDrawer(props: {
     [resolvedIntent, seed]
   );
 
-  const parseMentorJson = (raw: string) => {
-    try {
-      if (!raw) return null;
-      const t = String(raw).trim();
-      if (!t.startsWith("{")) return null;
-      const obj = JSON.parse(t);
-      if (!obj || typeof obj !== "object") return null;
-      if (typeof (obj as any).kind !== "string") return null;
-      if (typeof (obj as any).tutor === "string") return obj; // Solve With Me protocol
-      if ((obj as any).kind === "board_steps_ms" && Array.isArray((obj as any).steps)) return obj;
-      return null;
-    } catch {
-      return null;
-    }
-  };
+  const parseMentorJson = (raw: string) => parseMentorStructuredText(raw) as any;
 
-  const renderAssistantContent = (raw: string) => {
+  const renderAssistantContent = useCallback((raw: string) => {
     const obj: any = parseMentorJson(raw);
     if (!obj) return raw;
+
+    const tutorText = getMentorTutorText(obj);
+    if (tutorText.trim()) return tutorText;
 
     if (obj.kind === "board_steps_ms") {
       const total = Number(obj.totalMarks) || undefined;
@@ -1921,62 +1997,161 @@ function MentorSolveDrawer(props: {
       }
     }
     return lines.join("\n");
-  };
+  }, []);
+
+  const mentorStudentProfile =
+    resolvedIntent === "check_cbse"
+      ? "boards_focused"
+      : resolvedIntent === "explain"
+        ? "doubt_heavy"
+        : "weak_foundation";
+  const mentorHelpMode =
+    resolvedIntent === "check_cbse"
+      ? "proof_check"
+      : resolvedIntent === "explain"
+        ? "explain"
+        : "next_step";
 
   const buildLocalMentorReply = useCallback(
-    (history: MentorChatMsg[]) => {
+    (history: MentorChatMsg[]): MentorHybridReply => {
       const lastUser = [...history].reverse().find((m) => m.role === "user");
       const studentText = String(lastUser?.content || "").trim();
+      const familyLabel = String(seed?.questionFamilyLabel || seed?.title || "this question family");
+      const structured: MentorStructured = {
+        kind: "tutor",
+        tutor: {
+          text:
+            resolvedIntent === "check_cbse"
+              ? "I will check the structure first, then point to the exact board-risk line."
+              : resolvedIntent === "explain"
+                ? `Let's clarify the idea behind ${familyLabel} before you solve the next one.`
+                : studentText
+                  ? `Good attempt. I will keep the next move inside ${familyLabel}.`
+                  : `Let's start with the first safe step for ${familyLabel}.`,
+          diagnosis: {
+            chapter: topicKey,
+            family_id: seed?.questionFamilyId,
+            family_label: seed?.questionFamilyLabel || seed?.title,
+            qtype_id: seed?.questionTypeId,
+            theorem_focus: seed?.theoremFocus,
+            confusion_type:
+              resolvedIntent === "check_cbse"
+                ? "board_answer_weakness"
+                : resolvedIntent === "explain"
+                  ? "concept_confusion"
+                  : "next_step_unclear",
+            help_mode: mentorHelpMode,
+            student_profile: mentorStudentProfile,
+            diagram_needed: Boolean(seed?.recommendedDiagramType),
+            summary_line:
+              resolvedIntent === "check_cbse"
+                ? "Check theorem line, order, and final conclusion before rewriting."
+                : resolvedIntent === "explain"
+                  ? "Clarify the rule first, then use one short example."
+                  : "Take one next step, not the whole solution at once.",
+          },
+          hint_ladder:
+            resolvedIntent === "check_cbse"
+              ? undefined
+              : {
+                  level: 1,
+                  hint:
+                    studentText ||
+                    `Name the theorem or relation that controls ${familyLabel} before calculating.`,
+                  next_action: "Write one justified line, then ask for the next step.",
+                },
+          board_steps_ms:
+            resolvedIntent === "check_cbse"
+              ? {
+                  total_marks: Number(seed?.marks || 3) || 3,
+                  steps: [
+                    { line: "Write the given data and target clearly.", marks: 1 },
+                    { line: "State the correct theorem or criterion before the relation.", marks: 1 },
+                    { line: "Close with the exact required conclusion line.", marks: 1 },
+                  ],
+                  deductions: [
+                    {
+                      reason: "Missing theorem/criterion line or weak conclusion.",
+                      marks_lost: 1,
+                    },
+                  ],
+                  examiner_note:
+                    "Board marks depend on method order, not just the final result.",
+                }
+              : undefined,
+          board_tip: {
+            title: "Board-smart note",
+            summary:
+              resolvedIntent === "check_cbse"
+                ? "Check the opening theorem line and the final conclusion line first."
+                : "Keep the theorem choice visible before any ratio or algebra.",
+            mark_cut_risk: "Jumping straight to the answer can lose method marks.",
+            question_style: seed?.section ? `Section ${seed.section}` : "board-style question",
+          },
+          common_mistake: {
+            title: "Common mistake",
+            summary:
+              resolvedIntent === "check_cbse"
+                ? "The maths can be right but the board-writing order can still lose marks."
+                : "Students often start calculating before identifying the correct family.",
+            fix:
+              resolvedIntent === "check_cbse"
+                ? "Rewrite the theorem line, then the justified step, then the conclusion."
+                : "Say the theorem/criterion first, then write one linked step.",
+            mark_risk: "Weak structure reduces scoring confidence.",
+          },
+          next: {
+            micro_drill:
+              resolvedIntent === "check_cbse"
+                ? "Rewrite just the first two proof lines cleanly."
+                : `Do one more ${familyLabel} question with the same trigger.`,
+            revision_hook: "Keep the criterion and conclusion line together in revision.",
+            chapter_step: seed?.chapterStep,
+          },
+          practice_next: {
+            cta: "Practice this family",
+            topic_key: topicKey,
+            family_id: seed?.questionFamilyId,
+            family_label: familyLabel,
+            qtype_id: seed?.questionTypeId,
+            chapter_step: seed?.chapterStep,
+            reason: `Stay in ${familyLabel} for one more question before switching.`,
+            section_filter: seed?.practiceSectionFilter,
+            focus_question_ids: seed?.suggestedPracticeIds,
+          },
+          adaptive_style: {
+            profile: mentorStudentProfile,
+            tone:
+              mentorStudentProfile === "boards_focused"
+                ? "examiner-aware"
+                : mentorStudentProfile === "doubt_heavy"
+                  ? "reason-first"
+                  : "stepwise and calm",
+            depth:
+              mentorStudentProfile === "boards_focused"
+                ? "mark-safe"
+                : mentorStudentProfile === "doubt_heavy"
+                  ? "explain why"
+                  : "one step at a time",
+            pacing: mentorStudentProfile === "boards_focused" ? "direct" : "scaffolded",
+            rationale: "Keep the next move obvious and chapter-specific.",
+          },
+          diagramRequired: Boolean(seed?.recommendedDiagramType),
+          diagramType: seed?.recommendedDiagramType,
+        },
+      };
 
-      if (resolvedIntent === "check_cbse") {
-        const { tpl, section } = getOfflineBoardSteps();
-        const steps = Array.isArray(tpl?.steps)
-          ? tpl.steps.map((s: any) => ({
-              marks: Number(s?.marks || 1),
-              text: String(s?.title || "Board step"),
-              whyThisGetsMarks: Array.isArray(s?.whatToWrite)
-                ? String(s.whatToWrite[0] || "")
-                : "",
-            }))
-          : [
-              { marks: 1, text: "Write given data clearly." },
-              { marks: 1, text: "Apply the relevant criterion/theorem." },
-              { marks: 1, text: "Conclude with final board-format answer." },
-            ];
-
-        return JSON.stringify({
-          kind: "board_steps_ms",
-          totalMarks: Number(tpl?.marksTotal || seed?.marks || 3),
-          section,
-          steps,
-          finalAnswer: "Write one final answer line with labels/units.",
-        });
-      }
-
-      if (resolvedIntent === "explain") {
-        return [
-          "Concept focus:",
-          `- Identify which trig idea ${seed?.title || "this question"} is testing before solving.`,
-          "- Write the correct ratio / identity first, then substitute values carefully.",
-          "- Keep one clean algebra line and simplify before concluding.",
-          "- End with one short exam-ready statement.",
-        ].join("\n");
-      }
-
-      return JSON.stringify({
-        kind: "hint",
-        tutor: studentText
-          ? `Good attempt. Next move: connect your step to the core criterion in ${seed?.title || "this question"}.`
-          : `Let's start: what information is directly given in ${seed?.title || "this question"}?`,
-        answerFormat: "One short step + reason.",
-      });
+      return {
+        text: getMentorTutorText(structured) || "",
+        structured,
+      };
     },
-    [resolvedIntent, seed]
+    [mentorHelpMode, mentorStudentProfile, resolvedIntent, seed, topicKey]
   );
 
   const requestMentorHybrid = useCallback(
-    async (history: MentorChatMsg[], imageForRequest?: MentorImageAttachment | null) => {
-      if (!seed) return "";
+    async (history: MentorChatMsg[], imageForRequest?: MentorImageAttachment | null): Promise<MentorHybridReply> => {
+      if (!seed) return { text: "" };
       if (!canUseMentorServer()) {
         throw new Error("Mentor server temporarily unavailable.");
       }
@@ -2003,11 +2178,22 @@ function MentorSolveDrawer(props: {
             chapter: topicKey,
             selectedMode: modeApi,
             solveStyle: resolvedIntent === "check_cbse" ? "board" : "socratic",
+            studentIntent: resolvedIntent,
+            studentProfile: mentorStudentProfile,
+            mentorHelpMode,
             questionText: String(seed.question || ""),
             studentQuestion: applyMentorContext(String(lastUser?.content || "").trim()),
             cardTitle: seed.title,
             cardSection: seed.section,
             marks: Number(seed.marks || 0) || undefined,
+            questionFamilyId: seed.questionFamilyId,
+            questionFamilyLabel: seed.questionFamilyLabel,
+            questionTypeId: seed.questionTypeId,
+            chapterStep: seed.chapterStep,
+            practiceSectionFilter: seed.practiceSectionFilter,
+            suggestedPracticeIds: seed.suggestedPracticeIds,
+            theoremFocus: seed.theoremFocus,
+            recommendedDiagramType: seed.recommendedDiagramType,
             ...(imageForRequest
               ? {
                   imageBase64: imageForRequest.base64,
@@ -2058,14 +2244,25 @@ function MentorSolveDrawer(props: {
         const data = payload?.data || {};
         if (data && typeof data === "object") {
           if (data.structured && typeof data.structured === "object") {
-            return JSON.stringify(data.structured);
+            return {
+              text:
+                getMentorTutorText(data.structured as MentorStructured) ||
+                (typeof data.text === "string" ? data.text.trim() : ""),
+              structured: data.structured as MentorStructured,
+            };
           }
           if (typeof data.text === "string" && data.text.trim()) {
-            return data.text.trim();
+            return {
+              text: renderAssistantContent(data.text.trim()),
+              structured: parseMentorStructuredText(data.text.trim()) || undefined,
+            };
           }
         }
         if (typeof payload?.message === "string" && payload.message.trim()) {
-          return payload.message.trim();
+          return {
+            text: renderAssistantContent(payload.message.trim()),
+            structured: parseMentorStructuredText(payload.message.trim()) || undefined,
+          };
         }
         throw new Error("Mentor response incomplete. Please retry.");
       } catch (err) {
@@ -2078,7 +2275,17 @@ function MentorSolveDrawer(props: {
         clearTimeout(timeoutId);
       }
     },
-    [applyMentorContext, grade, resolvedIntent, seed, subjectTitle, topicKey]
+    [
+      applyMentorContext,
+      grade,
+      mentorHelpMode,
+      mentorStudentProfile,
+      renderAssistantContent,
+      resolvedIntent,
+      seed,
+      subjectTitle,
+      topicKey,
+    ]
   );
 
   const kickoff = useCallback(async () => {
@@ -2096,14 +2303,17 @@ function MentorSolveDrawer(props: {
     setMessages([firstUser]);
 
     try {
-      let assistantRaw = "";
+      let reply: MentorHybridReply;
       try {
-        assistantRaw = await requestMentorHybrid([firstUser], null);
+        reply = await requestMentorHybrid([firstUser], null);
       } catch (serverErr: any) {
         console.warn("Mentor server unavailable, using fallback", serverErr);
-        assistantRaw = buildLocalMentorReply([firstUser]);
+        reply = buildLocalMentorReply([firstUser]);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: assistantRaw }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: reply.text || "...", structured: reply.structured },
+      ]);
     } catch (e: any) {
       setErrorText(e?.message || "Failed to load mentor response.");
     } finally {
@@ -2140,14 +2350,17 @@ function MentorSolveDrawer(props: {
     setLoading(true);
     let nextError: string | null = null;
     try {
-      let assistantRaw = "";
+      let reply: MentorHybridReply;
       try {
-        assistantRaw = await requestMentorHybrid(nextHistory, imageForRequest);
+        reply = await requestMentorHybrid(nextHistory, imageForRequest);
       } catch (serverErr: any) {
         console.warn("Mentor server unavailable, using fallback", serverErr);
-        assistantRaw = buildLocalMentorReply(nextHistory);
+        reply = buildLocalMentorReply(nextHistory);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: assistantRaw }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: reply.text || "...", structured: reply.structured },
+      ]);
     } catch (e: any) {
       nextError = e?.message || "Failed to send.";
       setErrorText(nextError);
@@ -2164,6 +2377,38 @@ function MentorSolveDrawer(props: {
     requestMentorHybrid,
     showSolutionImageUpload,
   ]);
+
+  const handlePracticeNext = useCallback(
+    (practiceNext: {
+      family_label?: string;
+      section_filter?: string;
+      focus_question_ids?: string[];
+    }) => {
+      if (!seed) return;
+      navigateToPractice(navigate, {
+        grade: String(grade),
+        subject: subjectTitle as SubjectKey,
+        topicKey,
+        topicName: topicKey,
+        backPath: `${window.location.pathname}${window.location.search}`,
+        backLabel: "Back to Practice",
+        subtopicHint: String(practiceNext.family_label || seed.questionFamilyLabel || "").trim() || undefined,
+        sectionFilter:
+          (practiceNext.section_filter || seed.practiceSectionFilter || undefined) as
+            | PracticeSectionFilter
+            | undefined,
+        focusBankIds:
+          (Array.isArray(practiceNext.focus_question_ids) && practiceNext.focus_question_ids.length > 0
+            ? practiceNext.focus_question_ids
+            : seed.suggestedPracticeIds) || undefined,
+        strictFocus: true,
+        recommendedCount: 8,
+        difficultyPreset: "All",
+        source: "mentor_practice_next",
+      });
+    },
+    [grade, navigate, seed, subjectTitle, topicKey]
+  );
 
   if (!open || !seed) return null;
 
@@ -2210,6 +2455,11 @@ function MentorSolveDrawer(props: {
             <div style={{ fontWeight: 950, fontSize: 14 }}>
               {mentorTitle} - {seed.title}
             </div>
+            {seed.questionFamilyLabel ? (
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                Family: {seed.questionFamilyLabel}
+              </div>
+            ) : null}
             {seed.strategyContextHeader && (
               <div style={{ fontSize: 12, color: "#475569" }}>
                 Strategy context is being used for this question.
@@ -2332,22 +2582,52 @@ function MentorSolveDrawer(props: {
           {messages
             .filter((m) => m.role === "assistant")
             .map((m, i) => (
-              <pre
-                key={i}
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                  fontSize: 13,
-                  lineHeight: 1.55,
-                  padding: 12,
-                  borderRadius: 16,
-                  background: "rgba(248,250,252,0.9)",
-                  border: "1px solid rgba(148,163,184,0.35)",
-                }}
-              >
-                {renderAssistantContent(m.content)}
-              </pre>
+              (() => {
+                const tutorObj = getMentorTutorObject(m.structured);
+                const diagram = extractMentorDiagramBlock(
+                  m.structured,
+                  `${seed.questionFamilyLabel || seed.title} mentor figure`
+                );
+                const bodyText =
+                  getMentorTutorText(m.structured) || renderAssistantContent(m.content);
+
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: "grid",
+                      gap: 10,
+                      padding: 12,
+                      borderRadius: 16,
+                      background: "rgba(248,250,252,0.9)",
+                      border: "1px solid rgba(148,163,184,0.35)",
+                    }}
+                  >
+                    {bodyText ? (
+                      <div
+                        style={{
+                          whiteSpace: "pre-wrap",
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                          fontSize: 13,
+                          lineHeight: 1.55,
+                        }}
+                      >
+                        {bodyText}
+                      </div>
+                    ) : null}
+                    {diagram ? <DiagramBlock diagram={diagram} /> : null}
+                    {tutorObj ? (
+                      <HumanGradeCoachView
+                        tutorObj={tutorObj}
+                        hintLevel={1}
+                        compact
+                        onPracticeNext={handlePracticeNext}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })()
             ))}
 
           {loading && <div style={{ marginTop: 10, fontSize: 13, opacity: 0.75 }}>Thinking...</div>}
@@ -2528,6 +2808,3 @@ function MentorSolveDrawer(props: {
 }
 
 export default PracticePage;
-
-
-

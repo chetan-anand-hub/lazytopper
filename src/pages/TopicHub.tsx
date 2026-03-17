@@ -27,12 +27,13 @@ import {
 import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
+import { HumanGradeCoachView } from "../components/mentor/HumanGradeCoachView";
 import SharedTutorDrawerV2, {
   type TutorMasteryState,
   type TutorNodeProgress,
 } from "../components/tutor/TutorDrawerV2";
 import type { DiagramSpec } from "../tutor/diagram/diagramTypes";
-import type { MentorDiagramSpec } from "../types/mentor";
+import type { MentorDiagramSpec, MentorStructured } from "../types/mentor";
 import type {
   QuestionFamilyOverlay,
   QuestionTypeTile,
@@ -74,6 +75,12 @@ import {
 } from "../services/mentorServerGate";
 import { trackUxEvent } from "../services/uxTelemetry";
 import { getChapterTutorPath } from "../utils/getChapterTutorPath";
+import {
+  extractMentorDiagramBlock,
+  getMentorTutorObject,
+  getMentorTutorText,
+  parseMentorStructuredText,
+} from "../utils/mentorStructured";
 
 const MENTOR_HYBRID_TIMEOUT_MS = 9_000;
 const QTYPE_FIRST_TRIG = import.meta.env.VITE_QTYPE_FIRST_TRIGONOMETRY === "true";
@@ -479,7 +486,12 @@ type ModeKey = "zombie" | "beast";
 type RequestedMentorMode = "explain" | "board_steps" | "solve_with_me" | "learn_mindmap";
 type ExplainType = "misconception" | "competency" | "mindmap_node" | "general";
 
-type MentorChatMsg = { role: "user" | "assistant"; content: string };
+type MentorChatMsg = {
+  role: "user" | "assistant";
+  content: string;
+  structured?: MentorStructured;
+};
+type MentorHybridReply = { text: string; structured?: MentorStructured };
 type TutorTab = "teach" | "examples";
 
 function safeArray<T = any>(x: any): T[] {
@@ -920,6 +932,13 @@ export default function TopicHub() {
     itemTitle?: string;
     itemText?: string;
     theoremFocus?: string[];
+    questionFamilyId?: string;
+    questionFamilyLabel?: string;
+    questionTypeId?: string;
+    chapterStep?: string;
+    practiceSectionFilter?: PracticeSectionFilter;
+    suggestedPracticeIds?: string[];
+    recommendedDiagramType?: string;
     mindmapNodeId?: string;
     mindmapNodeTitle?: string;
     mindmapCoreId?: string;
@@ -966,6 +985,13 @@ export default function TopicHub() {
       itemTitle?: string;
       itemText?: string;
       theoremFocus?: string[];
+      questionFamilyId?: string;
+      questionFamilyLabel?: string;
+      questionTypeId?: string;
+      chapterStep?: string;
+      practiceSectionFilter?: PracticeSectionFilter;
+      suggestedPracticeIds?: string[];
+      recommendedDiagramType?: string;
       mindmapNodeId?: string;
       mindmapNodeTitle?: string;
       mindmapCoreId?: string;
@@ -985,6 +1011,13 @@ export default function TopicHub() {
         itemTitle: opts.itemTitle,
         itemText: opts.itemText,
         theoremFocus: opts.theoremFocus,
+        questionFamilyId: opts.questionFamilyId,
+        questionFamilyLabel: opts.questionFamilyLabel,
+        questionTypeId: opts.questionTypeId,
+        chapterStep: opts.chapterStep,
+        practiceSectionFilter: opts.practiceSectionFilter,
+        suggestedPracticeIds: opts.suggestedPracticeIds,
+        recommendedDiagramType: opts.recommendedDiagramType,
         mindmapNodeId: opts.mindmapNodeId,
         mindmapNodeTitle: opts.mindmapNodeTitle,
         mindmapCoreId: opts.mindmapCoreId,
@@ -2042,6 +2075,7 @@ const showInZombie = (sectionId: string) => {
 
   const openMentorForTrianglesFamily = useCallback(
     (family: QuestionFamilyOverlay) => {
+      const focusBankIds = trianglesFamilyFocusIdMap[family.familyId] || family.focusBankIds || [];
       openMentorDrawer({
         title: `Triangles • ${family.studentLabel}`,
         question: family.mentorPrompt,
@@ -2054,9 +2088,16 @@ const showInZombie = (sectionId: string) => {
         itemText: family.tutorMeaning,
         contextText: `Triangles family router: ${family.studentLabel}`,
         anchor: `triangles:qtf:${family.familyId}`,
+        questionFamilyId: family.familyId,
+        questionFamilyLabel: family.studentLabel,
+        questionTypeId: family.qtypeId,
+        chapterStep: family.tutorNodeId,
+        practiceSectionFilter: family.sectionFilter as PracticeSectionFilter | undefined,
+        suggestedPracticeIds: focusBankIds,
+        recommendedDiagramType: family.recommendedDiagramType,
       });
     },
-    [openMentorDrawer]
+    [openMentorDrawer, trianglesFamilyFocusIdMap]
   );
 
   const openPracticeFromQTypeTile = useCallback(
@@ -3049,6 +3090,13 @@ const showInZombie = (sectionId: string) => {
                         section: "C",
                         anchor: "triangles:runtime:proof-check",
                         contextText: "Triangles board proof help from the chapter runway.",
+                        questionFamilyId: "TRI_FAMILY_BOARD_CHECK",
+                        questionFamilyLabel: "Board-check my proof",
+                        questionTypeId: "TRI_QTYPE_06_BOARD_CHECK",
+                        chapterStep: "board-check",
+                        practiceSectionFilter: "C",
+                        suggestedPracticeIds: trianglesFamilyFocusIdMap.TRI_FAMILY_BOARD_CHECK,
+                        recommendedDiagramType: "geometry_triangle",
                       })
                     }
                   >
@@ -5360,6 +5408,13 @@ function MentorSolveDrawer({
     itemTitle?: string;
     itemText?: string;
     theoremFocus?: string[];
+    questionFamilyId?: string;
+    questionFamilyLabel?: string;
+    questionTypeId?: string;
+    chapterStep?: string;
+    practiceSectionFilter?: PracticeSectionFilter;
+    suggestedPracticeIds?: string[];
+    recommendedDiagramType?: string;
     mindmapNodeId?: string;
     mindmapNodeTitle?: string;
     mindmapCoreId?: string;
@@ -5372,6 +5427,7 @@ function MentorSolveDrawer({
   subjectTitle: string;
   topicKey: string;
 }) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<MentorChatMsg[]>([]);
   const isDev = import.meta.env.DEV;
 
@@ -6016,6 +6072,20 @@ const renderAssistantContent = (raw: string) => {
       : solveStyle === "board"
       ? "board_steps_ms"
       : "solve_with_me";
+  const mentorStudentProfile =
+    solveStyle === "board"
+      ? "boards_focused"
+      : requestedMode === "explain" || requestedMode === "learn_mindmap"
+        ? "doubt_heavy"
+        : seedExample?.questionFamilyId === "TRI_FAMILY_BOARD_CHECK"
+          ? "boards_focused"
+          : "weak_foundation";
+  const mentorHelpMode =
+    solveStyle === "board"
+      ? "proof_check"
+      : requestedMode === "explain" || requestedMode === "learn_mindmap"
+        ? "explain"
+        : "next_step";
 
   const getLastAssistantMessage = useCallback((history: MentorChatMsg[]) => {
     for (let i = history.length - 1; i >= 0; i -= 1) {
@@ -6073,46 +6143,149 @@ const renderAssistantContent = (raw: string) => {
   }, [seedExample, isLearnSection, requestedMode, isExplainOnly, solveStyle]);
 
   const buildLocalMentorChatReply = useCallback(
-    (history: MentorChatMsg[]) => {
+    (history: MentorChatMsg[]): MentorHybridReply => {
       const lastUser = [...history].reverse().find((m) => m.role === "user");
       const studentText = String(lastUser?.content || "").trim();
+      const familyLabel = String(seedExample?.questionFamilyLabel || seedExample?.title || "this family");
 
-      if (solveStyle === "board" || resolvedMode === "board_steps_ms" || isExplainOnly) {
-        const totalMarks = Number(seedExample?.marks) > 0 ? Number(seedExample?.marks) : 3;
-        const boardPayload = {
-          kind: "board_steps_ms",
-          totalMarks,
-          steps: [
-            { marks: 1, text: `Write what is given in ${seedExample?.title || "this question"}.` },
-            { marks: 1, text: "State the required theorem/criterion clearly." },
-            { marks: 1, text: "Show substitution/simplification step-by-step." },
-          ],
-          finalAnswer: "Write one final board-format conclusion line.",
-          boardWriteup: [
-            "Given: (state data)",
-            "Using theorem/criterion: (state line)",
-            "Substitute and simplify.",
-            "Hence proved / answer found.",
-          ].join("\n"),
-        };
-        return JSON.stringify(boardPayload);
-      }
-
-      const socraticPayload = {
-        kind: studentText ? "hint" : "hint",
-        tutor: studentText
-          ? `Good attempt. Next step: connect your line to the core criterion in ${seedExample?.title || "this concept"}.`
-          : `Let's begin. First, what is directly given in ${seedExample?.title || "this question"}?`,
-        answerFormat: "One short step, then reason.",
+      const structured: MentorStructured = {
+        kind: "tutor",
+        tutor: {
+          text:
+            solveStyle === "board" || resolvedMode === "board_steps_ms" || isExplainOnly
+              ? "I will check the family, the board-writing order, and the next clean step."
+              : studentText
+                ? `Good attempt. Stay inside ${familyLabel} and fix the next link first.`
+                : `Let's start with the first safe step inside ${familyLabel}.`,
+          diagnosis: {
+            chapter: topicKey,
+            family_id: seedExample?.questionFamilyId,
+            family_label: familyLabel,
+            qtype_id: seedExample?.questionTypeId,
+            theorem_focus: seedExample?.theoremFocus,
+            confusion_type:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "board_answer_weakness"
+                : isExplainOnly
+                  ? "concept_confusion"
+                  : "next_step_unclear",
+            help_mode: mentorHelpMode,
+            student_profile: mentorStudentProfile,
+            diagram_needed: Boolean(seedExample?.recommendedDiagramType),
+            summary_line:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "Check theorem line, order, and final conclusion before rewriting."
+                : "Identify the family first, then move one step at a time.",
+          },
+          hint_ladder:
+            solveStyle === "board" || resolvedMode === "board_steps_ms"
+              ? undefined
+              : {
+                  level: 1,
+                  hint:
+                    studentText ||
+                    `State the trigger for ${familyLabel} before doing any algebra or ratios.`,
+                  next_action: "Write one justified line, then ask for the next step.",
+                },
+          board_steps_ms:
+            solveStyle === "board" || resolvedMode === "board_steps_ms" || isExplainOnly
+              ? {
+                  total_marks: Number(seedExample?.marks || 3) || 3,
+                  steps: [
+                    { line: `Write what is given in ${seedExample?.title || "this question"}.`, marks: 1 },
+                    { line: "State the required theorem/criterion clearly.", marks: 1 },
+                    { line: "Show one clean justified step before the conclusion.", marks: 1 },
+                  ],
+                  deductions: [
+                    {
+                      reason: "Skipping theorem line or final conclusion weakens the board answer.",
+                      marks_lost: 1,
+                    },
+                  ],
+                  examiner_note: "Board answers score when the method order is visible.",
+                }
+              : undefined,
+          board_tip: {
+            title: "Board-smart note",
+            summary:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "Check the opening theorem line and the final conclusion line first."
+                : "Say the theorem family before you move into the next step.",
+            mark_cut_risk: "Jumping straight to a ratio or conclusion can lose method marks.",
+            question_style: seedExample?.section ? `Section ${seedExample.section}` : "board-style question",
+          },
+          common_mistake: {
+            title: "Common mistake",
+            summary:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "Mathematically close answers can still lose marks if the order is weak."
+                : "Students often jump to ratios before naming the family trigger.",
+            fix:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "Rewrite the theorem line, then the justified relation, then the conclusion."
+                : "State the family trigger first, then write one linked step.",
+            mark_risk: "Weak structure lowers score even when the idea is close.",
+          },
+          next: {
+            micro_drill:
+              solveStyle === "board" || resolvedMode === "board_steps_ms"
+                ? "Rewrite the first two lines in clean board format."
+                : `Do one more ${familyLabel} question before switching.`,
+            revision_hook: "Keep the trigger line and conclusion line together in revision.",
+            chapter_step: seedExample?.chapterStep,
+          },
+          practice_next: {
+            cta: "Practice this family",
+            topic_key: topicKey,
+            family_id: seedExample?.questionFamilyId,
+            family_label: familyLabel,
+            qtype_id: seedExample?.questionTypeId,
+            chapter_step: seedExample?.chapterStep,
+            reason: `Stay in ${familyLabel} for one more question before switching topics.`,
+            section_filter: seedExample?.practiceSectionFilter,
+            focus_question_ids: seedExample?.suggestedPracticeIds,
+          },
+          adaptive_style: {
+            profile: mentorStudentProfile,
+            tone:
+              mentorStudentProfile === "boards_focused"
+                ? "examiner-aware"
+                : mentorStudentProfile === "doubt_heavy"
+                  ? "reason-first"
+                  : "calm and direct",
+            depth:
+              mentorStudentProfile === "boards_focused"
+                ? "mark-safe"
+                : mentorStudentProfile === "doubt_heavy"
+                  ? "why-first"
+                  : "next step only",
+            pacing: mentorStudentProfile === "boards_focused" ? "direct" : "scaffolded",
+            rationale: "Keep the tutor response chapter-aware and low-overload.",
+          },
+          diagramRequired: Boolean(seedExample?.recommendedDiagramType),
+          diagramType: seedExample?.recommendedDiagramType,
+        },
       };
-      return JSON.stringify(socraticPayload);
+
+      return {
+        text: getMentorTutorText(structured) || "Mentor fallback response",
+        structured,
+      };
     },
-    [solveStyle, resolvedMode, isExplainOnly, seedExample?.marks, seedExample?.title]
+    [
+      isExplainOnly,
+      mentorHelpMode,
+      mentorStudentProfile,
+      resolvedMode,
+      seedExample,
+      solveStyle,
+      topicKey,
+    ]
   );
 
   const requestMentorChatHybrid = useCallback(
-    async (history: MentorChatMsg[]) => {
-      if (!seedExample) return "";
+    async (history: MentorChatMsg[]): Promise<MentorHybridReply> => {
+      if (!seedExample) return { text: "" };
       const apiMode = resolvedMode;
       const lastUser = [...history].reverse().find((m) => m.role === "user");
       const studentQuestion = String(lastUser?.content || "").trim();
@@ -6128,11 +6301,23 @@ const renderAssistantContent = (raw: string) => {
           marks: Number(seedExample.marks || 0) || undefined,
           selectedMode: apiMode,
           solveStyle,
+          studentIntent:
+            solveStyle === "board" || resolvedMode === "board_steps_ms" ? "check_cbse" : "hint",
+          studentProfile: mentorStudentProfile,
+          mentorHelpMode,
           vibe: mode,
           doubtContext: buildDoubtContext(history),
           cardTitle: seedExample.title,
           cardSection: seedExample.section,
           cardSubSection: seedExample.subSection,
+          questionFamilyId: seedExample.questionFamilyId,
+          questionFamilyLabel: seedExample.questionFamilyLabel,
+          questionTypeId: seedExample.questionTypeId,
+          chapterStep: seedExample.chapterStep,
+          practiceSectionFilter: seedExample.practiceSectionFilter,
+          suggestedPracticeIds: seedExample.suggestedPracticeIds,
+          theoremFocus: seedExample.theoremFocus,
+          recommendedDiagramType: seedExample.recommendedDiagramType,
         },
         messages: history.map((m) => ({ role: m.role, content: m.content })),
       };
@@ -6143,18 +6328,75 @@ const renderAssistantContent = (raw: string) => {
       const data = payload?.data || {};
       if (data && typeof data === "object") {
         if (data.structured && typeof data.structured === "object") {
-          return JSON.stringify(data.structured);
+          return {
+            text:
+              getMentorTutorText(data.structured as MentorStructured) ||
+              (typeof data.text === "string" ? data.text.trim() : "") ||
+              "Mentor response ready.",
+            structured: data.structured as MentorStructured,
+          };
         }
         if (typeof data.text === "string" && data.text.trim()) {
-          return data.text.trim();
+          return {
+            text: data.text.trim(),
+            structured: parseMentorStructuredText(data.text.trim()) || undefined,
+          };
         }
       }
       if (typeof payload?.message === "string" && payload.message.trim()) {
-        return payload.message.trim();
+        return {
+          text: payload.message.trim(),
+          structured: parseMentorStructuredText(payload.message.trim()) || undefined,
+        };
       }
       throw new Error("Mentor response incomplete. Please retry.");
     },
-    [seedExample, resolvedMode, subjectTitle, grade, topicKey, solveStyle, mode, buildDoubtContext]
+    [
+      buildDoubtContext,
+      grade,
+      mentorHelpMode,
+      mentorStudentProfile,
+      mode,
+      resolvedMode,
+      seedExample,
+      solveStyle,
+      subjectTitle,
+      topicKey,
+    ]
+  );
+
+  const handlePracticeNext = useCallback(
+    (practiceNext: {
+      family_label?: string;
+      section_filter?: string;
+      focus_question_ids?: string[];
+      qtype_id?: string;
+    }) => {
+      navigateToPractice(navigate, {
+        grade,
+        subject: subjectTitle === "Science" ? "Science" : "Maths",
+        topicKey,
+        topicName: seedExample?.title || topicKey,
+        backPath: `${window.location.pathname}${window.location.search}`,
+        backLabel: "Back to TopicHub",
+        subtopicHint:
+          String(practiceNext.family_label || seedExample?.questionFamilyLabel || seedExample?.title || "").trim() ||
+          undefined,
+        sectionFilter:
+          (practiceNext.section_filter || seedExample?.practiceSectionFilter || undefined) as
+            | PracticeSectionFilter
+            | undefined,
+        focusBankIds:
+          (Array.isArray(practiceNext.focus_question_ids) && practiceNext.focus_question_ids.length > 0
+            ? practiceNext.focus_question_ids
+            : seedExample?.suggestedPracticeIds) || undefined,
+        strictFocus: true,
+        recommendedCount: 8,
+        difficultyPreset: "All",
+        source: "mentor_practice_next",
+      });
+    },
+    [grade, navigate, seedExample, subjectTitle, topicKey]
   );
 
   const inputPlaceholder = isExplainOnly
@@ -6187,18 +6429,21 @@ const renderAssistantContent = (raw: string) => {
     setLoading(true);
     try {
       const initialHistory = [{ role: "user", content: firstUser.content }] as MentorChatMsg[];
-      let text = "";
+      let reply: MentorHybridReply;
       try {
-        text = await requestMentorChatHybrid(initialHistory);
+        reply = await requestMentorChatHybrid(initialHistory);
       } catch (serverErr: any) {
         if (isDev) {
           console.warn("[mentor] chat kickoff fallback", {
             message: String(serverErr?.message || serverErr || ""),
           });
         }
-        text = buildLocalMentorChatReply(initialHistory);
+        reply = buildLocalMentorChatReply(initialHistory);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: reply.text || "...", structured: reply.structured },
+      ]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -6244,7 +6489,9 @@ const renderAssistantContent = (raw: string) => {
       if (seedExample?.requestedMode === "solve_with_me" && solveStyle !== "socratic") return;
       kickoffRef.current?.();
     }
-  }, [open, messages.length, seedExample?.requestedMode, solveStyle]);const sendStudentMessage = useCallback(async () => {
+  }, [open, messages.length, seedExample?.requestedMode, solveStyle]);
+
+  const sendStudentMessage = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
 
@@ -6255,18 +6502,21 @@ const renderAssistantContent = (raw: string) => {
     setLoading(true);
 
     try {
-      let text = "";
+      let reply: MentorHybridReply;
       try {
-        text = await requestMentorChatHybrid(nextHistory);
+        reply = await requestMentorChatHybrid(nextHistory);
       } catch (serverErr: any) {
         if (isDev) {
           console.warn("[mentor] chat follow-up fallback", {
             message: String(serverErr?.message || serverErr || ""),
           });
         }
-        text = buildLocalMentorChatReply(nextHistory);
+        reply = buildLocalMentorChatReply(nextHistory);
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: text || "..." }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: reply.text || "...", structured: reply.structured },
+      ]);
     } catch (err: any) {
       console.warn("Mentor request error", err);
       setErrorText(
@@ -6376,6 +6626,7 @@ const renderAssistantContent = (raw: string) => {
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
           Vibe: <b>{mode === "beast" ? "Beast" : "Zombie"}</b> ·{" "}
           {seedExample?.title || "Worked example"}
+          {seedExample?.questionFamilyLabel ? ` · ${seedExample.questionFamilyLabel}` : ""}
         </div>
 
         <div
@@ -6391,6 +6642,16 @@ const renderAssistantContent = (raw: string) => {
         >
           {messages.map((m, i) => {
             const isUser = m.role === "user";
+            const tutorObj = isUser ? null : getMentorTutorObject(m.structured);
+            const diagram = isUser
+              ? null
+              : extractMentorDiagramBlock(
+                  m.structured,
+                  `${seedExample?.questionFamilyLabel || seedExample?.title || "mentor figure"}`
+                );
+            const assistantBody = isUser
+              ? ""
+              : getMentorTutorText(m.structured) || renderAssistantContent(m.content);
             return (
               <div
                 key={i}
@@ -6412,7 +6673,22 @@ const renderAssistantContent = (raw: string) => {
                     lineHeight: 1.35,
                   }}
                 >
-                  {isUser ? m.content : renderAssistantContent(m.content)}
+                  {isUser ? (
+                    m.content
+                  ) : (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {assistantBody ? <div>{assistantBody}</div> : null}
+                      {diagram ? <DiagramBlock diagram={diagram} /> : null}
+                      {tutorObj ? (
+                        <HumanGradeCoachView
+                          tutorObj={tutorObj}
+                          hintLevel={1}
+                          compact
+                          onPracticeNext={handlePracticeNext}
+                        />
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             );

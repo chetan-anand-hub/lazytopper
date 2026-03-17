@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 // Import the strategy plan helper.  Use a relative import since this file
 // sits at the project root alongside planStorage.ts.
 // We no longer persist plan drafts from within the MentorPanel.  Plan
@@ -7,12 +8,16 @@ import React, { useEffect, useRef, useState } from "react";
 // import avoids unused variable errors and mismatched argument counts.
 // import { saveStrategyPlan } from "../services/planStorage";
 import { callMentor } from "../ai/aiClient";
-import { buildDiagramBlockFromLegacy } from "../diagrams/diagramInterop";
 import { getHintVariant } from "../services/abFlags";
 import { logActivity } from "../services/sessionLogger";
 import { HumanGradeCoachView } from "./mentor/HumanGradeCoachView";
 import { DiagramBlock } from "./DiagramBlock";
 import { isRecord } from "../types/mentor";
+import {
+  extractMentorDiagramBlock,
+  getMentorTutorObject,
+  getMentorTutorText,
+} from "../utils/mentorStructured";
 import type {
   MentorMode,
   MentorMessage,
@@ -28,6 +33,7 @@ import type { MentorPayload } from "../ai/aiClient";
 import type { MentorImageMimeType, TutorBlock } from "../types/mentor";
 import type { LazytopperDiagramBlock } from "../diagrams/diagramIntelligence";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
+import { navigateToPractice, type PracticeSectionFilter } from "../navigation/practiceNavigation";
 import {
   createMentorImageAttachment,
   getMentorImageErrorMessage,
@@ -263,56 +269,48 @@ function isSolveWithMe(obj: unknown): obj is SolveWithMeStructured {
 }
 
 function getTutorObject(structured: MentorStructured | undefined): TutorBlock | null {
-  const tutor = structured?.tutor;
-  if (tutor && typeof tutor === "object" && !Array.isArray(tutor)) return tutor;
-  return null;
+  return getMentorTutorObject(structured);
 }
 
 function getTutorText(structured: MentorStructured | undefined): string {
-  const tutor = structured?.tutor;
-  if (typeof tutor === "string") return tutor;
-  if (isRecord(tutor)) {
-    const text = typeof tutor.text === "string" ? tutor.text : "";
-    const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
-    return text || rawText || "";
-  }
-  return "";
+  return getMentorTutorText(structured);
 }
 
 function extractStructuredDiagram(
   structured: MentorStructured | undefined,
   fallbackTitle = "Mentor diagram"
 ): LazytopperDiagramBlock | null {
-  if (!isRecord(structured)) return null;
+  return extractMentorDiagramBlock(structured, fallbackTitle);
+}
 
-  const directBlock = structured.diagramBlock;
-  if (isRecord(directBlock) && typeof directBlock.diagramType === "string" && directBlock.spec) {
-    return directBlock as unknown as LazytopperDiagramBlock;
+function inferStudentProfileFromState(
+  mode: MentorMode,
+  message: string,
+  studentState: StudentState
+): NonNullable<StudentState["studentProfile"]> {
+  if (studentState.studentProfile) return studentState.studentProfile;
+
+  const mood = String(studentState.mood || "").toLowerCase();
+  const confidence = String(studentState.confidenceLevel || "").toLowerCase();
+  const text = String(message || "").toLowerCase();
+
+  if (mood === "anxious" || mood === "burnt-out" || /(panic|overwhelm|scared|blank)/i.test(text)) {
+    return "anxious";
   }
-
-  const tutor = getTutorObject(structured);
-  const tutorDiagramBlock = tutor && isRecord(tutor.diagramBlock) ? tutor.diagramBlock : null;
-  if (
-    isRecord(tutorDiagramBlock) &&
-    typeof tutorDiagramBlock.diagramType === "string" &&
-    tutorDiagramBlock.spec
-  ) {
-    return tutorDiagramBlock as unknown as LazytopperDiagramBlock;
+  if (/(fast|shortcut|efficient|high[- ]value|just the key step)/i.test(text)) {
+    return "advanced_value_seeking";
   }
+  if (mode === "board_steps_ms") return "boards_focused";
+  if (/(why|reason|doubt|how)/i.test(text)) return "doubt_heavy";
+  if (confidence === "low" || mood === "stressed") return "weak_foundation";
+  return "weak_foundation";
+}
 
-  return buildDiagramBlockFromLegacy({
-    diagramType:
-      (typeof structured.diagramType === "string" ? structured.diagramType : "") ||
-      (tutor && typeof tutor.diagramType === "string" ? tutor.diagramType : ""),
-    diagramLabels:
-      (structured.diagramLabels as Record<string, string> | string[] | null) ||
-      (tutor?.diagramLabels as Record<string, string> | string[] | null) ||
-      null,
-    diagramSpec: structured.diagram || structured.diagramSpec || tutor?.diagram || tutor?.diagramSpec,
-    title: fallbackTitle,
-    accessibilityLabel: fallbackTitle,
-    diagramIntent: "mentor_support",
-  });
+function inferHelpModeFromMode(mode: MentorMode): string {
+  if (mode === "board_steps_ms" || mode === "learn_proof") return "proof_check";
+  if (mode === "learn_teach" || mode === "learn_mindmap" || mode === "explain") return "explain";
+  if (mode === "solve_with_me" || mode === "solve") return "next_step";
+  return "hint";
 }
 
 function formatBoardSteps(obj: unknown): string {
@@ -409,12 +407,49 @@ type MentorRequestWithHints = MentorRequest & {
 const getStringProp = (obj: unknown, key: string): string | undefined =>
   isRecord(obj) && typeof obj[key] === "string" ? String(obj[key]) : undefined;
 
+const getStringArrayProp = (obj: unknown, key: string): string[] | undefined => {
+  if (!isRecord(obj) || !Array.isArray(obj[key])) return undefined;
+  const list = obj[key]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  return list.length > 0 ? list : undefined;
+};
+
 async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorReply> {
   // Build a compact MentorPayload-style object from the richer MentorRequest.
   // This keeps all the planner logic here, while delegating the actual HTTP
   // call + error handling to src/ai/aiClient.ts.
   const pageContextTopicKey = getStringProp(payload.pageContext, "topicKey");
   const pageContextTopic = getStringProp(payload.pageContext, "topic");
+  const topicKey =
+    pageContextTopicKey ??
+    pageContextTopic ??
+    payload.pageContext.chapter ??
+    undefined;
+  const studentProfile = inferStudentProfileFromState(
+    payload.mode,
+    payload.message,
+    payload.studentState
+  );
+  const sharedMentorFields = {
+    topicKey,
+    studentIntent:
+      payload.mode === "board_steps_ms"
+        ? "check_cbse"
+        : payload.mode === "learn_teach" || payload.mode === "explain"
+          ? "explain"
+          : "hint",
+    studentProfile,
+    mentorHelpMode: inferHelpModeFromMode(payload.mode),
+    questionFamilyId: getStringProp(payload.pageContext, "questionFamilyId"),
+    questionFamilyLabel: getStringProp(payload.pageContext, "questionFamilyLabel"),
+    questionTypeId: getStringProp(payload.pageContext, "questionTypeId"),
+    chapterStep: getStringProp(payload.pageContext, "chapterStep"),
+    practiceSectionFilter: getStringProp(payload.pageContext, "practiceSectionFilter"),
+    suggestedPracticeIds: getStringArrayProp(payload.pageContext, "suggestedPracticeIds"),
+    theoremFocus: getStringArrayProp(payload.pageContext, "theoremFocus"),
+    recommendedDiagramType: getStringProp(payload.pageContext, "recommendedDiagramType"),
+  };
   const mentorPayload: MentorPayload & Record<string, unknown> =
     payload.mode === "plan"
       ? {
@@ -425,7 +460,7 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
           hoursPerDay:
             (payload.studentState.mathHoursPerDay ?? 0) +
             (payload.studentState.scienceHoursPerDay ?? 0),
-          topicKey: pageContextTopicKey ?? payload.pageContext.chapter ?? undefined,
+          ...sharedMentorFields,
           // Keep weak chapters for future prompt tuning (gateway ignores unknown keys safely).
           weakChapters: payload.studentState.weakChapters,
           optionalChapters: [],
@@ -435,7 +470,7 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
       ? {
           grade: String(payload.pageContext.grade),
           subject: payload.pageContext.subject,
-          topicKey: payload.pageContext.chapter ?? "",
+          ...sharedMentorFields,
           questionText: payload.message,
           marks: payload.pageContext.marks,
         }
@@ -443,17 +478,14 @@ async function callMentorAPI(payload: MentorRequestWithHints): Promise<MentorRep
       ? {
           grade: String(payload.pageContext.grade),
           subject: payload.pageContext.subject,
-          // Prefer a canonical topic/concept key when available.
-          topicKey:
-            pageContextTopic ??
-            payload.pageContext.chapter ??
-            "",
+          ...sharedMentorFields,
           questionText: payload.message,
         }
       : {
           grade: String(payload.pageContext.grade),
           subject: payload.pageContext.subject,
           daysLeft: payload.studentState.daysLeft ?? 90,
+          ...sharedMentorFields,
           extraNotes: payload.message,
         };
 
@@ -559,6 +591,7 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
   uiPreset = "student",
   defaultIntent,
 }) => {
+  const navigate = useNavigate();
   const [intent, setIntent] = useState<StudentMentorIntent>(() =>
     defaultIntent ?? resolveIntentFromMode(defaultMode)
   );
@@ -599,8 +632,15 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({
     ...pageContext,
     subject,
     chapter,
+    topicKey: pageContext.topicKey ?? pageContext.topic ?? chapter,
   };
   const chaptersForSubject = CHAPTERS_BY_SUBJECT[subject] ?? ["All Chapters"];
+  const effectiveTopicKey =
+    effectivePageContext.topicKey ??
+    effectivePageContext.topic ??
+    effectivePageContext.chapter ??
+    "";
+  const gradeNumber = String(effectivePageContext.grade || "Class 10").replace(/\D/g, "") || "10";
 
   useEffect(() => {
     attachedImageRef.current = attachedImage;
@@ -917,6 +957,33 @@ Give me hint level ${targetLevel} only (keep it short).`
     }
   };
 
+  const handlePracticeNext = (practiceNext: {
+    topic_key?: string;
+    family_label?: string;
+    section_filter?: string;
+    focus_question_ids?: string[];
+  }) => {
+    const topicKey = String(practiceNext.topic_key || effectiveTopicKey || "").trim();
+    if (!topicKey) return;
+    navigateToPractice(navigate, {
+      grade: gradeNumber,
+      subject,
+      topicKey,
+      topicName: chapter !== "All Chapters" ? chapter : topicKey,
+      backPath: `${window.location.pathname}${window.location.search}`,
+      backLabel: "Back to Mentor",
+      subtopicHint: String(practiceNext.family_label || "").trim() || undefined,
+      sectionFilter: (practiceNext.section_filter || undefined) as PracticeSectionFilter | undefined,
+      focusBankIds: Array.isArray(practiceNext.focus_question_ids)
+        ? practiceNext.focus_question_ids.map((id) => String(id || "").trim()).filter(Boolean)
+        : undefined,
+      strictFocus: Array.isArray(practiceNext.focus_question_ids) && practiceNext.focus_question_ids.length > 0,
+      recommendedCount: 8,
+      difficultyPreset: "All",
+      source: "mentor_practice_next",
+    });
+  };
+
 
   const buildCoachViewProps = (msg: MentorMessageView, idx: number) => {
     const tutorObj = getTutorObject(msg.structured);
@@ -980,6 +1047,7 @@ Give me hint level ${targetLevel} only (keep it short).`
       tutorObj: coachTutorObj,
       hintLevel: displayLevel,
       onNextHint,
+      onPracticeNext: handlePracticeNext,
       variantLabel: isDev ? hintVariant : undefined,
       compact: true,
     };
