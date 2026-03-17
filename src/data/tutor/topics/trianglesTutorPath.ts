@@ -9,7 +9,8 @@ export const trianglesTutorPath: ChapterTutorPath = {
     {
       id: "tri-start",
       title: "Start with similarity as the chapter spine",
-      studentGoal: "Give the student one clear entry point instead of mixing BPT, area ratio, and Pythagoras from the start.",
+      studentGoal:
+        "Give the student one clear entry point instead of mixing BPT, proof structure, and ratio consequences from the start.",
       stepType: "start",
       sourceRefs: [
         {
@@ -107,21 +108,27 @@ export const trianglesTutorPath: ChapterTutorPath = {
     },
     {
       id: "tri-board-practice",
-      title: "Use predicted and HPQ inventory for live board practice",
-      studentGoal: "Practice from the real runtime pool without pretending a full chapter pack already exists.",
+      title: "Use the chapter pack and live runtime pool for board practice",
+      studentGoal:
+        "Practice from the real runtime pool while keeping the chapter honest about its current depth.",
       stepType: "practice",
       sourceRefs: [
         {
-          kind: "questionId",
-          path: "src/data/predictedQuestions.ts",
-          value: "2026-TRI-SA-01",
-          label: "Triangles predicted question inventory",
+          kind: "file",
+          path: "src/data/questionBanks/class10/maths/triangles.pack1.ts",
+          label: "Triangles Pack1 canonical bank",
         },
         {
           kind: "questionId",
-          path: "src/data/predictedQuestions.ts",
-          value: "2026-TRI-SA-02",
-          label: "Triangles proof-style predicted question",
+          path: "src/data/questionBanks/class10/maths/triangles.pack1.ts",
+          value: "2026-TRI-P1-B-005",
+          label: "Triangles pack BPT checkpoint",
+        },
+        {
+          kind: "questionId",
+          path: "src/data/predictedQuestionsAdditions.ts",
+          value: "2026-TRI-SA-07",
+          label: "Triangles live predicted BPT question",
         },
         {
           kind: "stringSearch",
@@ -135,8 +142,10 @@ export const trianglesTutorPath: ChapterTutorPath = {
           label: "Unified practice selection runtime",
         },
       ],
-      recommendedCTA: "Use Practice from the current prediction pool; do not fake a QTF or Pack1 path that does not exist yet.",
-      expectedStudentOutcome: "Student still gets meaningful practice, but the architecture stays honest about current depth.",
+      recommendedCTA:
+        "Use Practice from the chapter pack plus the live prediction/HPQ pool, but keep the router theorem-family first.",
+      expectedStudentOutcome:
+        "Student gets chapter-specific practice without overclaiming full Trigonometry-level depth.",
       mentorModeHint: "hint",
       cognitiveLoadNote: "Keep practice grouped by proof family or theorem family instead of broad random sets.",
     },

@@ -449,65 +449,6 @@ const predictedQuestionsBase: PredictedQuestion[] = [
     policyTag: "AP sum/board pattern",
   },
 
-  // ========== TRIANGLES (MUST-CRACK) ==========
-
-  {
-    id: "2026-TRI-SA-01",
-    topicKey: "Triangles",
-    subtopic: "Similarity (BPT)",
-    kind: "Short",
-    section: "B",
-    marks: 2,
-    difficulty: "Medium",
-    bloomSkill: "Applying",
-    questionText:
-      "In ΔABC, DE ∥ BC with D on AB and E on AC. If AD = 3 cm, DB = 2 cm and AE = 4.5 cm, find EC.",
-    answer: "EC = 3 cm.",
-    finalAnswer: "EC = 3 cm.",
-    explanation:
-      "By Basic Proportionality Theorem, AD/DB = AE/EC. So 3/2 = 4.5/EC ⇒ EC = (4.5 × 2)/3 = 3 cm.",
-    solutionSteps: [
-      "Note that DE ∥ BC, so triangles ADE and ABC are similar.",
-      "Apply BPT: AD/DB = AE/EC.",
-      "Substitute given values and solve for EC.",
-      "Write the answer with units.",
-    ],
-    strategyHint:
-      "As soon as you see a line parallel to one side of a triangle, think BPT and similarity.",
-    pastBoardYear: "2022",
-    policyTag: "Geometry/BPT direct-use",
-  },
-
-  {
-    id: "2026-TRI-SA-02",
-    topicKey: "Triangles",
-    subtopic: "Pythagoras & Converse",
-    kind: "Short",
-    section: "C",
-    marks: 3,
-    difficulty: "Medium",
-    bloomSkill: "Analysing",
-    questionText:
-      "Prove that in a right-angled triangle, the square of the hypotenuse is equal to the sum of the squares of the other two sides.",
-    answer:
-      "In a right triangle with right angle at B, AC² = AB² + BC².",
-    finalAnswer:
-      "For right-angled ΔABC with ∠B = 90°, AC² = AB² + BC².",
-    explanation:
-      "Construct squares on each side and use similarity of triangles formed by an altitude from the right angle, or use the area method. Standard proof concludes AC² = AB² + BC².",
-    solutionSteps: [
-      "Consider right-angled ΔABC with ∠B = 90°.",
-      "Draw altitude from B to AC and name the foot D.",
-      "Use similarity of ΔABD, ΔCBD and ΔABC.",
-      "Write ratios of corresponding sides and derive relations.",
-      "Add the relations to obtain AC² = AB² + BC².",
-    ],
-    strategyHint:
-      "Using an altitude from the right angle creates smaller similar triangles inside the big triangle.",
-    pastBoardYear: "2023",
-    policyTag: "Theorem proof/Pythagoras",
-  },
-
   // ========== COORDINATE GEOMETRY (HIGH-ROI) ==========
 
   {

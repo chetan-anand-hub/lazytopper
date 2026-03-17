@@ -2,26 +2,6 @@ import { TRIANGLES_PACK1_QUESTIONS } from "../../questionBanks/class10/maths/tri
 import type { QuestionMeta } from "../types";
 
 const legacyTrianglesQuestionTagIndex: Record<string, QuestionMeta> = {
-  "2026-TRI-SA-01": {
-    questionId: "2026-TRI-SA-01",
-    cbseFormat: "B",
-    skillFamily: "BPT",
-    loIds: ["LO_TRI_03_BPT_PARALLEL_FLOW", "LO_TRI_04_PROOF_FLOW"],
-    mistakeTags: ["parallel-line-not-stated", "segment-order-error"],
-    scopeGuard: ["class10", "maths", "triangles"],
-    msAlignment: "template",
-    reviewTags: ["bpt", "legacy"],
-  },
-  "2026-TRI-SA-02": {
-    questionId: "2026-TRI-SA-02",
-    cbseFormat: "C",
-    skillFamily: "Proof",
-    loIds: ["LO_TRI_04_PROOF_FLOW", "LO_TRI_06_BOARD_AUDIT"],
-    mistakeTags: ["proof-sequence-break", "missing-conclusion"],
-    scopeGuard: ["class10", "maths", "triangles"],
-    msAlignment: "template",
-    reviewTags: ["proof", "legacy"],
-  },
   "2026-TRI-MCQ-03": {
     questionId: "2026-TRI-MCQ-03",
     cbseFormat: "A",
@@ -72,16 +52,6 @@ const legacyTrianglesQuestionTagIndex: Record<string, QuestionMeta> = {
     msAlignment: "final-only",
     reviewTags: ["similarity", "mcq"],
   },
-  "2026-TRI-MCQ-06": {
-    questionId: "2026-TRI-MCQ-06",
-    cbseFormat: "A",
-    skillFamily: "Theorem Choice",
-    loIds: ["LO_TRI_01_READ_FIGURE_FIRST", "LO_TRI_04_PROOF_FLOW"],
-    mistakeTags: ["wrong-theorem-trigger", "right-angle-miss"],
-    scopeGuard: ["class10", "maths", "triangles"],
-    msAlignment: "final-only",
-    reviewTags: ["theorem-choice", "mcq"],
-  },
   "2026-TRI-SA-07": {
     questionId: "2026-TRI-SA-07",
     cbseFormat: "C",
@@ -92,16 +62,6 @@ const legacyTrianglesQuestionTagIndex: Record<string, QuestionMeta> = {
     msAlignment: "partial-credit",
     reviewTags: ["bpt", "short-answer"],
   },
-  "2026-TRI-SA-08": {
-    questionId: "2026-TRI-SA-08",
-    cbseFormat: "B",
-    skillFamily: "Theorem Choice",
-    loIds: ["LO_TRI_01_READ_FIGURE_FIRST", "LO_TRI_04_PROOF_FLOW"],
-    mistakeTags: ["converse-theorem-miss", "wrong-right-angle"],
-    scopeGuard: ["class10", "maths", "triangles"],
-    msAlignment: "template",
-    reviewTags: ["theorem-choice", "pythagoras"],
-  },
   "2026-TRI-AR-09": {
     questionId: "2026-TRI-AR-09",
     cbseFormat: "A",
@@ -111,16 +71,6 @@ const legacyTrianglesQuestionTagIndex: Record<string, QuestionMeta> = {
     scopeGuard: ["class10", "maths", "triangles"],
     msAlignment: "final-only",
     reviewTags: ["similarity", "assertion-reason"],
-  },
-  "2026-TRI-CASE-10": {
-    questionId: "2026-TRI-CASE-10",
-    cbseFormat: "E",
-    skillFamily: "Area Ratio",
-    loIds: ["LO_TRI_05_AREA_RATIO", "LO_TRI_04_PROOF_FLOW", "LO_TRI_06_BOARD_AUDIT"],
-    mistakeTags: ["area-partition-misread", "ratio-justification-miss"],
-    scopeGuard: ["class10", "maths", "triangles"],
-    msAlignment: "template",
-    reviewTags: ["area-ratio", "case-study"],
   },
 };
 

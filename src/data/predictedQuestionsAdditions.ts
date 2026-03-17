@@ -1,4 +1,4 @@
-﻿// This file contains append‑only predicted question additions for Mathematics.
+// This file contains append‑only predicted question additions for Mathematics.
 // It expands the existing predicted questions to align with CBSE 2025–26 competency focus.
 // Note: Do not overwrite existing arrays; import and merge as needed in the main engine.
 
@@ -271,22 +271,6 @@ export const predictedQuestionsAdditions: PredictedQuestion[] = [
       "The pairs AB:DE and AC:DF correspond, so vertex A matches with D. Therefore ∠A = ∠D.",
   },
   {
-    id: "2026-TRI-MCQ-06",
-    topicKey: "Triangles",
-    subtopic: "Pythagoras/Converse",
-    kind: "MCQ",
-    section: "A",
-    marks: 1,
-    difficulty: "Easy",
-    bloomSkill: "Understanding",
-    questionText:
-      "In a right triangle, the hypotenuse is 10 cm and one of the other sides is 6 cm. The length of the third side is:",
-    options: ["4 cm", "6 cm", "8 cm", "12 cm"],
-    answer: "8 cm",
-    explanation:
-      "By the Pythagoras theorem: third side = √(10² − 6²) = √64 = 8 cm.",
-  },
-  {
     id: "2026-TRI-SA-07",
     topicKey: "Triangles",
     subtopic: "BPT (Basic Proportionality Theorem)",
@@ -308,26 +292,6 @@ export const predictedQuestionsAdditions: PredictedQuestion[] = [
     strategyHint: "Relate the segments using the Basic Proportionality Theorem.",
   },
   {
-    id: "2026-TRI-SA-08",
-    topicKey: "Triangles",
-    subtopic: "Pythagoras/Converse",
-    kind: "Short",
-    section: "B",
-    marks: 2,
-    difficulty: "Easy",
-    bloomSkill: "Understanding",
-    questionText:
-      "In ΔABC, AB = 6 cm, AC = 8 cm and BC = 10 cm. Show that ΔABC is a right‑angled triangle.",
-    answer: "Yes, it is right‑angled at A because 6² + 8² = 10².",
-    explanation:
-      "Compute 6² + 8² = 36 + 64 = 100. Since this equals 10², by the converse of the Pythagoras theorem ΔABC is right‑angled at A.",
-    solutionSteps: [
-      "Calculate 6² + 8² = 36 + 64 = 100.",
-      "Compute 10² = 100.",
-      "Since the sums match, the triangle is right‑angled at the vertex opposite the 10 cm side.",
-    ],
-  },
-  {
     id: "2026-TRI-AR-09",
     topicKey: "Triangles",
     subtopic: "Similarity Criteria",
@@ -343,30 +307,6 @@ export const predictedQuestionsAdditions: PredictedQuestion[] = [
     explanation:
       "The statement describes exactly the SAS criterion: two sides in proportion and the included angle equal implies similarity.",
   },
-  {
-    id: "2026-TRI-CASE-10",
-    topicKey: "Triangles",
-    subtopic: "Area Ratio in Similar Triangles",
-    kind: "Case-Based",
-    section: "E",
-    marks: 4,
-    difficulty: "Medium",
-    bloomSkill: "Analysing",
-    questionText:
-      "In ΔABC, the three medians intersect at the centroid G. Medians divide the triangle into six smaller triangles of equal area.\n(a) Use similarity to explain why ΔAGB, ΔBGC and ΔCGA all have equal areas.\n(b) Hence, find the ratio of the area of ΔAGB to the area of ΔABC.",
-    answer:
-      "(a) Each median divides the triangle into two equal‑area triangles, and the medians further divide these into six congruent triangles. (b) Area(ΔAGB) : Area(ΔABC) = 1 : 3.",
-    explanation:
-      "Medians meet at the centroid and divide the triangle into six smaller triangles of equal area. ΔAGB consists of two such small triangles, so its area is one‑third of the area of ΔABC.",
-    solutionSteps: [
-      "Recall that each median bisects the area of the triangle.",
-      "Show that the centroid divides medians in the ratio 2:1, creating six smaller triangles of equal area.",
-      "Observe that ΔAGB is composed of two of the six equal parts, so its area is 2/6 = 1/3 of ΔABC.",
-    ],
-    strategyHint:
-      "Use properties of medians and the centroid to compare the areas of the resulting triangles.",
-  },
-
   // ===== Trigonometry (must‑crack) =====
   {
     id: "2026-TRIG-MCQ-09",

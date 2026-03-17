@@ -273,55 +273,6 @@ export const hpqAdditions: HPQTopicBucket[] = [
           "The similarity ratio of corresponding sides is 1 : 3, so the ratio of areas is 1² : 3² = 1 : 9.",
       },
       {
-        id: "tri-hpq-103",
-        subject: "Maths",
-        topic: "Triangles",
-        subtopic: "Pythagoras/Converse",
-        concept: "Circumcentre of right triangle",
-        section: "A",
-        type: "AssertionReason",
-        difficulty: "Medium",
-        marks: 1,
-        likelihood: "Medium-High",
-        tier: "must-crack",
-        bloomSkill: "Analysing",
-        kind: "assertion-reason",
-        question: "Assertion–Reason: refer to assertion and reason below.",
-        assertion:
-          "In any right‑angled triangle, the midpoint of the hypotenuse is equidistant from all three vertices.",
-        reason:
-          "The midpoint of the hypotenuse of a right triangle is the centre of the circle passing through the three vertices.",
-        aROptions: [
-          { label: "A", text: "Both Assertion and Reason are true and Reason is the correct explanation." },
-          { label: "B", text: "Both Assertion and Reason are true but Reason is not the correct explanation." },
-          { label: "C", text: "Assertion is true but Reason is false." },
-          { label: "D", text: "Assertion is false but Reason is true." },
-        ],
-        correctOption: "A",
-        answer: "A",
-        explanation:
-          "For a right triangle, the circumcentre is the midpoint of the hypotenuse; hence all vertices are equidistant from this point.",
-      },
-      {
-        id: "tri-hpq-104",
-        subject: "Maths",
-        topic: "Triangles",
-        subtopic: "Medians",
-        concept: "Area bisected by median",
-        section: "C",
-        type: "Short",
-        difficulty: "Medium",
-        marks: 3,
-        likelihood: "High",
-        tier: "must-crack",
-        bloomSkill: "Applying",
-        question:
-          "In ΔABC, AB = 7 cm, AC = 9 cm and AD is a median to BC. If the area of ΔABD is 14 cm², find the area of ΔABC.",
-        answer: "28 cm²",
-        explanation:
-          "A median divides a triangle into two equal‑area triangles. Thus area ΔABC = 2 × area ΔABD = 28 cm².",
-      },
-      {
         id: "tri-hpq-105",
         subject: "Maths",
         topic: "Triangles",
@@ -953,7 +904,7 @@ export const dailyMixSeeds: Record<
   },
   "triangles": {
     mustCrackQuestionIds: [
-      "2026-TRI-CASE-10",
+      "2026-TRI-CASE-04",
       "2026-TRI-SA-07",
       "2026-TRI-AR-09",
     ],

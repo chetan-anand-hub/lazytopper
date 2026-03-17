@@ -21,7 +21,6 @@ import { useVibeMode } from "../context/vibeModeContext";
 import { trianglesRuntimeVisuals } from "../data/diagrams/trianglesRuntimeVisuals";
 import {
   buildParallelLinesDiagram,
-  buildRightTriangleDiagram,
   buildSimilarityDiagram,
   buildTriangleDiagram,
 } from "../diagrams/geometryBuilders";
@@ -597,7 +596,6 @@ function buildFallbackFormulae(args: {
       { title: "AA Similarity", formula: "If two angles are equal, triangles are similar.", whenToUse: "When two corresponding angles are given equal." },
       { title: "BPT", formula: "If DE || BC in triangle ABC, then AD/DB = AE/EC.", whenToUse: "When a line parallel to one side cuts the other two sides." },
       { title: "Area Ratio", formula: "For similar triangles, area1/area2 = (corresponding side ratio)^2.", whenToUse: "After proving similarity and asked area ratio." },
-      { title: "Pythagoras", formula: "In right triangle: hypotenuse^2 = base^2 + perpendicular^2.", whenToUse: "Only when right angle is given/proved." },
     ];
   }
   if (key.includes("trigon")) {
@@ -1088,23 +1086,6 @@ const proofWritingTemplates = useMemo(() => {
       hints: [
         "Square the side ratio when comparing areas.",
         "End with a clear numerical ratio."
-      ],
-    },
-    {
-      id: "pythagoras",
-      title: "Pythagoras in right triangles",
-      focus: "pythagoras",
-      marks: 4,
-      description:
-        "Apply Pythagoras only when a right angle is given or proved.",
-      question:
-        `Class ${grade} ${subjectTitle} - Triangles\n` +
-        `Write a full proof with Given / To Prove / Construction (if needed) / Proof / Conclusion.\n` +
-        `In right triangle ABC, angle A = 90 degrees, AB = 6 cm and AC = 8 cm.\n` +
-        `Prove BC^2 = AB^2 + AC^2 and find BC.`,
-      hints: [
-        "Identify the hypotenuse clearly.",
-        "Use the theorem name in the proof line."
       ],
     },
   ];
@@ -1712,7 +1693,6 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
   const mapProofFocusToNodeId = useCallback((focus?: string) => {
     const f = String(focus || "").toLowerCase();
     if (f.includes("bpt")) return "gBPT";
-    if (f.includes("pyth")) return "gPyth";
     if (f.includes("area")) return "gArea";
     if (f.includes("cpst")) return "gCPST";
     if (f.includes("aa")) return "gAA";
@@ -1728,14 +1708,6 @@ const buildFallbackQuickQuiz = useCallback((): V2Example[] => {
         caption: "Call out the parallel line before writing the ratio step.",
         diagramIntent: "visualize_question",
         accessibilityLabel: "BPT proof diagram",
-      });
-    }
-    if (f.includes("pyth")) {
-      return buildRightTriangleDiagram({
-        title: "Right triangle proof figure",
-        caption: "Use Pythagoras only after the right angle is fixed in the figure.",
-        diagramIntent: "visualize_question",
-        accessibilityLabel: "Right triangle proof diagram",
       });
     }
     if (f.includes("area") || f.includes("cpst") || f.includes("similar")) {
@@ -2163,7 +2135,7 @@ const showInZombie = (sectionId: string) => {
       mentorTitle: "Triangles • Check my proof",
       sourceNote:
         trianglesQuestionFamilies.length > 0
-          ? "The family router now resolves into a Triangles-specific focus bank backed by a chapter pack with Section A-E coverage and a competency-heavy mix. Depth is still lighter than the Trigonometry pack path, but the routing is now theorem-family aware."
+          ? "The family router now resolves into a Triangles-specific focus bank backed by a chapter pack guided by official CBSE Class X assessment design signals, including Section A-E style coverage, competency-focused items, and figure-aware prompts where the setup genuinely needs them. It is a chapter pack, not a full board-paper replica, and the depth still remains lighter than the Trigonometry pack path."
           : "",
     };
   }, [

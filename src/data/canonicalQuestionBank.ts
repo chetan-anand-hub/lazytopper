@@ -363,31 +363,6 @@ export const canonicalQuestionBank: CanonicalQuestion[] = [
     "predictionScore": 0
   },
   {
-    "id": "2026-TRI-SA-01",
-    "subject": "Maths",
-    "topicKey": "Triangles",
-    "subtopic": "Triangles",
-    "section": "B",
-    "marks": 3,
-    "format": "Short",
-    "difficulty": "Medium",
-    "bloomSkill": "Applying",
-    "questionText": "In \u25b3ABC, DE \u2225 BC and D, E are points on AB and AC respectively such that AD = 3 cm, DB = 2 cm. Find AE:EC.",
-    "options": [],
-    "answer": "",
-    "explanation": "",
-    "solutionSteps": [
-      "In \u25b3ABC, DE \u2225 BC with D on AB and E on AC.",
-      "By Basic Proportionality Theorem (Thales\u2019 theorem), AD/DB = AE/EC.",
-      "Substitute AD = 3 cm and DB = 2 cm to get 3/2 = AE/EC.",
-      "Therefore, AE:EC = 3:2.",
-      "State the final ratio clearly as AE:EC = 3:2."
-    ],
-    "finalAnswer": "",
-    "strategyHint": "",
-    "predictionScore": 0
-  },
-  {
     "id": "sci-chem-acids-2m-2022-01",
     "subject": "Science",
     "topicKey": "Acids, Bases & Salts",

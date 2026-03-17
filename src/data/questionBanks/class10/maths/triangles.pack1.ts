@@ -54,6 +54,40 @@ type GroupSpec = Omit<
     >
   >;
 
+// Design note for reviewers:
+// This chapter pack is guided by official CBSE Class X assessment design
+// signals. It is not a full board-paper replica and should not be used to
+// claim canonical completeness for the chapter.
+export const TRIANGLES_PACK1_SOURCE_BASIS = {
+  claimBoundary:
+    "Guided by official CBSE Class X assessment design signals, not a full board-paper replica.",
+  figureExpectation:
+    "Use neat and clean figures wherever the setup genuinely needs a diagram.",
+  officialSources: [
+    {
+      documentTitle: "CBSE Circular No. Acad-30/2024",
+      session: "2024-25",
+      url: "https://cbseacademic.nic.in/web_material/Circulars/2024/30_Circular_2024.pdf",
+      takeaway:
+        "Classes IX-X assessment design targets 50% competency-focused questions, 20% select-response questions, and 30% constructed-response questions.",
+    },
+    {
+      documentTitle: "CBSE Notification No. 66_Notification_2025",
+      session: "2025-26",
+      url: "https://cbseacademic.nic.in/web_material/Notifications/2025/66_Notification_2025.pdf",
+      takeaway:
+        "There is no change in the 2025-26 assessment scheme from 2024-25.",
+    },
+    {
+      documentTitle: "Class X Mathematics Standard Sample Question Paper",
+      session: "2025-26",
+      url: "https://cbseacademic.nic.in/web_material/SQP/ClassX_2025_26/MathsStandard-SQP.pdf",
+      takeaway:
+        "Use the official Section A-E pattern as a design guide and draw neat and clean figures wherever required.",
+    },
+  ],
+} as const;
+
 const MARKS_BY_SECTION: Record<SectionKey, number> = {
   A: 1,
   B: 2,

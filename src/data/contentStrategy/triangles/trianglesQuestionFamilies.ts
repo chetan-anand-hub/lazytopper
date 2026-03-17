@@ -11,13 +11,13 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
     qtypeId: "TRI_QTYPE_01_THEOREM_CHOICE",
     studentLabel: "Which theorem fits first?",
     tutorMeaning:
-      "Classify the figure before solving: equal angles -> similarity, parallel line -> BPT, right angle -> Pythagoras.",
+      "Classify the figure before solving: equal angles -> similarity, parallel line -> BPT, matching side ratios with the included angle -> SAS similarity.",
     weakStudentCue:
-      "Do not start ratios immediately. First ask: do I see equal angles, a parallel line, or a right angle?",
+      "Do not start ratios immediately. First ask: do I see equal angles, a parallel line, or side-pair correspondence that fixes a similarity criterion?",
     advancedStudentShortcut:
       "Write the theorem choice in one clean line, then jump straight to the target relation.",
     commonConfusion:
-      "Students mix CPST, BPT, similarity, and Pythagoras without proving the setup first.",
+      "Students mix CPST, BPT, and similarity without proving the setup first.",
     recommendedNextAction:
       "Do one theorem-choice drill, then one worked example from the same family.",
     theoremFamily: "Theorem choice",
@@ -26,13 +26,13 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
       "This prevents the biggest board loss: wrong theorem in the opening step.",
     practiceHint: "Similarity",
     focusBankIds: [
+      "2026-TRI-P1-A-001",
+      "2026-TRI-P1-A-003",
       "2026-TRI-MCQ-05",
-      "2026-TRI-MCQ-06",
-      "2026-TRI-AR-03",
-      "2026-TRI-SA-08",
+      "2026-TRI-P1-B-001",
     ],
     mentorPrompt:
-      "I am confused about which theorem fits this Triangles question. Help me decide between similarity, BPT, CPST, area ratio, and Pythagoras before solving.",
+      "I am confused about which theorem fits this Triangles question. Help me decide between similarity, BPT, converse BPT, and CPST before solving.",
     mentorModeHint: "solve_with_me",
     mentorSolveStyle: "socratic",
     tutorNodeId: "gQ1",
@@ -100,7 +100,12 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
     boardPayoff:
       "A clean BPT first line saves marks in both 2-mark and 4-mark geometry questions.",
     practiceHint: "BPT",
-    focusBankIds: ["2026-TRI-SA-01", "2026-TRI-SA-04", "2026-TRI-SA-07", "2026-TRI-CASE-04"],
+    focusBankIds: [
+      "2026-TRI-P1-B-005",
+      "2026-TRI-SA-04",
+      "2026-TRI-SA-07",
+      "2026-TRI-CASE-04",
+    ],
     mentorPrompt:
       "Check whether I used the parallel-line condition and BPT correctly. Tell me if I jumped to ratios too early.",
     mentorModeHint: "solve_with_me",
@@ -135,7 +140,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
     boardPayoff:
       "This is a favourite conceptual board pattern because it tests both theorem order and ratio discipline.",
     practiceHint: "Area Ratio",
-    focusBankIds: ["2026-TRI-MCQ-03", "2026-TRI-CASE-10"],
+    focusBankIds: ["2026-TRI-MCQ-03", "2026-TRI-P1-E-001"],
     mentorPrompt:
       "Check whether I proved similarity before using the area-ratio rule, and whether I squared the correct side ratio.",
     mentorModeHint: "solve_with_me",
@@ -206,7 +211,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
     boardPayoff:
       "Best for converting almost-correct proofs into full-mark answers.",
     practiceHint: "BPT + ratios",
-    focusBankIds: ["2026-TRI-SA-07", "2026-TRI-CASE-04", "2026-TRI-CASE-10"],
+    focusBankIds: ["2026-TRI-SA-07", "2026-TRI-CASE-04", "2026-TRI-P1-E-002"],
     sectionFilter: "C",
     mentorPrompt:
       "Use CBSE marking-scheme style and check my Triangles proof for missing reasons, wrong triangle order, ratio-order errors, and weak conclusion lines.",
