@@ -8,6 +8,7 @@ import {
 export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   {
     familyId: "TRI_FAMILY_THEOREM_CHOICE",
+    qtypeId: "TRI_QTYPE_01_THEOREM_CHOICE",
     studentLabel: "Which theorem fits first?",
     tutorMeaning:
       "Classify the figure before solving: equal angles -> similarity, parallel line -> BPT, right angle -> Pythagoras.",
@@ -47,6 +48,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   },
   {
     familyId: "TRI_FAMILY_SIMILARITY_CHOICE",
+    qtypeId: "TRI_QTYPE_02_SIMILARITY",
     studentLabel: "Similarity rule choice",
     tutorMeaning:
       "Choose AA, SAS, or SSS correctly and keep the triangle order consistent before writing ratios.",
@@ -81,6 +83,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   },
   {
     familyId: "TRI_FAMILY_BPT_PARALLEL",
+    qtypeId: "TRI_QTYPE_03_BPT",
     studentLabel: "BPT / parallel-line pattern",
     tutorMeaning:
       "Use the parallel line as the trigger. Once DE || BC is fixed, the ratio step becomes justified.",
@@ -115,6 +118,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   },
   {
     familyId: "TRI_FAMILY_AREA_RATIO",
+    qtypeId: "TRI_QTYPE_04_AREA_RATIO",
     studentLabel: "Area-ratio consequence",
     tutorMeaning:
       "After proving similarity, area ratio follows from the square of corresponding side ratio.",
@@ -149,6 +153,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   },
   {
     familyId: "TRI_FAMILY_PROOF_STRUCTURE",
+    qtypeId: "TRI_QTYPE_05_PROOF",
     studentLabel: "Proof structure and justification",
     tutorMeaning:
       "Treat the answer as a board proof: name triangles, state the theorem, justify the step, then conclude.",
@@ -184,6 +189,7 @@ export const trianglesQuestionFamilies: QuestionFamilyOverlay[] = [
   },
   {
     familyId: "TRI_FAMILY_BOARD_CHECK",
+    qtypeId: "TRI_QTYPE_06_BOARD_CHECK",
     studentLabel: "Board-check my proof",
     tutorMeaning:
       "This family is not about learning the theorem from scratch. It is about whether the written solution will survive examiner checking.",

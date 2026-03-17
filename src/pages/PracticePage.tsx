@@ -25,10 +25,12 @@ import {
 import {
   getQuestionMeta,
   getStrategyPackForTopic,
+  isStrategyEnabledForTopic,
   resolveCanonicalTopicForStrategy,
 } from "../services/questionTypeFirstResolver";
 import { trackUxEvent } from "../services/uxTelemetry";
 import { getTrigRubric } from "../data/contentStrategy/trigonometry/trigonometryRubrics";
+import { getTrianglesRubric } from "../data/contentStrategy/triangles";
 import type { LearningObject, QuestionMeta } from "../data/contentStrategy/types";
 import type { StudentMentorIntent } from "../types/studentMentorIntent";
 import {
@@ -96,14 +98,19 @@ function buildStrategyContextHeader(details: QuestionStrategyDetails | null): st
 
 function buildRubricContextHeader(
   details: QuestionStrategyDetails | null,
-  intent: StudentMentorIntent
+  intent: StudentMentorIntent,
+  canonicalTopicKey: string
 ): string {
   if (!details || intent !== "check_cbse") return "";
-  const rubric = getTrigRubric({
+  const rubricMeta = {
     cbseFormat: details.meta.cbseFormat,
     skillFamily: details.meta.skillFamily,
     loIds: details.meta.loIds || [],
-  });
+  };
+  const rubric =
+    canonicalTopicKey === "triangles"
+      ? getTrianglesRubric(rubricMeta)
+      : getTrigRubric(rubricMeta);
   const lines = ["[RUBRIC_CONTEXT]", "Expected steps checklist:"];
   for (const step of rubric.checklist) {
     lines.push(`- ${step}`);
@@ -741,7 +748,7 @@ const [mentorSeedExample, setMentorSeedExample] = useState<{
     [strategyTopicSeed]
   );
   const isWhyThisQuestionEnabled =
-    QTYPE_FIRST_TRIG && strategyCanonicalTopicKey === "trigonometry";
+    QTYPE_FIRST_TRIG && isStrategyEnabledForTopic(strategyCanonicalTopicKey);
   const strategyPack = useMemo(() => {
     if (!isWhyThisQuestionEnabled) return null;
     return getStrategyPackForTopic(strategyCanonicalTopicKey);
@@ -924,7 +931,11 @@ const packTopicKey = useMemo(() => {
         section: String((q as any).section || ""),
         defaultIntent,
         strategyContextHeader: buildStrategyContextHeader(strategyDetails),
-        rubricContextHeader: buildRubricContextHeader(strategyDetails, defaultIntent),
+        rubricContextHeader: buildRubricContextHeader(
+          strategyDetails,
+          defaultIntent,
+          strategyCanonicalTopicKey
+        ),
       });
       setMentorSolveStyle(defaultIntent === "check_cbse" ? "board" : "socratic");
       setMentorDrawerOpen(true);
@@ -2517,7 +2528,6 @@ function MentorSolveDrawer(props: {
 }
 
 export default PracticePage;
-
 
 
 

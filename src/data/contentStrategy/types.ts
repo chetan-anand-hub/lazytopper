@@ -38,6 +38,7 @@ export interface QuestionMeta {
 
 export interface QuestionFamilyOverlay {
   familyId: string;
+  qtypeId?: string;
   studentLabel: string;
   tutorMeaning: string;
   weakStudentCue: string;

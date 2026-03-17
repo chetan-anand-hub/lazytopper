@@ -1,5 +1,10 @@
 import { resolveCanonicalTopicKey } from "../data/syllabus/topicAliasMap";
-import { trianglesQuestionFamilies } from "../data/contentStrategy/triangles";
+import {
+  trianglesLearningObjects,
+  trianglesQuestionFamilies,
+  trianglesQuestionTagIndex,
+  trianglesQuestionTypeTiles,
+} from "../data/contentStrategy/triangles";
 import {
   trigonometryLearningObjects,
   trigonometryQuestionTagIndex,
@@ -19,23 +24,31 @@ export type StrategyPack = {
 };
 
 const MIN_QTYPE_SET_SIZE = 8;
+const STRATEGY_PACKS: Record<string, StrategyPack> = {
+  trigonometry: {
+    learningObjects: trigonometryLearningObjects,
+    tiles: trigonometryQuestionTypeTiles,
+    tagIndex: trigonometryQuestionTagIndex,
+  },
+  triangles: {
+    learningObjects: trianglesLearningObjects,
+    tiles: trianglesQuestionTypeTiles,
+    tagIndex: trianglesQuestionTagIndex,
+  },
+};
 
 export function resolveCanonicalTopicForStrategy(rawTopicKey: string): string {
   return resolveCanonicalTopicKey(rawTopicKey);
 }
 
 export function isStrategyEnabledForTopic(canonicalTopicKey: string): boolean {
-  return resolveCanonicalTopicKey(canonicalTopicKey) === "trigonometry";
+  const resolved = resolveCanonicalTopicKey(canonicalTopicKey);
+  return Boolean(STRATEGY_PACKS[resolved]);
 }
 
 export function getStrategyPackForTopic(rawTopicKey: string): StrategyPack | null {
   const canonicalTopicKey = resolveCanonicalTopicForStrategy(rawTopicKey);
-  if (!isStrategyEnabledForTopic(canonicalTopicKey)) return null;
-  return {
-    learningObjects: trigonometryLearningObjects,
-    tiles: trigonometryQuestionTypeTiles,
-    tagIndex: trigonometryQuestionTagIndex,
-  };
+  return STRATEGY_PACKS[canonicalTopicKey] || null;
 }
 
 export function getQuestionMeta(
@@ -43,27 +56,51 @@ export function getQuestionMeta(
   rawTopicKey?: string
 ): QuestionMeta | null {
   if (rawTopicKey) {
-    const canonicalTopicKey = resolveCanonicalTopicForStrategy(rawTopicKey);
-    if (!isStrategyEnabledForTopic(canonicalTopicKey)) return null;
+    return getStrategyPackForTopic(rawTopicKey)?.tagIndex[String(questionId)] || null;
   }
-  return trigonometryQuestionTagIndex[String(questionId)] || null;
+  for (const pack of Object.values(STRATEGY_PACKS)) {
+    const meta = pack.tagIndex[String(questionId)];
+    if (meta) return meta;
+  }
+  return null;
 }
 
-export function getQuestionIdsForLo(loId: string): string[] {
+export function getQuestionIdsForLo(loId: string, rawTopicKey?: string): string[] {
   const targetLoId = String(loId || "").trim();
   if (!targetLoId) return [];
-  return Object.values(trigonometryQuestionTagIndex)
+  const pack = rawTopicKey ? getStrategyPackForTopic(rawTopicKey) : null;
+  const entries = pack
+    ? Object.values(pack.tagIndex)
+    : Object.values(STRATEGY_PACKS).flatMap((strategyPack) => Object.values(strategyPack.tagIndex));
+  return entries
     .filter((meta) => Array.isArray(meta.loIds) && meta.loIds.includes(targetLoId))
     .map((meta) => meta.questionId);
 }
 
-export function getQuestionIdsForQType(qtypeId: string): string[] {
+export function getQuestionTypeTileById(
+  rawTopicKey: string,
+  qtypeId: string
+): QuestionTypeTile | null {
+  const pack = getStrategyPackForTopic(rawTopicKey);
+  if (!pack) return null;
+  const targetQTypeId = String(qtypeId || "").trim();
+  if (!targetQTypeId) return null;
+  return pack.tiles.find((tile) => tile.qtypeId === targetQTypeId) || null;
+}
+
+export function getQuestionIdsForQType(qtypeId: string, rawTopicKey?: string): string[] {
   const targetQTypeId = String(qtypeId || "").trim();
   if (!targetQTypeId) return [];
-  const tile = trigonometryQuestionTypeTiles.find((t) => t.qtypeId === targetQTypeId);
+  const pack = rawTopicKey
+    ? getStrategyPackForTopic(rawTopicKey)
+    : Object.values(STRATEGY_PACKS).find((strategyPack) =>
+        strategyPack.tiles.some((tile) => tile.qtypeId === targetQTypeId)
+      ) || null;
+  if (!pack) return [];
+  const tile = pack.tiles.find((t) => t.qtypeId === targetQTypeId);
   if (!tile) return [];
 
-  const allEntries = Object.values(trigonometryQuestionTagIndex);
+  const allEntries = Object.values(pack.tagIndex);
   const loSet = new Set(tile.loIds);
   const primary = allEntries
     .filter((meta) => meta.loIds.some((loId) => loSet.has(loId)))
@@ -141,7 +178,7 @@ export function getFocusIdsForTile(rawTopicKey: string, tile: QuestionTypeTile):
 
   let ordered = dedupePreservingOrder([...tier1, ...tier2, ...tier3, ...tier4]);
   if (ordered.length < MIN_QTYPE_SET_SIZE) {
-    const fallback = getQuestionIdsForQType(tile.qtypeId);
+    const fallback = getQuestionIdsForQType(tile.qtypeId, rawTopicKey);
     ordered = dedupePreservingOrder([...ordered, ...fallback]);
   }
 

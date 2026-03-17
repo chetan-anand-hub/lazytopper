@@ -46,7 +46,9 @@ import {
 import {
   getFocusIdsForTile,
   getQuestionFamiliesForTopic,
+  getQuestionTypeTileById,
   getStrategyPackForTopic,
+  isStrategyEnabledForTopic,
   resolveCanonicalTopicForStrategy,
 } from "../services/questionTypeFirstResolver";
 import {
@@ -858,9 +860,9 @@ export default function TopicHub() {
     [topicKey]
   );
   const strategyPack = useMemo(() => {
-    if (!QTYPE_FIRST_TRIG || strategyCanonicalTopicKey !== "trigonometry") return null;
-    return getStrategyPackForTopic(topicKey);
-  }, [strategyCanonicalTopicKey, topicKey]);
+    if (!QTYPE_FIRST_TRIG || !isStrategyEnabledForTopic(strategyCanonicalTopicKey)) return null;
+    return getStrategyPackForTopic(strategyCanonicalTopicKey);
+  }, [strategyCanonicalTopicKey]);
   const tileFocusIdMap = useMemo(() => {
     if (!strategyPack?.tiles?.length) return {} as Record<string, string[]>;
     const map: Record<string, string[]> = {};
@@ -2016,25 +2018,54 @@ const showInZombie = (sectionId: string) => {
     [selectedTrianglesFamilyId, trianglesQuestionFamilies]
   );
 
+  const trianglesFamilyFocusIdMap = useMemo(() => {
+    if (!isTrianglesTopic) return {} as Record<string, string[]>;
+    const dedupe = (ids: string[]) => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const id of ids) {
+        const key = String(id || "").trim();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(key);
+      }
+      return out;
+    };
+
+    const nextMap: Record<string, string[]> = {};
+    for (const family of trianglesQuestionFamilies) {
+      const tile = family.qtypeId
+        ? getQuestionTypeTileById(topicKey, family.qtypeId)
+        : null;
+      const tileDrivenIds = tile ? getFocusIdsForTile(topicKey, tile) : [];
+      const fallbackIds = Array.isArray(family.focusBankIds)
+        ? family.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
+        : [];
+      nextMap[family.familyId] = dedupe([...tileDrivenIds, ...fallbackIds]);
+    }
+    return nextMap;
+  }, [isTrianglesTopic, topicKey, trianglesQuestionFamilies]);
+
   const openPracticeFromTrianglesFamily = useCallback(
     (family: QuestionFamilyOverlay) => {
       const nodeId = String(family.tutorNodeId || "").trim();
-      const focusBankIds = Array.isArray(family.focusBankIds)
-        ? family.focusBankIds.map((id) => String(id || "").trim()).filter(Boolean)
-        : undefined;
+      const focusBankIds = trianglesFamilyFocusIdMap[family.familyId] || [];
+      const tile = family.qtypeId ? getQuestionTypeTileById(topicKey, family.qtypeId) : null;
       openPracticeFromTopicHub({
         tab: "learn",
         nodeId: nodeId || undefined,
         subtopicHint: family.practiceHint,
-        sectionFilter: family.sectionFilter as PracticeSectionFilter | undefined,
-        focusBankIds,
-        strictFocus: Boolean(focusBankIds && focusBankIds.length > 0),
-        recommendedCount: focusBankIds && focusBankIds.length > 0 ? 8 : 10,
+        sectionFilter:
+          (family.sectionFilter as PracticeSectionFilter | undefined) ||
+          (tile?.cbseFormat as PracticeSectionFilter | undefined),
+        focusBankIds: focusBankIds.length > 0 ? focusBankIds : undefined,
+        strictFocus: focusBankIds.length > 0,
+        recommendedCount: focusBankIds.length > 0 ? Math.min(10, Math.max(8, focusBankIds.length)) : 10,
         difficultyPreset: "All",
         source: "triangles_qtf_overlay",
       });
     },
-    [openPracticeFromTopicHub]
+    [openPracticeFromTopicHub, topicKey, trianglesFamilyFocusIdMap]
   );
 
   const openMentorForTrianglesFamily = useCallback(
@@ -2132,7 +2163,7 @@ const showInZombie = (sectionId: string) => {
       mentorTitle: "Triangles • Check my proof",
       sourceNote:
         trianglesQuestionFamilies.length > 0
-          ? "The family router is now chapter-specific, but practice still draws from the live prediction/runtime pool rather than a separate Triangles canonical pack."
+          ? "The family router now resolves into a Triangles-specific focus bank, so practice is no longer only a generic runtime pull. Depth is still lighter than the Trigonometry pack path, but the routing is now theorem-family aware."
           : "",
     };
   }, [
@@ -2693,7 +2724,7 @@ const showInZombie = (sectionId: string) => {
                         >
                           {selectedTrianglesFamily.skillFamily}
                         </span>
-                        {selectedTrianglesFamily.focusBankIds?.length ? (
+                        {(trianglesFamilyFocusIdMap[selectedTrianglesFamily.familyId] || []).length ? (
                           <span
                             style={{
                               fontSize: 10,
@@ -2704,7 +2735,7 @@ const showInZombie = (sectionId: string) => {
                               border: "1px solid rgba(15,23,42,0.16)",
                             }}
                           >
-                            {selectedTrianglesFamily.focusBankIds.length} focused questions now
+                            {(trianglesFamilyFocusIdMap[selectedTrianglesFamily.familyId] || []).length} focused questions now
                           </span>
                         ) : null}
                       </div>

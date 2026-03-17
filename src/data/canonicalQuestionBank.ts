@@ -1,8 +1,10 @@
 // Auto-generated canonical question bank from Prompt A
 import type { CanonicalQuestion } from './predictionTypes';
+import { TRIANGLES_PACK1_QUESTIONS } from './questionBanks/class10/maths/triangles.pack1';
 import { TRIG_PACK1_QUESTIONS } from './questionBanks/class10/maths/trigonometry.pack1';
 
 export const canonicalQuestionBank: CanonicalQuestion[] = [
+  ...TRIANGLES_PACK1_QUESTIONS,
   ...TRIG_PACK1_QUESTIONS,
   {
     "id": "2026-TRIG-APP-01",
