@@ -46,7 +46,7 @@ checks.push(
 checks.push(
   makeCheck(
     "triangles_path_marks_partial_honestly",
-    registry.triangles?.status === "partial" && registry.triangles?.qtfSupport?.status === "none",
+    registry.triangles?.status === "partial" && registry.triangles?.qtfSupport?.status === "partial",
     "Weak-foundation guidance must stay honest about chapter depth.",
     "P1",
     "Do not overstate chapter support in the registry."
