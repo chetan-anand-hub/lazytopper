@@ -26,11 +26,18 @@
   1. `npm run test:software-bot`
   2. `npm run test:persona-gate`
   3. `npm run test:persona-browser-gate`
-  4. the most relevant targeted browser journey, if one exists
+  4. `npm run test:browser:mentor` when mentor behavior is touched
+  5. the most relevant additional targeted browser journey, if one exists
 - Tooling tasks that change review/test infrastructure should still run:
   1. `npm run scope:guard`
   2. `npm run test:repo-boundary`
   3. the new software-testing bot in the most relevant mode (`fast` or `product`)
+- Software-testing bot lane behavior:
+  - by default it detects the current changed surface and uses product-mode scope guard for product files, tooling/default scope guard for tooling-only changes
+  - `--lane=product` or `--lane=tooling` can override that detection when needed
+- Mentor smoke:
+  - `test:software-bot` now includes a deterministic mentor runtime smoke in `product` and `full` modes.
+  - `npm run test:mentor:smoke` is the direct entrypoint for that check.
 - Generated evidence stays local-only even when these checks write JSON reports.
 
 ## Push Rule

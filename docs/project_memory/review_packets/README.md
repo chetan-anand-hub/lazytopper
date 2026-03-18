@@ -39,13 +39,16 @@ Mandatory validation loop for future product tasks:
 1. `npm run test:software-bot`
 2. `npm run test:persona-gate`
 3. `npm run test:persona-browser-gate`
-4. the most relevant targeted browser journey if the touched surface already has one
+4. `npm run test:browser:mentor` when mentor behavior is touched
+5. the most relevant additional targeted browser journey if the touched surface already has one
 
 Software-testing bot scope:
 - `test:software-bot` is the technical/runtime counterpart to the persona gates.
 - It is responsible for deterministic build/runtime/journey/governance correctness signals.
 - It does not replace persona or pedagogy review; it complements them.
 - It is honest about web-now coverage vs mobile-later structure.
+- It now resolves scope guard in a lane-aware way from the current changed surface by default, with `--lane=product` or `--lane=tooling` available as explicit overrides.
+- It now includes a deterministic mentor runtime smoke in product/full runs. Use `npm run test:mentor:smoke` to run that check directly.
 
 Validation layers:
 - Structural validation checks the required headings exist.
