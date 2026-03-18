@@ -6,7 +6,7 @@ type Chunk = { id: string; title: string; excerpt: string; path: string; score: 
 type RetrieverInput = {
   attemptText: string;
   mistakeTags: string[];
-  theoremFocus?: string;
+  theoremFocus?: string | string[];
 };
 
 const KNOWLEDGE_DIR = path.join(process.cwd(), "docs", "knowledge", "triangles");
@@ -42,7 +42,7 @@ function splitByHeadings(content: string) {
   return chunks;
 }
 
-function scoreChunk(tokens: string[], chunkTokens: string[], tags: string[], theoremFocus?: string) {
+function scoreChunk(tokens: string[], chunkTokens: string[], tags: string[], theoremFocus?: string | string[]) {
   const tokenSet = new Set(tokens);
   let score = 0;
   for (const t of chunkTokens) {
@@ -51,9 +51,11 @@ function scoreChunk(tokens: string[], chunkTokens: string[], tags: string[], the
   for (const tag of tags) {
     if (chunkTokens.includes(tag.toLowerCase())) score += 2;
   }
-  if (theoremFocus) {
-    const tf = theoremFocus.toLowerCase();
-    if (chunkTokens.includes(tf)) score += 3;
+  const theoremFocusTokens = Array.isArray(theoremFocus)
+    ? theoremFocus.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)
+    : [String(theoremFocus || "").trim().toLowerCase()].filter(Boolean);
+  for (const focus of theoremFocusTokens) {
+    if (chunkTokens.includes(focus)) score += 3;
   }
   return score;
 }
