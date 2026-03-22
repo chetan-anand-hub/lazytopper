@@ -3,6 +3,11 @@ import type { LazytopperDiagramBlock } from "../diagrams/diagramIntelligence";
 import { isRecord } from "../types/mentor";
 import type { MentorStructured, TutorBlock } from "../types/mentor";
 
+const isInternalTutorScaffoldText = (value: string) =>
+  /Teacher goal:|Definition:|Criterion:|Correspondence:|Conclusion:|Client continuity mode active/i.test(
+    String(value || "")
+  );
+
 export function stripMentorCodeFences(raw: string): string {
   return String(raw || "")
     .replace(/```[a-zA-Z0-9_-]*\n?/g, "")
@@ -102,11 +107,14 @@ export function getMentorTutorObject(structured: MentorStructured | undefined | 
 
 export function getMentorTutorText(structured: MentorStructured | undefined | null): string {
   const tutor = structured?.tutor;
-  if (typeof tutor === "string") return tutor;
+  if (typeof tutor === "string") {
+    return isInternalTutorScaffoldText(tutor) ? "" : tutor;
+  }
   if (isRecord(tutor)) {
     const text = typeof tutor.text === "string" ? tutor.text : "";
     const rawText = typeof tutor.rawText === "string" ? tutor.rawText : "";
-    return text || rawText || "";
+    const preferred = text || rawText || "";
+    return isInternalTutorScaffoldText(preferred) ? "" : preferred;
   }
   return "";
 }

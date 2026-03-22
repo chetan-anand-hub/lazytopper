@@ -21,6 +21,16 @@ const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 const asStringArray = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((item) => String(item)) : [];
 
+const humanizeKey = (value: string) =>
+  String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const cleanSentence = (value: unknown) => {
+  const text = asString(value).trim();
+  return text.replace(/\s+/g, " ").trim();
+};
+
 export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
   tutorObj,
   hintLevel,
@@ -73,6 +83,39 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
   const steps = Array.isArray(boardRecord?.steps) ? boardRecord.steps : [];
   const deductions = Array.isArray(boardRecord?.deductions) ? boardRecord.deductions : [];
   const totalMarks = Number(boardRecord?.total_marks);
+  const diagnosisSummary =
+    cleanSentence(diagnosisRecord?.summary_line) ||
+    cleanSentence(diagnosisRecord?.misconception_summary) ||
+    cleanSentence(boardTipRecord?.summary) ||
+    cleanSentence(socraticRecord?.question);
+  const primaryAction =
+    cleanSentence(nextRecord?.micro_drill) ||
+    cleanSentence(hintText) ||
+    cleanSentence(socraticRecord?.question) ||
+    cleanSentence(boardRecord?.steps && Array.isArray(boardRecord.steps) && boardRecord.steps[0] && isRecord(boardRecord.steps[0]) ? boardRecord.steps[0].line : "");
+  const watchOut =
+    cleanSentence(commonMistakeRecord?.summary) ||
+    cleanSentence(boardTipRecord?.mark_cut_risk) ||
+    cleanSentence(diagnosisRecord?.misconception_summary) ||
+    cleanSentence(diagnosisRecord?.confusion_type);
+  const watchOutFix =
+    cleanSentence(commonMistakeRecord?.fix) ||
+    cleanSentence(nextRecord?.revision_hook) ||
+    cleanSentence(boardTipRecord?.summary);
+  const tryOneMore =
+    cleanSentence(practiceNextRecord?.reason) ||
+    cleanSentence(socraticRecord?.expected_thought) ||
+    cleanSentence(nextRecord?.revision_hook);
+  const detailMeta = [
+    diagnosisRecord?.family_label ? `Family: ${String(diagnosisRecord.family_label)}` : "",
+    diagnosisRecord?.confusion_type ? `Bottleneck: ${humanizeKey(String(diagnosisRecord.confusion_type))}` : "",
+    diagnosisRecord?.help_mode ? `Help mode: ${humanizeKey(String(diagnosisRecord.help_mode))}` : "",
+    diagnosisRecord?.student_profile ? `Style: ${humanizeKey(String(diagnosisRecord.student_profile))}` : "",
+    adaptiveStyleRecord?.profile ? `Profile: ${humanizeKey(String(adaptiveStyleRecord.profile))}` : "",
+    adaptiveStyleRecord?.tone ? `Tone: ${String(adaptiveStyleRecord.tone)}` : "",
+    adaptiveStyleRecord?.depth ? `Depth: ${String(adaptiveStyleRecord.depth)}` : "",
+    adaptiveStyleRecord?.pacing ? `Pacing: ${String(adaptiveStyleRecord.pacing)}` : "",
+  ].filter(Boolean);
 
   const containerStyle = compact
     ? { marginTop: 10 }
@@ -84,16 +127,83 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
       };
 
   return (
-    <details style={containerStyle} open={false}>
-      <summary style={{ cursor: "pointer", fontWeight: compact ? 700 : 800 }}>
-        Human-grade Coach View
-      </summary>
-      <div style={{ marginTop: 8, display: "grid", gap: compact ? 12 : 10 }}>
-        {diagnosis ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Diagnosis</div>
+    <div style={containerStyle}>
+      <div style={{ display: "grid", gap: compact ? 10 : 12 }}>
+        {diagnosisSummary ? (
+          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" } : { padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" }}>
+            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>What this is</div>
+            <div style={{ lineHeight: 1.5 }}>{diagnosisSummary}</div>
+          </div>
+        ) : null}
+
+        {primaryAction ? (
+          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" } : { padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" }}>
+            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Do this now</div>
+            <div style={{ lineHeight: 1.5 }}>{primaryAction}</div>
+            {hintWarning ? (
+              <div style={{ marginTop: 6, fontSize: 11, opacity: 0.72 }}>{hintWarning}</div>
+            ) : null}
+            {hintText && onNextHint ? (
+              <button
+                type="button"
+                className={compact ? "mentor-panel__mode-chip" : "lt-pill"}
+                style={{ marginTop: 8 }}
+                onClick={onNextHint}
+                disabled={hintBusy || !canAdvance}
+              >
+                {hintBusy ? "Loading..." : "Next hint"}
+              </button>
+            ) : null}
+            {showSingleHintNote ? (
+              <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
+                Only one hint is available here.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {watchOut ? (
+          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(254,249,195,0.5)", border: "1px solid rgba(202,138,4,0.18)" } : { padding: "10px 12px", borderRadius: 12, background: "rgba(254,249,195,0.5)", border: "1px solid rgba(202,138,4,0.18)" }}>
+            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Watch out</div>
+            <div style={{ lineHeight: 1.5 }}>{watchOut}</div>
+            {watchOutFix ? (
+              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.82 }}>
+                Fix: {watchOutFix}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {(practiceNext || tryOneMore) ? (
+          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" } : { padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.92)", border: "1px solid rgba(15,23,42,0.08)" }}>
+            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Try one more</div>
+            {practiceNextRecord?.family_label ? (
+              <div style={{ marginBottom: 4 }}>{String(practiceNextRecord.family_label)}</div>
+            ) : null}
+            {tryOneMore ? (
+              <div style={{ fontSize: 12, opacity: 0.82, lineHeight: 1.5, marginBottom: practiceNextRecord && onPracticeNext ? 8 : 0 }}>
+                {tryOneMore}
+              </div>
+            ) : null}
+            {practiceNextRecord && onPracticeNext ? (
+              <button
+                type="button"
+                className={compact ? "mentor-panel__mode-chip" : "lt-pill"}
+                onClick={() => onPracticeNext(practiceNextRecord as MentorTutorPracticeNext)}
+              >
+                {String(practiceNextRecord.cta || "Practice this family")}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <details>
+          <summary style={{ cursor: "pointer", fontWeight: compact ? 700 : 800 }}>
+            Show more coach details
+          </summary>
+          <div style={{ marginTop: 8, display: "grid", gap: 10 }}>
             {mistakeTags.length ? (
-              <div style={{ marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {mistakeTags.map((tag: string, tagIdx: number) => (
                   <span
                     key={`${tag}-${tagIdx}`}
@@ -111,143 +221,61 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
                   >
                     {tag}
                   </span>
-                ))} 
+                ))}
               </div>
             ) : null}
-            {diagnosisRecord?.misconception_summary ? (
-              <div style={{ marginBottom: 4 }}>{String(diagnosisRecord.misconception_summary)}</div>
-            ) : null}
-            {diagnosisRecord?.summary_line ? (
-              <div style={{ marginBottom: 4, fontSize: 12, opacity: 0.82 }}>
-                {String(diagnosisRecord.summary_line)}
-              </div>
-            ) : null}
-            {diagnosisRecord?.family_label ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Family: {String(diagnosisRecord.family_label)}
-              </div>
-            ) : null}
-            {diagnosisRecord?.confusion_type ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Bottleneck: {String(diagnosisRecord.confusion_type).replace(/_/g, " ")}
-              </div>
-            ) : null}
-            {diagnosisRecord?.help_mode ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Help mode: {String(diagnosisRecord.help_mode).replace(/_/g, " ")}
-              </div>
-            ) : null}
-            {diagnosisRecord?.student_profile ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Style: {String(diagnosisRecord.student_profile).replace(/_/g, " ")}
-              </div>
-            ) : null}
-            {diagnosisRecord?.confidence ? (
-              <div style={{ fontSize: 12, opacity: compact ? 0.8 : 0.75 }}>
-                Confidence: {String(diagnosisRecord.confidence)}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
-        {adaptiveStyle ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Tutor style</div>
-            {adaptiveStyleRecord?.profile ? (
-              <div style={{ marginBottom: 4 }}>
-                Profile: {String(adaptiveStyleRecord.profile).replace(/_/g, " ")}
+            {detailMeta.length ? (
+              <div style={{ fontSize: 12, opacity: 0.8, display: "grid", gap: 4 }}>
+                {detailMeta.map((line, idx) => (
+                  <div key={`${line}-${idx}`}>{line}</div>
+                ))}
               </div>
             ) : null}
-            {adaptiveStyleRecord?.tone ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Tone: {String(adaptiveStyleRecord.tone)}
-              </div>
-            ) : null}
-            {adaptiveStyleRecord?.depth ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Depth: {String(adaptiveStyleRecord.depth)}
-              </div>
-            ) : null}
-            {adaptiveStyleRecord?.pacing ? (
-              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                Pacing: {String(adaptiveStyleRecord.pacing)}
-              </div>
-            ) : null}
-            {adaptiveStyleRecord?.rationale ? (
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                {String(adaptiveStyleRecord.rationale)}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
-        {socratic ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Socratic</div>
-            {socraticRecord?.question ? (
-              <div style={{ fontWeight: 700 }}>{String(socraticRecord.question)}</div>
-            ) : null}
-            {socraticRecord?.expected_thought ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(socraticRecord.expected_thought)}</div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {hint ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Hint ladder</div>
             {variantLabel ? (
-              <div style={{ fontSize: 10, opacity: 0.55, marginBottom: 4 }}>
+              <div style={{ fontSize: 10, opacity: 0.55 }}>
                 Variant: {variantLabel}
               </div>
             ) : null}
-            <div style={{ fontSize: 12, marginBottom: 6 }}>Level: {hintLevel}</div>
-            {hintText ? <div>{hintText}</div> : null}
-            {hintWarning ? (
-              <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>{hintWarning}</div>
-            ) : null}
-            {hintText && onNextHint ? (
-              <button
-                type="button"
-                className={compact ? "mentor-panel__mode-chip" : "lt-pill"}
-                style={{ marginTop: 6 }}
-                onClick={onNextHint}
-                disabled={hintBusy || !canAdvance}
-              >
-                {hintBusy ? "Loading..." : "Next hint"}
-              </button>
-            ) : null}
-            {showSingleHintNote ? (
-              <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
-                Only one hint available.
+
+            {socraticRecord?.question ? (
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Socratic prompt</div>
+                <div>{String(socraticRecord.question)}</div>
+                {socraticRecord?.expected_thought ? (
+                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
+                    {String(socraticRecord.expected_thought)}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-          </div>
-        ) : null}
 
-        {board ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Board steps</div>
             {Number.isFinite(totalMarks) ? (
-              <div style={{ fontSize: 12, marginBottom: 6 }}>Total marks: {totalMarks}</div>
+              <div style={{ fontSize: 12, opacity: 0.78 }}>Board answer weight: {totalMarks} marks</div>
             ) : null}
+
             {steps.length ? (
-              <ol style={{ margin: 0, paddingLeft: 18 }}>
-                {steps.map((s, stepIdx: number) => {
-                  const line = isRecord(s) ? String(s.line || "") : "";
-                  const marks = isRecord(s) ? Number(s.marks) : Number.NaN;
-                  if (!line) return null;
-                  return (
-                    <li key={stepIdx} style={{ marginBottom: 6 }}>
-                      {line} {Number.isFinite(marks) ? <span>({marks} mark)</span> : null}
-                    </li>
-                  );
-                })}
-              </ol>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Board steps</div>
+                <ol style={{ margin: 0, paddingLeft: 18 }}>
+                  {steps.map((s, stepIdx: number) => {
+                    const line = isRecord(s) ? String(s.line || "") : "";
+                    const marks = isRecord(s) ? Number(s.marks) : Number.NaN;
+                    if (!line) return null;
+                    return (
+                      <li key={stepIdx} style={{ marginBottom: 6 }}>
+                        {line} {Number.isFinite(marks) ? <span>({marks} mark)</span> : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
             ) : null}
+
             {deductions.length ? (
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>Deductions</div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Possible mark cuts</div>
                 {deductions.map((d, dIdx: number) => (
                   <div key={dIdx} style={{ fontSize: 12, marginBottom: 4 }}>
                     {isRecord(d) ? String(d.reason || "") : ""}{" "}
@@ -256,93 +284,29 @@ export const HumanGradeCoachView: React.FC<HumanGradeCoachViewProps> = ({
                 ))}
               </div>
             ) : null}
+
             {boardRecord?.examiner_note ? (
               <div style={{ fontSize: 12, opacity: 0.75 }}>{String(boardRecord.examiner_note)}</div>
             ) : null}
-          </div>
-        ) : null}
 
-        {boardTip ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>
-              {String(boardTipRecord?.title || "Board-smart tip")}
-            </div>
-            {boardTipRecord?.summary ? <div>{String(boardTipRecord.summary)}</div> : null}
-            {boardTipRecord?.mark_cut_risk ? (
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                Mark-cut risk: {String(boardTipRecord.mark_cut_risk)}
-              </div>
-            ) : null}
             {boardTipRecord?.question_style ? (
               <div style={{ fontSize: 12, opacity: 0.75 }}>
                 Question style: {String(boardTipRecord.question_style)}
               </div>
             ) : null}
-          </div>
-        ) : null}
 
-        {commonMistake ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>
-              {String(commonMistakeRecord?.title || "Common mistake")}
+            {adaptiveStyleRecord?.rationale ? (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>
+                {String(adaptiveStyleRecord.rationale)}
+              </div>
+            ) : null}
+
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              Hint level: {hintLevel}
             </div>
-            {commonMistakeRecord?.summary ? <div>{String(commonMistakeRecord.summary)}</div> : null}
-            {commonMistakeRecord?.fix ? (
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-                Fix: {String(commonMistakeRecord.fix)}
-              </div>
-            ) : null}
-            {commonMistakeRecord?.mark_risk ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Risk: {String(commonMistakeRecord.mark_risk)}
-              </div>
-            ) : null}
           </div>
-        ) : null}
-
-        {next ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Next</div>
-            {nextRecord?.micro_drill ? <div style={{ marginBottom: 4 }}>{String(nextRecord.micro_drill)}</div> : null}
-            {nextRecord?.revision_hook ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{String(nextRecord.revision_hook)}</div>
-            ) : null}
-            {nextRecord?.chapter_step ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Chapter step: {String(nextRecord.chapter_step)}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {practiceNext ? (
-          <div style={compact ? { padding: "8px 10px", borderRadius: 10, background: "rgba(0,0,0,0.04)" } : {}}>
-            <div style={{ fontWeight: compact ? 700 : 800, marginBottom: 4 }}>Practice next</div>
-            {practiceNextRecord?.family_label ? (
-              <div style={{ marginBottom: 4 }}>{String(practiceNextRecord.family_label)}</div>
-            ) : null}
-            {practiceNextRecord?.reason ? (
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
-                {String(practiceNextRecord.reason)}
-              </div>
-            ) : null}
-            {practiceNextRecord?.focus_question_ids ? (
-              <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 6 }}>
-                Focus IDs: {asStringArray(practiceNextRecord.focus_question_ids).slice(0, 4).join(", ")}
-              </div>
-            ) : null}
-            {practiceNextRecord && onPracticeNext ? (
-              <button
-                type="button"
-                className={compact ? "mentor-panel__mode-chip" : "lt-pill"}
-                onClick={() => onPracticeNext(practiceNextRecord as MentorTutorPracticeNext)}
-              >
-                {String(practiceNextRecord.cta || "Practice this family")}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        </details>
       </div>
-    </details>
+    </div>
   );
 };

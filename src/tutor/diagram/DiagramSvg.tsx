@@ -79,8 +79,7 @@ export function DiagramSvg({ spec }: Props) {
   return (
     <svg
       viewBox={`0 0 ${spec.width} ${spec.height}`}
-      width="100%"
-      height="auto"
+      style={{ width: "100%", height: "auto", display: "block" }}
       role="img"
       aria-label={spec.title || "Diagram"}
     >

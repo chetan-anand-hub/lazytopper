@@ -397,12 +397,31 @@ function isValidMentorProtocol(obj, mode) {
     if (obj.kind === 'solve_with_me') return Array.isArray(obj.turns);
 
     if (obj.kind !== 'question' && obj.kind !== 'hint' && obj.kind !== 'final') return false;
-    if (typeof obj.tutor !== 'string' || !String(obj.tutor).trim()) return false;
-    return true;
+    if (typeof obj.tutor === 'string' && String(obj.tutor).trim()) return true;
+    if (obj.tutor && typeof obj.tutor === 'object' && !Array.isArray(obj.tutor)) {
+      const tutorText =
+        typeof obj.tutor.text === 'string'
+          ? obj.tutor.text
+          : typeof obj.tutor.rawText === 'string'
+            ? obj.tutor.rawText
+            : '';
+      if (String(tutorText || '').trim()) return true;
+      if (obj.tutor.next || obj.tutor.diagnosis || obj.tutor.practice_next || obj.tutor.board_tip) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // Unknown protocol mode
   return false;
+}
+
+function summarizeValidationIssues(issues, max = 4) {
+  const list = Array.isArray(issues) ? issues.map((item) => String(item || '').trim()).filter(Boolean) : [];
+  if (!list.length) return 'unknown validation issue';
+  const clipped = list.slice(0, max).join('; ');
+  return list.length > max ? `${clipped}; +${list.length - max} more` : clipped;
 }
 
 let mentorSeedCache = undefined;
@@ -4991,7 +5010,9 @@ ${userPrompt}` }];
 
         if (!check.ok) {
           if (isTeachContract && IS_DEV) {
-            console.warn('[teach-contract] validation failed (pre-repair)', { issues: check.issues });
+            console.warn(
+              `[teach-contract] validation failed before repair: ${summarizeValidationIssues(check.issues)}`
+            );
           }
           repairUsed = true;
           const clipped = String(finalText || '').slice(0, 8000);
@@ -5044,17 +5065,17 @@ ${userPrompt}` }];
         if (!check.ok) {
           if (isTeachContract) {
             if (IS_DEV) {
-              console.warn('[teach-contract] validation failed', {
-                issues: check.issues,
-                repair_used: repairUsed,
-                fallback_used: true,
-              });
+              console.warn(
+                `[teach-contract] fallback used after validation failure: ${summarizeValidationIssues(check.issues)}`
+              );
             }
             structured = buildLearnTeachFallback(payload);
           } else if (isLearnStructured) {
             structured = buildStructuredFallback(normalisedMode, payload, { learn: true });
           } else {
-            console.warn('[mentor] schema mismatch, falling back:', normalisedMode, check.issues);
+            console.warn(
+              `[mentor] schema mismatch (${normalisedMode}); falling back: ${summarizeValidationIssues(check.issues)}`
+            );
             structured = buildStructuredFallback(normalisedMode, payload);
             if (!structured) {
               return {

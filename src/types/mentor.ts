@@ -471,7 +471,7 @@ export interface MentorTutorObject {
 
 export interface SolveWithMeStructured {
   kind: SolveWithMeKind;
-  tutor: string;
+  tutor: string | MentorTutorObject;
   /** Optional small title or tag (e.g., "Step 2") */
   label?: string;
   /** Optional problem restatement / working line */

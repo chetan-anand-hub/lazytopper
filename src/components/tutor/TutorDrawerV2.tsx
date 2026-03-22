@@ -130,6 +130,56 @@ const cleanDisplayText = (value: string): string =>
     .replace(/\u00c2 /g, " ")
     .replace(/\u00a0/g, " ");
 
+const cleanTeachLine = (value: string): string => {
+  const cleaned = cleanDisplayText(String(value || "").trim())
+    .replace(/^Teacher goal:\s*/i, "")
+    .replace(/^Definition:\s*/i, "")
+    .replace(/^Criterion:\s*/i, "Start with the right theorem: ")
+    .replace(/^Correspondence:\s*/i, "Match the letters carefully: ")
+    .replace(/^Conclusion:\s*/i, "Finish with a clean final line: ")
+    .replace(/^Checkpoint:\s*/i, "Quick check: ")
+    .replace(/^Expected answer:\s*/i, "")
+    .replace(/^Common mistake:\s*/i, "")
+    .replace(/^Fix:\s*/i, "")
+    .trim();
+  return cleaned;
+};
+
+const isPlaceholderTeachText = (value: string): boolean => {
+  const normalized = cleanDisplayText(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return (
+    !normalized ||
+    normalized === "string" ||
+    normalized === "string." ||
+    normalized.startsWith("string ") ||
+    normalized.startsWith("string:") ||
+    normalized === "text"
+  );
+};
+
+const toStudentFacingTeachText = (value: string, fallback: string): string => {
+  const cleaned = cleanTeachLine(value)
+    .replace(/^Board checkpoint:\s*string\b\s*/i, "Board checkpoint: ")
+    .replace(/^string\b[:\s-]*/i, "")
+    .trim();
+  if (
+    isPlaceholderTeachText(cleaned) ||
+    /^\(?cbse\b.*board-writing format\)?\.?$/i.test(cleaned) ||
+    /^\(?board\b.*format\)?\.?$/i.test(cleaned)
+  ) {
+    return fallback;
+  }
+  return cleaned;
+};
+
+const shouldHideTutorRawText = (value: string): boolean =>
+  /Teacher goal:|Definition:|Criterion:|Correspondence:|Conclusion:|Client continuity mode active/i.test(
+    String(value || "")
+  );
+
 const deriveMasteryState = (status: string, score: number): TutorMasteryState => {
   const norm = String(status || "").toLowerCase();
   if (norm === "correct" || (Number.isFinite(score) && score >= 70)) return "mastered";
@@ -400,12 +450,12 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           String(existingDiagram.altText || "").trim() ||
           "Placeholder tutor response without diagram dependency.",
       };
-      teach.goal = `Teacher goal: Learn ${nodeTitle} with cloud continuity mode.`;
+      teach.goal = `Learn ${nodeTitle} step by step.`;
       teach.keyIdeas = [
-        `Definition: ${prompt}`,
-        "Criterion: write your answer in clear board format.",
-        "Correspondence: map your step to the asked prompt.",
-        "Conclusion: finish with one final answer line.",
+        `In simple words: ${prompt}`,
+        "Start with the key theorem, rule, or idea before you write the answer.",
+        "Keep the order clear so each step matches the question properly.",
+        "Finish with one clean final line in board style.",
       ];
       teach.checkpoint = {
         question: options.length
@@ -413,7 +463,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           : `Checkpoint: ${prompt}`,
         answer: `Expected answer: ${expected}${explanation ? ` (${explanation})` : ""}`,
       };
-      teach.commonMistake = "Skipping the final answer line in board format.";
+      teach.commonMistake = "Skipping the final line or jumping to the answer too early.";
 
       const continuityLines = [
         "Client continuity mode active (server-free).",
@@ -1303,9 +1353,28 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         : checkpointQuestion;
 
     return {
-      goalLine: cleanDisplayText(goalLine),
-      keyIdeas: keyIdeas.map((line) => cleanDisplayText(line)),
-      examLines: examLines.map((line) => cleanDisplayText(line)),
+      goalLine: toStudentFacingTeachText(
+        goalLine,
+        `Learn ${nodeTitle} in clear board-writing format.`
+      ),
+      keyIdeas: keyIdeas.map((line, idx) =>
+        toStudentFacingTeachText(
+          line,
+          idx === 0
+            ? `Understand what ${nodeTitle} means in this question first.`
+            : idx === 1
+              ? "Start with the right theorem or criterion before you write the main step."
+              : "Keep the matching order clear before you conclude."
+        )
+      ),
+      examLines: examLines.map((line, idx) =>
+        toStudentFacingTeachText(
+          line,
+          idx === 0
+            ? "State the given data and the target result."
+            : "Apply the correct theorem or criterion with one reason."
+        )
+      ),
       workedQuestion: cleanDisplayText(workedQuestion),
       workedSteps: workedSteps.map((step) => ({
         ...step,
@@ -1321,10 +1390,22 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           text: cleanDisplayText(String(step.text || "")),
         })),
       })),
-      checkpointQuestion: cleanDisplayText(checkpointQuestion),
-      checkpointAnswer: cleanDisplayText(checkpointAnswer),
-      commonMistake: cleanDisplayText(commonMistake),
-      commonFix: cleanDisplayText(commonFix),
+      checkpointQuestion: toStudentFacingTeachText(
+        checkpointQuestion,
+        `Board checkpoint: Name the theorem or criterion for ${nodeTitle}, then write one clean Therefore/Hence line.`
+      ),
+      checkpointAnswer: toStudentFacingTeachText(
+        checkpointAnswer,
+        "Given: [matching angle/side data]. To Prove: [required result]. Criterion/Theorem: [exact name]. Therefore/Hence: [final conclusion line]."
+      ),
+      commonMistake: toStudentFacingTeachText(
+        commonMistake,
+        "Skipping the reason or final line can lose marks."
+      ),
+      commonFix: toStudentFacingTeachText(
+        commonFix,
+        "Add one justified step and end with a clean final conclusion."
+      ),
       boardQuestion: cleanDisplayText(boardQuestion),
     };
   };
@@ -1337,51 +1418,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     const coachProps = buildCoachViewProps(obj);
     const view = normalizeTeachView(obj);
     const tutorText = getTutorText(obj);
-    const workedStepText = view.workedSteps
-      .map((step, idx) => {
-        const marks = Number.isFinite(Number(step.marks)) ? ` (${Number(step.marks)}M)` : "";
-        return `${idx + 1}. ${String(step.text)}${marks}`;
-      })
-      .join("\n");
-    const lessonMessages: Array<{ id: string; role: "assistant"; title: string; text: string; tone?: "neutral" | "warn" }> = [
-      {
-        id: "lesson",
-        role: "assistant",
-        title: "Lesson",
-        text: [view.goalLine, ...view.keyIdeas.map((line) => `- ${line}`)].join("\n"),
-      },
-      {
-        id: "intuition",
-        role: "assistant",
-        title: "Why This Works",
-        text: view.examLines.map((line) => `- ${line}`).join("\n"),
-      },
-      {
-        id: "worked",
-        role: "assistant",
-        title: "Worked Example",
-        text: `${view.workedQuestion}\n\n${workedStepText}\n\nFinal: ${view.workedFinal}`,
-      },
-      {
-        id: "board-q",
-        role: "assistant",
-        title: "Board-Style Question",
-        text: `${view.boardQuestion}\n\nTry it in the input box below. I will hint before giving full steps.`,
-      },
-      {
-        id: "checkpoint",
-        role: "assistant",
-        title: "Checkpoint",
-        text: `${view.checkpointQuestion}\n\nExpected answer style: ${view.checkpointAnswer}`,
-      },
-      {
-        id: "mistake",
-        role: "assistant",
-        title: "Common Trap",
-        text: `${view.commonMistake}\n\nFix: ${view.commonFix}`,
-        tone: "warn",
-      },
-    ];
+    const safeTutorText = shouldHideTutorRawText(tutorText) ? "" : cleanDisplayText(String(tutorText));
     const chatMessages = chatTurns.map((turn, idx) => ({
       id: `chat-${idx}`,
       role: turn.role,
@@ -1390,7 +1427,6 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
       tone: "neutral" as const,
     }));
     const allMessages = [
-      ...(showLessonPack ? lessonMessages : []),
       ...chatMessages,
       ...(doubtLoading
         ? [{ id: "pending", role: "assistant" as const, title: "Tutor", text: "Thinking...", tone: "neutral" as const }]
@@ -1414,51 +1450,183 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           diagramType={response.diagramType}
           diagramLabels={response.diagramLabels}
           diagramSpec={response.diagramSpec}
-          note="CBSE diagram block"
+          note="Look at the figure first"
         />
-        {tutorText ? (
+
+        <div
+          style={{
+            borderRadius: 16,
+            padding: "14px 14px",
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid rgba(15,23,42,0.10)",
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.7 }}>Today&apos;s goal</div>
+            <div style={{ marginTop: 4, fontWeight: 900, fontSize: 17 }}>{view.goalLine}</div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(248,250,252,0.95)",
+                border: "1px solid rgba(15,23,42,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>In simple words</div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {view.keyIdeas.slice(0, 3).map((line, idx) => (
+                  <li key={idx} style={{ marginBottom: 6, lineHeight: 1.5 }}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(248,250,252,0.95)",
+                border: "1px solid rgba(15,23,42,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>One clean board line</div>
+              <div style={{ lineHeight: 1.5 }}>{view.examLines[0] || view.goalLine}</div>
+              {view.examLines[1] ? (
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
+                  {view.examLines[1]}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(255,255,255,0.96)",
+                border: "1px solid rgba(15,23,42,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Quick check</div>
+              <div style={{ lineHeight: 1.5 }}>{view.checkpointQuestion}</div>
+              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
+                Good answer style: {view.checkpointAnswer}
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(254,249,195,0.45)",
+                border: "1px solid rgba(202,138,4,0.18)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Watch out</div>
+              <div style={{ lineHeight: 1.5 }}>{view.commonMistake}</div>
+              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, lineHeight: 1.45 }}>
+                Fix: {view.commonFix}
+              </div>
+            </div>
+          </div>
+
+          <details open={false}>
+            <summary style={{ cursor: "pointer", fontWeight: 800 }}>Show full tutor notes</summary>
+            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+              <div
+                style={{
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                  background: "rgba(248,250,252,0.95)",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked example</div>
+                <div style={{ lineHeight: 1.5 }}>{view.workedQuestion}</div>
+                <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                  {view.workedSteps.map((step, idx) => (
+                    <li key={`${step.text}-${idx}`} style={{ marginBottom: 6, lineHeight: 1.5 }}>
+                      {String(step.text)}
+                      {Number.isFinite(Number(step.marks)) ? (
+                        <span style={{ fontSize: 12, opacity: 0.72 }}>
+                          {" "}
+                          ({Number(step.marks)}M)
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.78 }}>
+                  Final line: {view.workedFinal}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 12,
+                  padding: "10px 12px",
+                  background: "rgba(248,250,252,0.95)",
+                  border: "1px solid rgba(15,23,42,0.08)",
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Continue</div>
+                <div style={{ lineHeight: 1.5 }}>
+                  {view.boardQuestion}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>
+                  Try it in the input box below. I&apos;ll guide you step by step before giving full help.
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        {safeTutorText ? (
           <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.9)", border: "1px solid rgba(0,0,0,0.08)" }}>
-            {cleanDisplayText(String(tutorText))}
+            {safeTutorText}
           </div>
         ) : null}
         {coachProps ? <HumanGradeCoachView {...coachProps} compact /> : null}
         {renderAttemptFeedback(obj)}
-        {chatTurns.length > 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className="lt-pill"
-              style={{ padding: "6px 10px", fontSize: 12 }}
-              onClick={() => setShowLessonPack((prev) => !prev)}
-            >
-              {showLessonPack ? "Hide lesson pack" : "Show lesson pack"}
-            </button>
-            {!showLessonPack ? (
-              <span style={{ fontSize: 12, opacity: 0.7 }}>Focus mode: chat and guidance only.</span>
-            ) : null}
-          </div>
-        ) : null}
-        <div style={{ display: "grid", gap: 10 }}>
-          {allMessages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                display: "flex",
-                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
-              <div style={bubbleStyle(msg.role, msg.tone)}>
-                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
-                  {cleanDisplayText(msg.text)}
+        {allMessages.length ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {allMessages.map((msg) => (
+              <div
+                key={msg.id}
+                style={{
+                  display: "flex",
+                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                }}
+              >
+                <div style={bubbleStyle(msg.role, msg.tone)}>
+                  <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
+                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                    {cleanDisplayText(msg.text)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.74 }}>
-          Quick controls moved to the footer action bar for a cleaner lesson workspace.
-        </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -1598,34 +1766,25 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   };
 
   const inputPlaceholder =
-    tab === "teach" ? "Answer checkpoint or ask a doubt..." : "Ask a doubt about this step...";
+    tab === "teach" ? "Type your next step or ask a doubt..." : "Ask a doubt about this step...";
   const sendButtonLabel = tab === "teach" ? "Submit" : "Send";
   const checkpointHint =
     tab === "teach"
-      ? "Checkpoint = answer the quick check above in your own words."
+      ? "Answer the quick check in your own words, or ask for the next hint."
       : "Ask any doubt about this step.";
   const quickPrompts =
     tab === "teach"
       ? [
           "Explain this in simple Class 10 language.",
-          "Give one board-style solved example for this step.",
-          "Check my checkpoint answer and tell me one mistake.",
+          "Show me one clean board line for this step.",
+          "Check my answer and point out one mistake.",
         ]
       : [
           "Show one more board example for this node.",
           "What is the most common exam mistake here?",
         ];
-  const sessionSteps = ["Learn", "Checkpoint", "Practice", "Mistake Fix", "Exam Drill", "Mastery"];
-  const activeSessionStep = (() => {
-    if (nodeMasteryState === "mastered") return 5;
-    if (tab === "examples") return 4;
-    if (nodeMasteryState === "needs_practice") return 3;
-    if (nodeMasteryState === "checkpoint_passed") return 2;
-    if (currentResponse || chatTurns.length > 0) return 1;
-    return 0;
-  })();
   const primaryActionLabel = !canAdvanceWithoutWarning
-    ? "Try checkpoint"
+    ? "Do quick check"
     : tab === "teach" && nodeId && onPracticeThisNode
       ? "Practice this node"
       : tab === "teach"
@@ -1685,7 +1844,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor</div>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor lesson</div>
           <span
             style={{
               fontSize: 11,
@@ -1729,34 +1888,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         </div>
 
         <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-          You're learning: <b>{nodeTitle}</b> - Step {nodeIndex + 1} of {Math.max(1, order.length)}
-        </div>
-
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {sessionSteps.map((step, idx) => {
-            const active = idx === activeSessionStep;
-            const done = idx < activeSessionStep;
-            return (
-              <span
-                key={step}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  borderRadius: 999,
-                  padding: "3px 9px",
-                  border: "1px solid rgba(0,0,0,0.12)",
-                  background: active
-                    ? "rgba(15,23,42,0.92)"
-                    : done
-                      ? "rgba(34,197,94,0.12)"
-                      : "rgba(255,255,255,0.85)",
-                  color: active ? "#fff" : done ? "rgba(20,83,45,0.9)" : "rgba(15,23,42,0.8)",
-                }}
-              >
-                {step}
-              </span>
-            );
-          })}
+          Step {nodeIndex + 1} of {Math.max(1, order.length)} • <b>{nodeTitle}</b>
         </div>
 
         {currentNotice ? (
@@ -1786,7 +1918,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           >
             <div style={{ fontWeight: 800 }}>Checkpoint not yet passed for this node.</div>
             <div style={{ marginTop: 4, fontSize: 13, opacity: 0.88 }}>
-              You can still continue, but mastery will improve faster if you checkpoint first.
+              It is fine to continue, but this quick check will make the next step easier.
             </div>
             <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
@@ -1804,7 +1936,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                 className="lt-pill"
                 onClick={() => requestTutor(tab, { force: true, requestNextHint: true })}
               >
-                Next hint
+                Give me a hint
               </button>
               <button
                 type="button"
@@ -1904,7 +2036,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             style={{ padding: "8px 10px", fontSize: 12 }}
             onClick={() => setShowMoreActions((prev) => !prev)}
           >
-            {showMoreActions ? "Hide extra actions" : "More actions"}
+            {showMoreActions ? "Hide options" : "More options"}
           </button>
           <div style={{ fontSize: 12, opacity: 0.72 }}>{checkpointHint}</div>
         </div>

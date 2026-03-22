@@ -747,20 +747,20 @@ const trianglesBase = buildGenericTopicConfig({
 const trianglesConfig: TopicContentConfig = {
   ...trianglesBase,
   heroTagline:
-    "Similarity + BPT + Pythagoras ⇒ this chapter powers many geometry questions across the paper.",
+    "Similarity + BPT + proof writing form one clean runway for board geometry.",
 
   quickRevisionRoadmap: [
     "1️⃣ Revise similarity criteria: AAA, SAS, SSS and their statements.",
     "2️⃣ Practise 5–6 questions on BPT (Basic Proportionality Theorem) and its converse.",
     "3️⃣ Solve questions where areas of similar triangles are compared via the square of corresponding sides.",
-    "4️⃣ Do 3–4 Pythagoras theorem and converse questions anchored in board-style figures.",
+    "4. Do 3-4 theorem-choice and proof-setup questions anchored in clean board-style figures.",
   ],
 
   keyConceptsSummary:
-    "Important: similarity criteria and their applications, BPT and its converse, ratio of areas in similar triangles, and Pythagoras theorem + converse. Many questions are proof-based, so stepwise reasoning + correct statements is critical.",
+    "Important: similarity criteria and their applications, BPT and its converse, and ratio-based reasoning inside similar triangles. Many questions are proof-based, so stepwise reasoning + correct statements is critical.",
 
   boardExamplesSummary:
-    "Standard PYQs: prove two triangles similar using a given condition and then find a ratio of sides/areas; BPT-based segment division; using Pythagoras to prove a result in a given figure.",
+    "Standard PYQs: prove two triangles similar using a given condition and then find a ratio of sides/areas; BPT-based segment division; and one proof where the theorem choice must be stated clearly.",
 
   recommendedVideoSummary:
     "Choose a ‘Triangles full chapter’ video that focuses heavily on proofs and writing reasons – that’s where students lose marks.",

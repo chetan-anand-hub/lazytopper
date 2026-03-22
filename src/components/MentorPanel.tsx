@@ -264,7 +264,7 @@ function isSolveWithMe(obj: unknown): obj is SolveWithMeStructured {
   return (
     isRecord(obj) &&
     (obj.kind === "question" || obj.kind === "hint" || obj.kind === "final") &&
-    typeof obj.tutor === "string"
+    (typeof obj.tutor === "string" || (isRecord(obj.tutor) && Boolean(obj.tutor)))
   );
 }
 
@@ -346,7 +346,12 @@ function formatBoardStepsBlock(block: unknown): string {
 }
 
 function formatSolveWithMe(obj: unknown): string {
-  const tutor = isRecord(obj) ? String(obj.tutor ?? "").trim() : "";
+  const tutor =
+    isRecord(obj) && typeof obj.tutor === "string"
+      ? String(obj.tutor ?? "").trim()
+      : isRecord(obj) && isRecord(obj.tutor)
+        ? String(obj.tutor.text ?? obj.tutor.rawText ?? "").trim()
+        : "";
   if (!tutor) return "";
   if (!isRecord(obj) || obj.kind !== "final") return tutor;
 
