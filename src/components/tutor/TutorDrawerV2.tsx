@@ -290,7 +290,6 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
   const [doubtLoading, setDoubtLoading] = useState(false);
   const [chatTurns, setChatTurns] = useState<TutorChatTurn[]>([]);
   const [showLessonPack, setShowLessonPack] = useState(true);
-  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
   const [feedbackChoice, setFeedbackChoice] = useState<"yes" | "no" | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -985,7 +984,6 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
     setChatTurns([]);
     setShowLessonPack(true);
     setShowSoftGateWarning(false);
-    setShowFeedbackPanel(false);
     setFeedbackChoice(null);
     setFeedbackText("");
     setFeedbackStatus("idle");
@@ -1444,6 +1442,9 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             : "rgba(255,255,255,0.92)"
           : "rgba(59,130,246,0.12)",
     });
+    const previewIdeas = view.keyIdeas.slice(0, 2);
+    const exampleSteps = view.workedSteps.slice(0, 2);
+    const boardLine = view.examLines[0] || view.goalLine;
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <DiagramBlock
@@ -1456,59 +1457,27 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
         <div
           style={{
             borderRadius: 16,
-            padding: "14px 14px",
+            padding: "12px 12px",
             background: "rgba(255,255,255,0.92)",
             border: "1px solid rgba(15,23,42,0.10)",
             display: "grid",
-            gap: 12,
+            gap: 10,
           }}
         >
           <div>
             <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.7 }}>Today&apos;s goal</div>
-            <div style={{ marginTop: 4, fontWeight: 900, fontSize: 17 }}>{view.goalLine}</div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 10,
-            }}
-          >
-            <div
-              style={{
-                borderRadius: 12,
-                padding: "10px 12px",
-                background: "rgba(248,250,252,0.95)",
-                border: "1px solid rgba(15,23,42,0.08)",
-              }}
-            >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>In simple words</div>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {view.keyIdeas.slice(0, 3).map((line, idx) => (
-                  <li key={idx} style={{ marginBottom: 6, lineHeight: 1.5 }}>
+            <div style={{ marginTop: 4, fontWeight: 900, fontSize: 16, lineHeight: 1.45 }}>
+              {view.goalLine}
+            </div>
+            {previewIdeas.length ? (
+              <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+                {previewIdeas.map((line, idx) => (
+                  <div key={idx} style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.84 }}>
                     {line}
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            </div>
-
-            <div
-              style={{
-                borderRadius: 12,
-                padding: "10px 12px",
-                background: "rgba(248,250,252,0.95)",
-                border: "1px solid rgba(15,23,42,0.08)",
-              }}
-            >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>One clean board line</div>
-              <div style={{ lineHeight: 1.5 }}>{view.examLines[0] || view.goalLine}</div>
-              {view.examLines[1] ? (
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
-                  {view.examLines[1]}
-                </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
 
           <div
@@ -1522,11 +1491,35 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               style={{
                 borderRadius: 12,
                 padding: "10px 12px",
-                background: "rgba(255,255,255,0.96)",
+                background: "rgba(248,250,252,0.95)",
                 border: "1px solid rgba(15,23,42,0.08)",
               }}
             >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Quick check</div>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>One example</div>
+              <div style={{ fontSize: 13, lineHeight: 1.5 }}>{view.workedQuestion || view.boardQuestion}</div>
+              {exampleSteps.length ? (
+                <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                  {exampleSteps.map((step, idx) => (
+                    <li key={`${step.text}-${idx}`} style={{ marginBottom: 6, lineHeight: 1.45, fontSize: 13 }}>
+                      {String(step.text)}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+              <div style={{ marginTop: 8, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
+                One clean board line: {boardLine}
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 12,
+                padding: "10px 12px",
+                background: "rgba(248,250,252,0.95)",
+                border: "1px solid rgba(15,23,42,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Your turn</div>
               <div style={{ lineHeight: 1.5 }}>{view.checkpointQuestion}</div>
               <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
                 Good answer style: {view.checkpointAnswer}
@@ -1543,15 +1536,30 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             >
               <div style={{ fontWeight: 800, marginBottom: 6 }}>Watch out</div>
               <div style={{ lineHeight: 1.5 }}>{view.commonMistake}</div>
-              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, lineHeight: 1.45 }}>
-                Fix: {view.commonFix}
-              </div>
+              {view.commonFix ? (
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8, lineHeight: 1.45 }}>
+                  Fix: {view.commonFix}
+                </div>
+              ) : null}
             </div>
           </div>
 
           <details open={false}>
-            <summary style={{ cursor: "pointer", fontWeight: 800 }}>Show full tutor notes</summary>
+            <summary style={{ cursor: "pointer", fontWeight: 800 }}>Show more</summary>
             <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+              {safeTutorText ? (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.9)",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {safeTutorText}
+                </div>
+              ) : null}
               <div
                 style={{
                   borderRadius: 12,
@@ -1560,7 +1568,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                   border: "1px solid rgba(15,23,42,0.08)",
                 }}
               >
-                <div style={{ fontWeight: 800, marginBottom: 6 }}>Worked example</div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Full worked example</div>
                 <div style={{ lineHeight: 1.5 }}>{view.workedQuestion}</div>
                 <ol style={{ margin: "8px 0 0", paddingLeft: 18 }}>
                   {view.workedSteps.map((step, idx) => (
@@ -1596,37 +1604,31 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                   Try it in the input box below. I&apos;ll guide you step by step before giving full help.
                 </div>
               </div>
+              {coachProps ? <HumanGradeCoachView {...coachProps} compact /> : null}
+              {renderAttemptFeedback(obj)}
+              {allMessages.length ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {allMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                      }}
+                    >
+                      <div style={bubbleStyle(msg.role, msg.tone)}>
+                        <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
+                        <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                          {cleanDisplayText(msg.text)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </details>
         </div>
-
-        {safeTutorText ? (
-          <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.9)", border: "1px solid rgba(0,0,0,0.08)" }}>
-            {safeTutorText}
-          </div>
-        ) : null}
-        {coachProps ? <HumanGradeCoachView {...coachProps} compact /> : null}
-        {renderAttemptFeedback(obj)}
-        {allMessages.length ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            {allMessages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  display: "flex",
-                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div style={bubbleStyle(msg.role, msg.tone)}>
-                  <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 4, opacity: 0.8 }}>{msg.title}</div>
-                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
-                    {cleanDisplayText(msg.text)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
     );
   };
@@ -1840,11 +1842,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           boxShadow: "none",
           display: "flex",
           flexDirection: "column",
-          padding: "14px 14px 10px",
+          padding: "12px 12px 10px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>Tutor lesson</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 900, fontSize: 15 }}>Tutor lesson</div>
           <span
             style={{
               fontSize: 11,
@@ -1858,12 +1860,12 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           >
             {masteryMeta[nodeMasteryState].label}
           </span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
               className="lt-pill"
               onClick={() => handleTabChange("teach")}
-              style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white" }}
+              style={{ background: tab === "teach" ? "rgba(0,0,0,0.08)" : "white", padding: "6px 10px" }}
             >
               Teach
             </button>
@@ -1871,7 +1873,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
               type="button"
               className="lt-pill"
               onClick={() => handleTabChange("examples")}
-              style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white" }}
+              style={{ background: tab === "examples" ? "rgba(0,0,0,0.08)" : "white", padding: "6px 10px" }}
             >
               Board Examples
             </button>
@@ -1887,7 +1889,7 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </div>
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
           Step {nodeIndex + 1} of {Math.max(1, order.length)} • <b>{nodeTitle}</b>
         </div>
 
@@ -1956,41 +1958,44 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="lt-pill"
-            onClick={() => goToNodeIndex(0)}
-            disabled={nodeIndex === 0}
-          >
-            Start from basics
-          </button>
-          <button
-            type="button"
-            className="lt-pill"
-            onClick={() => handleNextConcept()}
-            disabled={nodeIndex >= order.length - 1}
-          >
-            Next concept
-          </button>
-          <select
-            value={nodeId || ""}
-            onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value))}
-            style={{
-              borderRadius: 999,
-              padding: "6px 10px",
-              border: "1px solid rgba(0,0,0,0.12)",
-              background: "white",
-              fontWeight: 700,
-            }}
-          >
-            {order.map((id, idx) => (
-              <option key={id} value={id}>
-                {idx + 1}. {nodeTitles[id] || id}
-              </option>
-            ))}
-          </select>
-        </div>
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: 13 }}>Lesson options</summary>
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              className="lt-pill"
+              onClick={() => goToNodeIndex(0)}
+              disabled={nodeIndex === 0}
+            >
+              Start from basics
+            </button>
+            <button
+              type="button"
+              className="lt-pill"
+              onClick={() => handleNextConcept()}
+              disabled={nodeIndex >= order.length - 1}
+            >
+              Next concept
+            </button>
+            <select
+              value={nodeId || ""}
+              onChange={(e) => goToNodeIndex(order.findIndex((id) => id === e.target.value))}
+              style={{
+                borderRadius: 999,
+                padding: "6px 10px",
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: "white",
+                fontWeight: 700,
+              }}
+            >
+              {order.map((id, idx) => (
+                <option key={id} value={id}>
+                  {idx + 1}. {nodeTitles[id] || id}
+                </option>
+              ))}
+            </select>
+          </div>
+        </details>
 
         <div
           ref={contentScrollRef}
@@ -2000,8 +2005,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             overflow: "auto",
             padding: 10,
             borderRadius: 14,
-            border: "1px solid rgba(0,0,0,0.10)",
-            background: "rgba(255,255,255,0.6)",
+            border: "1px solid rgba(0,0,0,0.08)",
+            background: "rgba(255,255,255,0.72)",
             minHeight: 280,
           }}
         >
@@ -2036,10 +2041,10 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
             style={{ padding: "8px 10px", fontSize: 12 }}
             onClick={() => setShowMoreActions((prev) => !prev)}
           >
-            {showMoreActions ? "Hide options" : "More options"}
+            {showMoreActions ? "Hide help options" : "More help options"}
           </button>
-          <div style={{ fontSize: 12, opacity: 0.72 }}>{checkpointHint}</div>
         </div>
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.72 }}>{checkpointHint}</div>
 
         {showMoreActions ? (
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2136,17 +2141,11 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
           </div>
         ) : null}
 
-        <div style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
-          <button
-            type="button"
-            className="lt-pill"
-            onClick={() => setShowFeedbackPanel((prev) => !prev)}
-            style={{ padding: "6px 10px", fontSize: 13, background: "white" }}
-          >
-            {showFeedbackPanel ? "Hide feedback" : "Was this helpful? Add feedback (optional)"}
-          </button>
-          {showFeedbackPanel ? (
-            <div style={{ marginTop: 10 }}>
+        <details style={{ marginTop: 12, borderRadius: 12, padding: "10px 12px", background: "rgba(0,0,0,0.03)" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+            Was this helpful? Add feedback (optional)
+          </summary>
+          <div style={{ marginTop: 10 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
@@ -2227,9 +2226,8 @@ export default function TutorDrawerV2(props: TutorDrawerProps) {
                   </div>
                 ) : null}
               </div>
-            </div>
-          ) : null}
-        </div>
+          </div>
+        </details>
       </div>
     </div>
   );

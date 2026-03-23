@@ -66,8 +66,6 @@ import {
   type TopicHubNodeMasteryState,
   upsertNodeProgress,
 } from "../services/topicHubMastery";
-import JourneyStrip from "../components/ux/JourneyStrip";
-import ReturnContextBar from "../components/ux/ReturnContextBar";
 import {
   canUseMentorServer,
   isMentorNetworkFailure,
@@ -1854,7 +1852,7 @@ const showInZombie = (sectionId: string) => {
   const isLearn = activeTab === 'learn';
   const isGrind = activeTab === 'grind';
   const isResources = activeTab === 'resources';
-  const timelineStepIndex = isLearn ? 0 : isGrind ? 1 : 2;
+  const timelineStepLabel = isLearn ? "Learn" : isGrind ? "Grind" : "Resources";
 
   const toSectionFilter = useCallback((value: unknown): PracticeSectionFilter | undefined => {
     const raw = String(value ?? "").trim().toUpperCase();
@@ -2247,48 +2245,37 @@ const showInZombie = (sectionId: string) => {
 
   return (
     <div className="lt-page">
-      <div style={{ maxWidth: 1120, margin: "0 auto", padding: "18px 14px 40px" }}>
-        <ReturnContextBar
-          backTo={backTo}
-          backLabel={backLabel}
-          quickLinks={[
-            { label: "Trends", to: `/trends/${grade}/${subjectTitle}` },
-            { label: "Practice", to: `/practice/${grade}/${subjectTitle}?topic=${encodeURIComponent(title)}` },
-            { label: "HPQ", to: `/highly-probable/${grade}/${subjectTitle}?topic=${encodeURIComponent(title)}` },
-          ]}
-        />
-        <JourneyStrip current="topichub" grade={grade} subject={subjectTitle} topic={title} />
+      <div style={{ maxWidth: 1120, margin: "0 auto", padding: "12px 14px 40px" }}>
         {/* Topic header (clean) */}
         <div
           style={{
             position: "sticky",
-            top: 6,
+            top: 0,
             zIndex: 10,
-            borderRadius: 16,
-            padding: "10px 10px",
-            background: "rgba(255,255,255,0.82)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(0,0,0,0.08)",
-            boxShadow: "0 8px 18px rgba(0,0,0,0.08)",
+            padding: "8px 0 10px",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.93) 72%, rgba(255,255,255,0.72) 100%)",
+            backdropFilter: "blur(8px)",
+            borderBottom: "1px solid rgba(15,23,42,0.08)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Link className="lt-pill" to={`/trends/${grade}/${subject}`}>
-              Open trends
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <Link className="lt-pill" to={backTo}>
+              {"<-"} {backLabel}
             </Link>
 
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
-                padding: "6px 9px",
-                borderRadius: 14,
-                border: "1px solid rgba(0,0,0,0.10)",
-                background: "rgba(0,0,0,0.03)",
+                gap: 6,
+                padding: "4px 8px",
+                borderRadius: 999,
+                border: "1px solid rgba(15,23,42,0.12)",
+                background: "rgba(255,255,255,0.82)",
               }}
             >
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Topic</div>
+              <div style={{ fontSize: 11, opacity: 0.72 }}>Topic</div>
               <select
                 value={topicKey}
                 onChange={(e) => onChangeTopic(e.target.value)}
@@ -2297,7 +2284,8 @@ const showInZombie = (sectionId: string) => {
                   outline: "none",
                   background: "transparent",
                   fontWeight: 800,
-                  paddingRight: 6,
+                  fontSize: 12,
+                  paddingRight: 4,
                   cursor: "pointer",
                 }}
               >
@@ -2338,7 +2326,7 @@ const showInZombie = (sectionId: string) => {
           </div>
 
           {/* ONLY 3 tabs: Learn / Grind / Resources */}
-          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={tabButtonStyle(activeTab === 'learn')} onClick={() => setActiveTab('learn')}>
               Learn
             </button>
@@ -2352,48 +2340,48 @@ const showInZombie = (sectionId: string) => {
           <div
             style={{
               marginTop: 8,
-              borderRadius: 14,
-              border: "1px solid rgba(15,23,42,0.12)",
-              background: "rgba(255,255,255,0.78)",
-              padding: "8px 10px",
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              alignItems: "center",
+              fontSize: 11,
+              opacity: 0.74,
             }}
             data-testid="topichub-learn-grind-practice-timeline"
           >
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.76 }}>Flow</div>
-              <div style={{ fontSize: 11, opacity: 0.7 }}>Learn {"->"} Grind {"->"} Practice</div>
+            <div style={{ fontWeight: 900 }}>Flow</div>
+            <div>Now: {timelineStepLabel}</div>
+            <div>Learn {"->"} Grind {"->"} Practice</div>
+            <div style={{ opacity: 0.68 }}>
+              Recommended order: Learn concept {"->"} Grind writing format {"->"} Practice timed questions.
             </div>
-            <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {[
-                { key: "learn", label: "1. Learn", onClick: () => setActiveTab("learn") },
-                { key: "grind", label: "2. Grind", onClick: () => setActiveTab("grind") },
+                { key: "learn", label: "1. Learn", onClick: () => setActiveTab("learn"), active: isLearn },
+                { key: "grind", label: "2. Grind", onClick: () => setActiveTab("grind"), active: isGrind },
                 {
                   key: "practice",
                   label: "3. Practice",
                   onClick: () => openPracticeFromTopicHub({ tab: activeTab }),
+                  active: false,
                 },
-              ].map((item, idx) => {
-                const active = idx === timelineStepIndex;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className="lt-pill"
-                    onClick={item.onClick}
-                    style={{
-                      padding: "6px 10px",
-                      background: active ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
-                      color: active ? "#fff" : "rgba(15,23,42,0.9)",
-                      borderColor: active ? "rgba(15,23,42,0.92)" : "rgba(15,23,42,0.24)",
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 6, fontSize: 11, opacity: 0.72 }}>
-              Recommended order: Learn concept {"->"} Grind writing format {"->"} Practice timed questions.
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className="lt-pill"
+                  onClick={item.onClick}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: 11,
+                    background: item.active ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.72)",
+                    color: "rgba(15,23,42,0.82)",
+                    borderColor: "rgba(15,23,42,0.16)",
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -2476,18 +2464,18 @@ const showInZombie = (sectionId: string) => {
               data-testid="triangles-runtime-runway"
               style={{
                 borderRadius: 20,
-                padding: "14px 14px",
+                padding: "12px 12px",
                 background:
                   "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(239,246,255,0.94) 46%, rgba(254,249,195,0.42) 100%)",
                 border: "1px solid rgba(15,23,42,0.12)",
-                boxShadow: "0 12px 28px rgba(15,23,42,0.08)",
+                boxShadow: "0 8px 22px rgba(15,23,42,0.07)",
               }}
             >
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)",
-                  gap: 12,
+                  gridTemplateColumns: "minmax(0, 1.15fr) minmax(240px, 0.85fr)",
+                  gap: 10,
                   alignItems: "start",
                 }}
               >
@@ -2515,22 +2503,19 @@ const showInZombie = (sectionId: string) => {
                         border: "1px solid rgba(15,23,42,0.16)",
                       }}
                     >
-                      ~{runtimeTopicConfig.weightagePercent}% boards signal
+                      High ROI for boards
                     </span>
                   </div>
-                  <div style={{ marginTop: 10, fontWeight: 950, fontSize: 22, letterSpacing: -0.2 }}>
+                  <div style={{ marginTop: 8, fontWeight: 950, fontSize: 20, letterSpacing: -0.2 }}>
                     Triangles, taught like a tutor
                   </div>
-                  <div style={{ marginTop: 8, opacity: 0.88, lineHeight: 1.6 }}>
+                  <div style={{ marginTop: 6, opacity: 0.88, lineHeight: 1.55 }}>
                     {trianglesRuntimeStrip.chapterPromise}
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 13, opacity: 0.78, lineHeight: 1.55 }}>
-                    Start with one guided explanation, then pick the problem family you need and move straight into the right practice.
+                  <div style={{ marginTop: 6, fontSize: 13, opacity: 0.78, lineHeight: 1.5 }}>
+                    Start with one clear explanation, then choose the problem family you want to fix right now.
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 12, opacity: 0.72 }}>
-                    Mastery now: {masteryCounts.mastered}/{masteryCounts.total} mastered • {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoint passed
-                  </div>
-                  <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <button
                       type="button"
                       className="lt-pill"
@@ -2554,6 +2539,7 @@ const showInZombie = (sectionId: string) => {
                     <button
                       type="button"
                       className="lt-pill"
+                      style={{ background: "rgba(255,255,255,0.88)" }}
                       onClick={() =>
                         openMentorDrawer({
                           title: trianglesRuntimeStrip.mentorTitle,
@@ -2576,12 +2562,15 @@ const showInZombie = (sectionId: string) => {
                       Check my proof
                     </button>
                   </div>
+                  <div style={{ marginTop: 8, fontSize: 11, opacity: 0.66 }}>
+                    {runtimeTopicConfig.weightagePercent}% board signal • {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoints cleared
+                  </div>
                 </div>
 
                 <div
                   style={{
                     borderRadius: 16,
-                    padding: "12px 12px",
+                    padding: "10px 10px",
                     border: "1px solid rgba(15,23,42,0.12)",
                     background: "rgba(255,255,255,0.84)",
                   }}
@@ -2604,10 +2593,10 @@ const showInZombie = (sectionId: string) => {
               {selectedTrianglesFamily ? (
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontWeight: 900, fontSize: 14 }}>
-                    What kind of Triangles problem is this?
+                    Pick the problem family
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, opacity: 0.76 }}>
-                    Pick the family first. That keeps the next step clear and sends you into the right practice faster.
+                    One family first. Then either practise it or ask for help on that exact pattern.
                   </div>
                   <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {trianglesQuestionFamilies.map((family) => {
@@ -2635,7 +2624,7 @@ const showInZombie = (sectionId: string) => {
                     style={{
                       marginTop: 12,
                       display: "grid",
-                      gridTemplateColumns: "minmax(0, 1.2fr) minmax(250px, 0.8fr)",
+                      gridTemplateColumns: "minmax(0, 1.1fr) minmax(240px, 0.9fr)",
                       gap: 12,
                     }}
                   >
@@ -2690,10 +2679,6 @@ const showInZombie = (sectionId: string) => {
                       <div style={{ marginTop: 8, fontWeight: 900, fontSize: 16 }}>
                         {selectedTrianglesFamily.studentLabel}
                       </div>
-                      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.84, lineHeight: 1.58 }}>
-                        {selectedTrianglesFamily.tutorMeaning}
-                      </div>
-
                       <div
                         style={{
                           marginTop: 10,
@@ -2704,18 +2689,18 @@ const showInZombie = (sectionId: string) => {
                       >
                         <div>
                           <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
-                            Start here
+                            What this is
                           </div>
                           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
-                            {selectedTrianglesFamily.weakStudentCue}
+                            {selectedTrianglesFamily.tutorMeaning}
                           </div>
                         </div>
                         <div>
                           <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
-                            Fast track
+                            Start here
                           </div>
                           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
-                            {selectedTrianglesFamily.advancedStudentShortcut}
+                            {selectedTrianglesFamily.weakStudentCue}
                           </div>
                         </div>
                         <div>
@@ -2736,34 +2721,15 @@ const showInZombie = (sectionId: string) => {
                         </div>
                       </div>
 
-                      <div
-                        style={{
-                          marginTop: 10,
-                          borderRadius: 12,
-                          padding: "10px 10px",
-                          background: "rgba(248,250,252,0.9)",
-                          border: "1px solid rgba(15,23,42,0.1)",
-                        }}
-                      >
-                        <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
-                          Why this matters in boards
-                        </div>
-                        <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
-                          {selectedTrianglesFamily.boardPayoff}
-                        </div>
-                      </div>
-
                       <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button
                           type="button"
                           className="lt-pill"
-                          onClick={() => openPracticeFromTrianglesFamily(selectedTrianglesFamily)}
-                        >
-                          Practice this family
-                        </button>
-                        <button
-                          type="button"
-                          className="lt-pill"
+                          style={{
+                            background: "rgba(15,23,42,0.92)",
+                            color: "#fff",
+                            borderColor: "rgba(15,23,42,0.92)",
+                          }}
                           onClick={() => {
                             setActiveTab("learn");
                             openTutorDrawer({
@@ -2777,11 +2743,52 @@ const showInZombie = (sectionId: string) => {
                         <button
                           type="button"
                           className="lt-pill"
+                          onClick={() => openPracticeFromTrianglesFamily(selectedTrianglesFamily)}
+                        >
+                          Practice this family
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="lt-pill"
+                          style={{ padding: "6px 10px", fontSize: 12 }}
                           onClick={() => openMentorForTrianglesFamily(selectedTrianglesFamily)}
                         >
                           Ask mentor on this family
                         </button>
+                        <div style={{ fontSize: 12, opacity: 0.68 }}>
+                          Use this if you know the family but still feel stuck mid-step.
+                        </div>
                       </div>
+                      <details style={{ marginTop: 10 }}>
+                        <summary style={{ cursor: "pointer", fontWeight: 800 }}>See more</summary>
+                        <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                              Fast track
+                            </div>
+                            <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                              {selectedTrianglesFamily.advancedStudentShortcut}
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              borderRadius: 12,
+                              padding: "10px 10px",
+                              background: "rgba(248,250,252,0.9)",
+                              border: "1px solid rgba(15,23,42,0.1)",
+                            }}
+                          >
+                            <div style={{ fontSize: 11, fontWeight: 900, opacity: 0.72 }}>
+                              Why this matters in boards
+                            </div>
+                            <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.55 }}>
+                              {selectedTrianglesFamily.boardPayoff}
+                            </div>
+                          </div>
+                        </div>
+                      </details>
                     </div>
 
                     <div
@@ -2840,7 +2847,7 @@ const showInZombie = (sectionId: string) => {
                         ) : null}
                       </div>
                       <div style={{ marginTop: 10, fontSize: 12, opacity: 0.76, lineHeight: 1.55 }}>
-                        Use the figure first, then either practise this family or ask for help before the confusion spreads.
+                        Look at the setup first. Then decide the theorem family before you write or calculate anything.
                       </div>
                     </div>
                   </div>
@@ -3065,71 +3072,6 @@ const showInZombie = (sectionId: string) => {
             </section>
           ) : null}
 
-          {isLearn ? (
-            <div
-              style={{
-                borderRadius: 18,
-                padding: "14px 14px",
-                background: "rgba(255,255,255,0.65)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 900, fontSize: 16 }}>
-                  {isTrianglesTopic ? "Need a quick reset?" : "Let me teach you"}
-                </div>
-                <div style={{ fontSize: 13, opacity: 0.75 }}>
-                  {isTrianglesTopic
-                    ? "Reopen the guided tutor, then do one checkpoint before you spread out into broader practice."
-                    : "Start from basics and move step-by-step with the guided learning path."}
-                </div>
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78 }}>
-                  Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
-                  {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoint passed
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="lt-pill"
-                  onClick={() =>
-                    openTutorDrawer({
-                      tab: "teach",
-                      nodeId: isTrianglesTopic && trianglesRuntimeStrip
-                        ? trianglesRuntimeStrip.firstTutorNodeId
-                        : undefined,
-                    })
-                  }
-                >
-                  {isTrianglesTopic ? "Open guided tutor" : "Teach this topic"}
-                </button>
-                <button
-                  type="button"
-                  className="lt-pill"
-                  onClick={() => {
-                    setActiveTab("grind");
-                    if (hasGrindContractFlow) {
-                      openGrindDrawer({
-                        nodeId:
-                          isTrianglesTopic && trianglesRuntimeStrip
-                            ? trianglesRuntimeStrip.proofGrindNodeId
-                            : undefined,
-                      });
-                    }
-                  }}
-                >
-                  {isTrianglesTopic ? "Open proof grind" : "Practice via Grind"}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
           {isGrind ? (
             <div
               style={{
@@ -3182,41 +3124,29 @@ const showInZombie = (sectionId: string) => {
               </div>
             </div>
           ) : null}
-{isLearn && showInZombie("summary") && overview.length > 0 && (
-            <AccordionCard id="summary" title="Summary" defaultOpen={false}>
-              {overview.map((p, idx) => (
-                <p key={idx} style={{ marginTop: idx === 0 ? 0 : 10, lineHeight: 1.65, opacity: 0.95 }}>
-                  {p}
-                </p>
-              ))}
+          {isLearn && guidedOrder.length > 0 ? (
+            <AccordionCard
+              id="guided-learning-path"
+              title={isTrianglesTopic ? "Guided learning path (Triangles)" : "Guided learning path"}
+              defaultOpen={false}
+            >
+              <GuidedMindmapPanel
+                data={guidedPanelData}
+                onAskMentor={(node) => {
+                  if (!node?.id) return;
+                  openTutorDrawer({ tab: "teach", nodeId: node.id });
+                }}
+                getNodeMasteryState={(nodeId) => getNodeMasteryState(topicMastery, nodeId)}
+                onPracticeNode={(nodeId) =>
+                  openPracticeFromTopicHub({ nodeId, tab: "learn" })
+                }
+              />
             </AccordionCard>
-          )}
-
-          {isLearn && showInZombie("exam-patterns") && examPatterns.length > 0 && (
-            <AccordionCard id="exam-patterns" title="CBSE exam patterns" defaultOpen={mode === "zombie"}>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {examPatterns.slice(0, 10).map((p, idx) => (
-                  <li key={idx} style={{ marginBottom: 8, lineHeight: 1.55 }}>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </AccordionCard>
-          )}
+          ) : null}
 
           {isLearn && showInZombie("key-definitions") && definitions.length > 0 && (
             <AccordionCard id="key-definitions" title="Key definitions" defaultOpen={false}>
-              
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-                <button
-                  type="button"
-                  className="lt-pill"
-                  onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
-                >
-                  Open Tutor
-                </button>
-              </div>
-<div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
                 {definitions.slice(0, 14).map((d, idx) => (
                   <div
                     key={idx}
@@ -3242,92 +3172,148 @@ const showInZombie = (sectionId: string) => {
             </AccordionCard>
           )}
 
-            {isLearn && guidedOrder.length > 0 ? (
-              <AccordionCard
-                id="guided-learning-path"
-                title={isTrianglesTopic ? "Guided learning path (Triangles)" : "Guided learning path"}
-                defaultOpen={false}
-              >
-                <GuidedMindmapPanel
-                  data={guidedPanelData}
-                  onAskMentor={(node) => {
-                    if (!node?.id) return;
-                    openTutorDrawer({ tab: "teach", nodeId: node.id });
-                  }}
-                  getNodeMasteryState={(nodeId) => getNodeMasteryState(topicMastery, nodeId)}
-                  onPracticeNode={(nodeId) =>
-                    openPracticeFromTopicHub({ nodeId, tab: "learn" })
-                  }
-                />
-              </AccordionCard>
-            ) : null}
-
-            {isLearn && isTrianglesTopic ? (
-              <AccordionCard id="proof-writing" title="Proof writing (Triangles)" defaultOpen={false}>
-                <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
-                  Write proofs in CBSE board style: Given / To Prove / Construction / Proof / Conclusion.
-                </div>
-                <div style={{ display: "grid", gap: 12 }}>
-                  {proofWritingTemplates.map((t) => (
-                    <div
-                      key={t.id}
-                      style={{
-                        borderRadius: 16,
-                        padding: "12px 12px",
-                        border: "1px solid rgba(0,0,0,0.10)",
-                        background: "rgba(0,0,0,0.02)",
-                      }}
-                    >
-                      <div style={{ fontWeight: 900 }}>{t.title}</div>
-                      <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.5 }}>{t.description}</div>
-                      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                        Marks: {t.marks} | Focus: {t.focus.replace("_", " ")}
-                      </div>
-                      <div style={{ marginTop: 10 }}>
-                        <DiagramBlock diagram={buildTrianglesProofDiagram(t.focus)} />
-                      </div>
-                      <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          className="lt-pill"
-                          style={{ padding: "7px 10px", fontSize: 13 }}
-                          onClick={() => openTutorDrawer({ tab: "teach", nodeId: mapProofFocusToNodeId(t.focus) })}
-                          title="Open Tutor in teaching mode"
-                        >
-                          Teach this proof
-                        </button>
-                        <button
-                          type="button"
-                          className="lt-pill"
-                          style={{ padding: "7px 10px", fontSize: 13 }}
-                          onClick={() => openTutorDrawer({ tab: "examples", nodeId: mapProofFocusToNodeId(t.focus) })}
-                          title="See board-style examples"
-                        >
-                          Board example
-                        </button>
-                      </div>
-                      <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7, whiteSpace: "pre-wrap" }}>
-                        {t.question}
-                      </div>
+          {isLearn && isTrianglesTopic ? (
+            <AccordionCard id="proof-writing" title="Proof writing (Triangles)" defaultOpen={false}>
+              <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
+                Write proofs in CBSE board style: Given / To Prove / Construction / Proof / Conclusion.
+              </div>
+              <div style={{ display: "grid", gap: 12 }}>
+                {proofWritingTemplates.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      borderRadius: 16,
+                      padding: "12px 12px",
+                      border: "1px solid rgba(0,0,0,0.10)",
+                      background: "rgba(0,0,0,0.02)",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900 }}>{t.title}</div>
+                    <div style={{ marginTop: 6, opacity: 0.85, lineHeight: 1.5 }}>{t.description}</div>
+                    <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+                      Marks: {t.marks} | Focus: {t.focus.replace("_", " ")}
                     </div>
-                  ))}
-                </div>
-              </AccordionCard>
-            ) : null}
+                    <div style={{ marginTop: 10 }}>
+                      <DiagramBlock diagram={buildTrianglesProofDiagram(t.focus)} />
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="lt-pill"
+                        style={{ padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => openTutorDrawer({ tab: "teach", nodeId: mapProofFocusToNodeId(t.focus) })}
+                        title="Open Tutor in teaching mode"
+                      >
+                        Teach this proof
+                      </button>
+                      <button
+                        type="button"
+                        className="lt-pill"
+                        style={{ padding: "7px 10px", fontSize: 13 }}
+                        onClick={() => openTutorDrawer({ tab: "examples", nodeId: mapProofFocusToNodeId(t.focus) })}
+                        title="See board-style examples"
+                      >
+                        Board example
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7, whiteSpace: "pre-wrap" }}>
+                      {t.question}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </AccordionCard>
+          ) : null}
 
-            {isLearn && mode === "beast" && misconceptions.length > 0 && (
-              <AccordionCard id="misconceptions" title="Common misconceptions">
-                
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          {isLearn && showInZombie("exam-patterns") && examPatterns.length > 0 && (
+            <AccordionCard id="exam-patterns" title="CBSE exam patterns" defaultOpen={mode === "zombie"}>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {examPatterns.slice(0, 10).map((p, idx) => (
+                  <li key={idx} style={{ marginBottom: 8, lineHeight: 1.55 }}>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </AccordionCard>
+          )}
+
+          {isLearn && showInZombie("summary") && overview.length > 0 && (
+            <AccordionCard id="summary" title="Summary" defaultOpen={false}>
+              {overview.map((p, idx) => (
+                <p key={idx} style={{ marginTop: idx === 0 ? 0 : 10, lineHeight: 1.65, opacity: 0.95 }}>
+                  {p}
+                </p>
+              ))}
+            </AccordionCard>
+          )}
+
+          {isLearn ? (
+            <div
+              style={{
+                borderRadius: 16,
+                padding: "12px 12px",
+                background: "rgba(255,255,255,0.64)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 15 }}>
+                  {isTrianglesTopic ? "Need a quick reset?" : "Need a calmer restart?"}
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.76, lineHeight: 1.5 }}>
+                  {isTrianglesTopic
+                    ? "Reopen one guided tutor step, clear one checkpoint, then move back into family practice."
+                    : "Go back to one guided teaching step, then continue with focused practice."}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
+                  Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
+                  {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoints cleared
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="lt-pill"
-                  onClick={() => openTutorDrawer({ tab: "teach", nodeId: guidedOrder[0] })}
+                  onClick={() =>
+                    openTutorDrawer({
+                      tab: "teach",
+                      nodeId: isTrianglesTopic && trianglesRuntimeStrip
+                        ? trianglesRuntimeStrip.firstTutorNodeId
+                        : undefined,
+                    })
+                  }
                 >
-                  Open Tutor
+                  Open guided tutor
+                </button>
+                <button
+                  type="button"
+                  className="lt-pill"
+                  onClick={() => {
+                    setActiveTab("grind");
+                    if (hasGrindContractFlow) {
+                      openGrindDrawer({
+                        nodeId:
+                          isTrianglesTopic && trianglesRuntimeStrip
+                            ? trianglesRuntimeStrip.proofGrindNodeId
+                            : undefined,
+                      });
+                    }
+                  }}
+                >
+                  Open proof grind
                 </button>
               </div>
-<ul style={{ margin: 0, paddingLeft: 18 }}>
+            </div>
+          ) : null}
+
+            {isLearn && mode === "beast" && misconceptions.length > 0 && (
+              <AccordionCard id="misconceptions" title="Common misconceptions">
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {misconceptions.slice(0, 10).map((m, idx) => (
                   <li key={idx} style={{ marginBottom: 10, lineHeight: 1.55 }}>
                     <b>{String(m?.concept || "Concept")}:</b> {String(m?.commonError || "")}
