@@ -3267,16 +3267,11 @@ const showInZombie = (sectionId: string) => {
 
           {isLearn ? (
             <TeachFlow
-              topicKey={String(topicKey || "")}
-              subject={String(subject || "maths")}
-              grade={String(grade || "10")}
-              nodeId={
-                isTrianglesTopic && trianglesRuntimeStrip
-                  ? trianglesRuntimeStrip.firstTutorNodeId
-                  : String(topicKey || "")
-              }
+              topicKey={topicKey}
+              subject={subject}
+              grade={grade}
               onComplete={() => {
-                try { updateTopicMastery((prev) => markNodeLearning(prev, String(topicKey || ""))); } catch (_) {}
+                try { (markNodeLearning as any)(topicKey); } catch (_) {}
                 setActiveTab("grind");
               }}
             />

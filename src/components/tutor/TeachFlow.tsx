@@ -1,6 +1,5 @@
 // src/components/tutor/TeachFlow.tsx
-import { useRef, useState } from "react";
-import { DiagramBlock } from "../DiagramBlock";
+import { useState, useRef } from "react";
 
 interface TeachFlowProps {
   topicKey: string;
@@ -22,16 +21,18 @@ interface TeachCard {
 }
 
 function extractFeedbackText(payload: any): string {
-  if (!payload) return "Good effort! Let's keep going.";
-  const data = payload.data ?? payload;
-  if (typeof data.feedback === "string" && data.feedback.trim()) return data.feedback.trim();
-  if (typeof data.responseText === "string" && data.responseText.trim()) return data.responseText.trim();
-  if (typeof data.checkpointAnswer === "string" && data.checkpointAnswer.trim())
-    return data.checkpointAnswer.trim();
-  if (data.teach?.checkpoint?.answer) return String(data.teach.checkpoint.answer).trim();
-  if (typeof data.text === "string" && data.text.trim()) return data.text.trim();
-  if (typeof payload.message === "string" && payload.message.trim()) return payload.message.trim();
-  return "Good effort! Let's keep going.";
+  if (!payload) return "Good effort! Let's continue.";
+  const d = payload.data ?? payload;
+  if (typeof d.feedback === "string" && d.feedback.trim()) return d.feedback.trim();
+  if (typeof d.responseText === "string" && d.responseText.trim()) return d.responseText.trim();
+  if (typeof d.checkpointAnswer === "string" && d.checkpointAnswer.trim())
+    return d.checkpointAnswer.trim();
+  if (d.teach?.checkpoint?.answer && typeof d.teach.checkpoint.answer === "string")
+    return d.teach.checkpoint.answer.trim();
+  if (typeof d.text === "string" && d.text.trim()) return d.text.trim();
+  if (typeof payload.message === "string" && payload.message.trim())
+    return payload.message.trim();
+  return "Good effort! Let's continue.";
 }
 
 function extractTeachCard(payload: any): TeachCard | null {
@@ -39,17 +40,17 @@ function extractTeachCard(payload: any): TeachCard | null {
   if (payload.teach && typeof payload.teach === "object") return payload.teach as TeachCard;
   if (payload.data?.teach && typeof payload.data.teach === "object")
     return payload.data.teach as TeachCard;
-  const data = payload.data ?? payload;
-  if (data && (data.goalLine || data.keyIdeas || data.checkpointQuestion)) {
+  const d = payload.data ?? payload;
+  if (d && (d.goalLine || d.keyIdeas || d.checkpointQuestion)) {
     return {
-      goal: data.goalLine ?? "",
-      goalLine: data.goalLine ?? "",
-      keyIdeas: Array.isArray(data.keyIdeas) ? data.keyIdeas : [],
+      goal: d.goalLine ?? "",
+      goalLine: d.goalLine ?? "",
+      keyIdeas: Array.isArray(d.keyIdeas) ? d.keyIdeas : [],
       checkpoint: {
-        question: data.checkpointQuestion ?? data.checkpoint?.question ?? "",
-        answer: data.checkpointAnswer ?? data.checkpoint?.answer ?? "",
+        question: d.checkpointQuestion ?? d.checkpoint?.question ?? "",
+        answer: d.checkpointAnswer ?? d.checkpoint?.answer ?? "",
       },
-    } as TeachCard;
+    };
   }
   return null;
 }
@@ -60,8 +61,7 @@ function getGoal(card: TeachCard): string {
 
 function getKeyIdeas(card: TeachCard): string[] {
   const raw = card.keyIdeas || card.keyIdeaBullets || [];
-  if (!Array.isArray(raw)) return [];
-  return raw.map((s: any) => String(s).trim()).filter(Boolean);
+  return Array.isArray(raw) ? raw.map((s) => String(s).trim()).filter(Boolean) : [];
 }
 
 const styles = {
@@ -75,10 +75,12 @@ const styles = {
   input: { width: "100%", padding: "10px 12px", fontSize: 14, border: "1px solid #ccc", borderRadius: 8, boxSizing: "border-box", marginBottom: 12, fontFamily: "inherit" } as React.CSSProperties,
   primaryBtn: { background: "#4f46e5", color: "white", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginRight: 10 } as React.CSSProperties,
   secondaryBtn: { background: "transparent", color: "#4f46e5", border: "1px solid #4f46e5", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer" } as React.CSSProperties,
+  skipBtn: { background: "transparent", color: "#888", border: "1px solid #ddd", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", display: "block", marginTop: 8 } as React.CSSProperties,
   spinner: { color: "#888", fontSize: 14, padding: "20px 0" } as React.CSSProperties,
   error: { color: "#cc0000", fontSize: 13, marginTop: 8, marginBottom: 12 } as React.CSSProperties,
   feedback: { fontSize: 14, color: "#333", lineHeight: 1.7, marginBottom: 16 } as React.CSSProperties,
   stepBadge: { fontSize: 12, color: "#888", marginBottom: 16 } as React.CSSProperties,
+  diagram: { border: "1px solid #e0e0e0", borderRadius: 8, marginBottom: 16, padding: 8, fontSize: 12, color: "#888" } as React.CSSProperties,
   complete: { textAlign: "center", padding: "32px 0" } as React.CSSProperties,
   completeTick: { fontSize: 40, marginBottom: 12 } as React.CSSProperties,
   completeMsg: { fontSize: 16, fontWeight: 600, color: "#1a1a2e", marginBottom: 8 } as React.CSSProperties,
@@ -111,11 +113,7 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
       clearTimeout(timeoutId);
       const raw = await res.text();
       let payload: any = {};
-      try {
-        payload = raw ? JSON.parse(raw) : {};
-      } catch {
-        payload = { text: raw };
-      }
+      try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = { text: raw }; }
       if (!res.ok) throw new Error(payload?.error || payload?.message || `Server error ${res.status}`);
       return payload;
     } catch (err: any) {
@@ -128,7 +126,6 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
   async function startLearning() {
     setLoading(true);
     setError(null);
-    setAiFeedback("");
     setPhase("teaching");
     try {
       const payload = await callMentor({
@@ -139,7 +136,7 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
         topic: topicKey,
         subject,
         grade,
-        nodeId: nodeId ?? topicKey,
+        nodeId: nodeId ?? `${topicKey}-step-1`,
         messages: [],
       });
       const card = extractTeachCard(payload) || extractTeachCard(payload?.data);
@@ -149,10 +146,7 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
       } else {
         setTeachCard({
           goal: `Let's learn ${topicKey}`,
-          keyIdeas: [
-            "Review the key concepts for this topic.",
-            "Focus on definitions and theorems.",
-          ],
+          keyIdeas: ["Review the key concepts for this topic.", "Focus on definitions and theorems."],
           checkpoint: { question: "What do you already know about this topic?" },
         });
       }
@@ -221,13 +215,13 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
   if (phase === "intro") {
     return (
       <div style={styles.container}>
-        <div style={styles.heading}>{topicKey}</div>
-        <div style={styles.hook}>Let's understand {topicKey} - step by step, concept by concept.</div>
-        {loading && <div style={styles.spinner}>Preparing your lesson...</div>}
+        <h2 style={styles.heading}>{topicKey}</h2>
+        <p style={styles.hook}>Let's understand {topicKey} — step by step, concept by concept.</p>
+        {loading && <p style={styles.spinner}>Preparing your lesson…</p>}
         {error && (
           <>
-            <div style={styles.error}>{error}</div>
-            <button style={styles.primaryBtn} onClick={retry}>Retry</button>
+            <p style={styles.error}>{error}</p>
+            <button style={styles.secondaryBtn} onClick={retry}>Retry</button>
           </>
         )}
         {!loading && !error && (
@@ -239,14 +233,18 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
 
   if (phase === "complete") {
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.complete }}>
-          <div style={styles.completeTick}>Done</div>
-          <div style={styles.completeMsg}>Great work!</div>
-          <div style={styles.completeSub}>You've covered the key ideas for {topicKey}. Ready to test yourself?</div>
-          <button style={styles.primaryBtn} onClick={() => onComplete?.()}>Try a Practice Question</button>
-          <button style={styles.secondaryBtn} onClick={reset}>Review Again</button>
-        </div>
+      <div style={{ ...styles.container, ...styles.complete }}>
+        <div style={styles.completeTick}>✓</div>
+        <p style={styles.completeMsg}>Great work!</p>
+        <p style={styles.completeSub}>
+          You've covered the key ideas for {topicKey}. Ready to test yourself?
+        </p>
+        <button style={styles.primaryBtn} onClick={() => onComplete?.()}>
+          Try a Practice Question
+        </button>
+        <button style={styles.secondaryBtn} onClick={reset}>
+          Review Again
+        </button>
       </div>
     );
   }
@@ -259,72 +257,63 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
 
   return (
     <div style={styles.container}>
-      <div style={styles.heading}>{topicKey}</div>
-      <div style={styles.stepBadge}>Step {stepCount + 1} of 3</div>
+      <h2 style={styles.heading}>{topicKey}</h2>
+      <p style={styles.stepBadge}>Step {stepCount + 1} of 3</p>
 
       {aiFeedback && phase === "awaiting_answer" && (
-        <div style={styles.card}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#4f46e5", marginBottom: 8 }}>Tutor's Response</div>
-          <div style={styles.feedback}>{aiFeedback}</div>
+        <div style={{ ...styles.card, borderLeft: "3px solid #4f46e5" }}>
+          <p style={{ ...styles.goalLine, color: "#4f46e5" }}>Tutor's Response</p>
+          <p style={styles.feedback}>{aiFeedback}</p>
         </div>
       )}
 
       {card && (
         <div style={styles.card}>
-          <div style={styles.goalLine}>{goal}</div>
+          <p style={styles.goalLine}>{goal}</p>
           {ideas.length > 0 && (
-            <ul style={{ ...styles.bullet, paddingLeft: 20, margin: 0 }}>
-              {ideas.map((idea, i) => <li key={i}>{idea}</li>)}
+            <ul style={{ paddingLeft: 18, margin: 0 }}>
+              {ideas.map((idea, i) => (
+                <li key={i} style={styles.bullet}>{idea}</li>
+              ))}
             </ul>
           )}
-          {diagram && diagram.type && String(diagram.type).toLowerCase() !== "generic" && (
-            <div style={{ marginBottom: 16 }}>
-              <DiagramBlock
-                diagramType={diagram.type}
-                diagramLabels={[]}
-                title="Concept diagram"
-                note={diagram.altText || "Concept diagram"}
-              />
+          {diagram && (
+            <div style={styles.diagram}>
+              {diagram.type} {(diagram.altText || "").slice(0, 40)}
             </div>
           )}
-          {checkpointQ && <div style={styles.checkpointQ}>{checkpointQ}</div>}
+          {checkpointQ && <p style={styles.checkpointQ}>{checkpointQ}</p>}
         </div>
       )}
 
       {phase === "awaiting_answer" && (
         <>
           <textarea
-            style={{ ...styles.input, height: 80, resize: "vertical" } as React.CSSProperties}
-            placeholder="Type your answer here..."
+            style={{ ...styles.input, minHeight: 80, resize: "vertical" }}
+            placeholder="Type your answer here…"
             value={studentAnswer}
             onChange={(e) => setStudentAnswer(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && e.ctrlKey) submitAnswer();
-            }}
+            disabled={loading}
           />
-          {error && <div style={styles.error}>{error}</div>}
-          <button style={styles.primaryBtn} onClick={submitAnswer} disabled={loading || !studentAnswer.trim()}>
-            {loading ? "Checking..." : "Submit Answer"}
+          {error && <p style={styles.error}>{error}</p>}
+          <button
+            style={styles.primaryBtn}
+            onClick={submitAnswer}
+            disabled={loading || !studentAnswer.trim()}
+          >
+            {loading ? "Checking…" : "Submit Answer"}
           </button>
-          {error && <button style={{ ...styles.secondaryBtn, marginLeft: 8 }} onClick={retry}>Retry</button>}
-          {phase === "awaiting_answer" && stepCount >= 1 && (
-            <button
-              style={{ marginTop: 8, background: "transparent", border: "1px solid #ccc",
-                       borderRadius: 6, padding: "6px 14px", cursor: "pointer",
-                       fontSize: 13, color: "#555" }}
-              onClick={() => setPhase("complete")}
-            >
-              I already understand this - skip to practice
+          {stepCount >= 1 && (
+            <button style={styles.skipBtn} onClick={() => setPhase("complete")}>
+              I already understand this — skip to practice
             </button>
           )}
         </>
       )}
 
-      {(phase === "teaching" || phase === "responding") && loading && (
-        <div style={styles.spinner}>Your tutor is thinking...</div>
+      {(phase === "teaching" || phase === "responding") && (
+        <p style={styles.spinner}>{phase === "teaching" ? "Loading your lesson…" : "Analysing your answer…"}</p>
       )}
     </div>
   );
 }
-
-export default TeachFlow;
