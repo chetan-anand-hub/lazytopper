@@ -1,0 +1,23 @@
+Gemini smoke check
+Date: 2026-04-01
+Server: http://localhost:3001
+
+Exact flat curl body response:
+{"ok":false,"error":"Invalid image: Only JPG and PNG images are allowed."}
+
+Root cause analysis:
+- The flat request shape goes through normalizeMentorRequest() in server/index.cjs.
+- That function always adds imageBase64, imageMimeType, and imageName keys to the derived payload, even when the caller did not send any image fields.
+- validateMentorImagePayload() in server/mentorImageSupport.cjs checks hasOwn(payload, "imageBase64" | "imageMimeType" | "imageName"), so the flat learn_teach request is treated as an image request.
+- Because imageMimeType is empty, the validator returns: "Only JPG and PNG images are allowed."
+- Result: the exact flat curl body cannot reach Gemini at all; it is rejected earlier by the mentor image validation path.
+
+Follow-up nested payload request used to verify provider path:
+{"ok":true,"data":{"text":"{\"kind\":\"learn_teach\",\"teach\":{\"goal\":\"Teacher goal: string (CBSE board-writing format).\",\"keyIdeas\":[\"Definition: define similarity in terms of corresponding angles/sides.\",\"Criterion: state AA/SAS/SSS or BPT criterion exactly before proof.\",\"Correspondence: maintain vertex correspondence order through all ratios.\",\"Conclusion: close with Therefore/Hence and required proportionality/result.\"],\"diagram\":{\"required\":false,\"type\":\"generic\",\"labels\":[\"string\",\"string\"],\"spec\":{\"kind\":\"tutor_diagram_v1\",\"width\":420,\"height\":220,\"title\":\"Similarity\",\"caption\":\"Two triangles with corresponding angles and sides.\",\"points\":[{\"id\":\"A\",\"x\":60,\"y\":170,\"label\":\"A\"},{\"id\":\"B\",\"x\":170,\"y\":170,\"label\":\"B\"},{\"id\":\"C\",\"x\":120,\"y\":55,\"label\":\"C\"},{\"id\":\"P\",\"x\":245,\"y\":170,\"label\":\"P\"},{\"id\":\"Q\",\"x\":355,\"y\":170,\"label\":\"Q\"},{\"id\":\"R\",\"x\":300,\"y\":70,\"label\":\"R\"}],\"edges\":[{\"from\":\"A\",\"to\":\"B\"},{\"from\":\"B\",\"to\":\"C\"},{\"from\":\"C\",\"to\":\"A\"},{\"from\":\"P\",\"to\":\"Q\"},{\"from\":\"Q\",\"to\":\"R\"},{\"from\":\"R\",\"to\":\"P\"}]},\"svg\":null,\"altText\":\"string\"},\"checkpoint\":{\"question\":\"Board checkpoint: string Include the criterion/theorem name. Use Given, To Prove, and Therefore/Hence format.\",\"answer\":\"Expected answer: string Given: [matching angle/side data]. To Prove: [triangles are similar or required relation]. Criterion/Theorem: [AA/SAS/SSS/BPT exact name]. Therefore/Hence: [final similarity/proportionality line].\"},\"commonMistake\":\"Common mistake: string This can lose marks in CBSE board checking.\",\"contract_source\":\"topic\""}}}
+
+Health endpoint:
+{"ok":true,"service":"lazytopper-ai-server","provider":"gemini","model":"gemini-2.5-flash","modelZombie":null,"modelBeast":null,"hasKey":true,"stub":false,"node":"v22.20.0"}
+
+Conclusion:
+LIVE PATH CONFIRMED via the server's preferred nested payload shape.
+The exact flat curl body is currently blocked by the mentor image validation bug, not by STUB_MODE.

@@ -1,5 +1,6 @@
 // src/components/tutor/TeachFlow.tsx
 import { useState, useRef } from "react";
+import { DiagramBlock } from "../DiagramBlock";
 
 interface TeachFlowProps {
   topicKey: string;
@@ -277,9 +278,12 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
               ))}
             </ul>
           )}
-          {diagram && (
-            <div style={styles.diagram}>
-              {diagram.type} {(diagram.altText || "").slice(0, 40)}
+          {diagram && diagram.type && (
+            <div style={{ marginBottom: 16 }}>
+              <DiagramBlock
+                diagramType={diagram.type}
+                note={diagram.altText || "Concept diagram"}
+              />
             </div>
           )}
           {checkpointQ && <p style={styles.checkpointQ}>{checkpointQ}</p>}

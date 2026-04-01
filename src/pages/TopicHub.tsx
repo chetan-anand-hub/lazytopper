@@ -3271,7 +3271,7 @@ const showInZombie = (sectionId: string) => {
               subject={subject}
               grade={grade}
               onComplete={() => {
-                try { (markNodeLearning as any)(topicKey); } catch (_) {}
+                try { updateTopicMastery((prev) => markNodeLearning(prev, topicKey)); } catch (_) {}
                 setActiveTab("grind");
               }}
             />
