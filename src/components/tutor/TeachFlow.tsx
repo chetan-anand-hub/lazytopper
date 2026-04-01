@@ -22,30 +22,28 @@ interface TeachCard {
 }
 
 function extractFeedbackText(payload: any): string {
-  if (!payload) return "Good effort! Let's continue.";
+  if (!payload) return "Good effort! Let's keep going.";
   const data = payload.data ?? payload;
   if (typeof data.feedback === "string" && data.feedback.trim()) return data.feedback.trim();
   if (typeof data.responseText === "string" && data.responseText.trim()) return data.responseText.trim();
-  if (data.teach?.checkpoint?.answer && typeof data.teach.checkpoint.answer === "string")
-    return data.teach.checkpoint.answer.trim();
   if (typeof data.checkpointAnswer === "string" && data.checkpointAnswer.trim())
     return data.checkpointAnswer.trim();
+  if (data.teach?.checkpoint?.answer) return String(data.teach.checkpoint.answer).trim();
   if (typeof data.text === "string" && data.text.trim()) return data.text.trim();
   if (typeof payload.message === "string" && payload.message.trim()) return payload.message.trim();
-  return "Good effort! Let's continue.";
+  return "Good effort! Let's keep going.";
 }
 
 function extractTeachCard(payload: any): TeachCard | null {
   if (!payload) return null;
-  // Try nested teach object first
   if (payload.teach && typeof payload.teach === "object") return payload.teach as TeachCard;
-  if (payload.data?.teach && typeof payload.data.teach === "object") return payload.data.teach as TeachCard;
-  // The server's topicTeachContracts returns fields at the top level of data
+  if (payload.data?.teach && typeof payload.data.teach === "object")
+    return payload.data.teach as TeachCard;
   const data = payload.data ?? payload;
   if (data && (data.goalLine || data.keyIdeas || data.checkpointQuestion)) {
     return {
-      goal: data.goalLine,
-      goalLine: data.goalLine,
+      goal: data.goalLine ?? "",
+      goalLine: data.goalLine ?? "",
       keyIdeas: Array.isArray(data.keyIdeas) ? data.keyIdeas : [],
       checkpoint: {
         question: data.checkpointQuestion ?? data.checkpoint?.question ?? "",
@@ -141,7 +139,7 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
         topic: topicKey,
         subject,
         grade,
-        nodeId: nodeId ?? `${topicKey}-step-1`,
+        nodeId: nodeId ?? topicKey,
         messages: [],
       });
       const card = extractTeachCard(payload) || extractTeachCard(payload?.data);
@@ -311,10 +309,12 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
           {error && <button style={{ ...styles.secondaryBtn, marginLeft: 8 }} onClick={retry}>Retry</button>}
           {phase === "awaiting_answer" && stepCount >= 1 && (
             <button
-              style={{ ...styles.secondaryBtn, marginTop: 8, display: "block" }}
+              style={{ marginTop: 8, background: "transparent", border: "1px solid #ccc",
+                       borderRadius: 6, padding: "6px 14px", cursor: "pointer",
+                       fontSize: 13, color: "#555" }}
               onClick={() => setPhase("complete")}
             >
-              I'm ready to practice
+              I already understand this - skip to practice
             </button>
           )}
         </>

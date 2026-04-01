@@ -2391,23 +2391,17 @@ const showInZombie = (sectionId: string) => {
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
           {isLearn ? (
             <TeachFlow
-              topicKey={String(topicKey ?? "Triangles")}
-              subject={String(subjectTitle ?? "Maths")}
-              grade={String(grade ?? "10")}
-              nodeId={String(currentTutorNodeId ?? topicKey ?? "Triangles")}
+              topicKey={String(topicKey || "")}
+              subject={String(subject || "maths")}
+              grade={String(grade || "10")}
+              nodeId={
+                isTrianglesTopic && trianglesRuntimeStrip
+                  ? trianglesRuntimeStrip.firstTutorNodeId
+                  : String(topicKey || "")
+              }
               onComplete={() => {
-                try {
-                  updateTopicMastery((prev) =>
-                    markNodeLearning(prev, String(currentTutorNodeId ?? topicKey ?? "Triangles"))
-                  );
-                } catch (_) {}
-                try {
-                  navigateToPractice(navigate, {
-                    topicKey: String(topicKey ?? "Triangles"),
-                    subject: subjectTitle === "Science" ? "Science" : "Maths",
-                    grade: String(grade ?? "10"),
-                  });
-                } catch (_) {}
+                try { updateTopicMastery((prev) => markNodeLearning(prev, String(topicKey || ""))); } catch (_) {}
+                setActiveTab("grind");
               }}
             />
           ) : (
@@ -3272,67 +3266,20 @@ const showInZombie = (sectionId: string) => {
           )}
 
           {isLearn ? (
-            <div
-              style={{
-                borderRadius: 16,
-                padding: "12px 12px",
-                background: "rgba(255,255,255,0.64)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
+            <TeachFlow
+              topicKey={String(topicKey || "")}
+              subject={String(subject || "maths")}
+              grade={String(grade || "10")}
+              nodeId={
+                isTrianglesTopic && trianglesRuntimeStrip
+                  ? trianglesRuntimeStrip.firstTutorNodeId
+                  : String(topicKey || "")
+              }
+              onComplete={() => {
+                try { updateTopicMastery((prev) => markNodeLearning(prev, String(topicKey || ""))); } catch (_) {}
+                setActiveTab("grind");
               }}
-            >
-              <div>
-                <div style={{ fontWeight: 900, fontSize: 15 }}>
-                  {isTrianglesTopic ? "Need a quick reset?" : "Need a calmer restart?"}
-                </div>
-                <div style={{ fontSize: 13, opacity: 0.76, lineHeight: 1.5 }}>
-                  {isTrianglesTopic
-                    ? "Reopen one guided tutor step, clear one checkpoint, then move back into family practice."
-                    : "Go back to one guided teaching step, then continue with focused practice."}
-                </div>
-                <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7 }}>
-                  Mastery: {masteryCounts.mastered}/{masteryCounts.total} mastered •{" "}
-                  {masteryCounts.checkpointPassed}/{masteryCounts.total} checkpoints cleared
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="lt-pill"
-                  onClick={() =>
-                    openTutorDrawer({
-                      tab: "teach",
-                      nodeId: isTrianglesTopic && trianglesRuntimeStrip
-                        ? trianglesRuntimeStrip.firstTutorNodeId
-                        : undefined,
-                    })
-                  }
-                >
-                  Open guided tutor
-                </button>
-                <button
-                  type="button"
-                  className="lt-pill"
-                  onClick={() => {
-                    setActiveTab("grind");
-                    if (hasGrindContractFlow) {
-                      openGrindDrawer({
-                        nodeId:
-                          isTrianglesTopic && trianglesRuntimeStrip
-                            ? trianglesRuntimeStrip.proofGrindNodeId
-                            : undefined,
-                      });
-                    }
-                  }}
-                >
-                  Open proof grind
-                </button>
-              </div>
-            </div>
+            />
           ) : null}
 
             {isLearn && mode === "beast" && misconceptions.length > 0 && (
