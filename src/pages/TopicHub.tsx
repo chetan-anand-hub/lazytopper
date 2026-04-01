@@ -28,6 +28,7 @@ import { trianglesGuidedMindmap } from "../data/trianglesGuidedMindmap";
 import { trianglesGrindMindmap } from "../data/trianglesGrindMindmap";
 import { DiagramBlock } from "../components/DiagramBlock";
 import { HumanGradeCoachView } from "../components/mentor/HumanGradeCoachView";
+import { TeachFlow } from "../components/tutor/TeachFlow";
 import SharedTutorDrawerV2, {
   type TutorMasteryState,
   type TutorNodeProgress,
@@ -2388,6 +2389,25 @@ const showInZombie = (sectionId: string) => {
 
         {/* Content */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
+          {isLearn ? (
+            <TeachFlow
+              topicKey={topicKey ?? "Triangles"}
+              subject={subjectTitle ?? "Maths"}
+              grade={grade ?? "10"}
+              onComplete={() =>
+                navigateToPractice(navigate, {
+                  grade: grade ?? "10",
+                  subject: subjectTitle === "Science" ? "Science" : "Maths",
+                  topicKey,
+                  topicName: title,
+                  backPath: `${location.pathname}?tab=learn`,
+                  backLabel: "Back to TopicHub",
+                  source: "teach_flow",
+                })
+              }
+            />
+          ) : (
+            <>
           {QTYPE_FIRST_TRIG &&
           strategyCanonicalTopicKey === "trigonometry" &&
           strategyPack?.tiles?.length &&
@@ -4118,6 +4138,8 @@ const showInZombie = (sectionId: string) => {
                   </div>
                 )}
               </AccordionCard>
+            </>
+          )}
             </>
           )}
 
