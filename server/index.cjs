@@ -4465,10 +4465,15 @@ function normalizeMentorRequest(reqJson) {
     extraNotes: reqJson.extraNotes,
     marks: reqJson.marks,
     questionText: reqJson.questionText || reqJson.question || reqJson.prompt || '',
-    imageBase64: reqJson.imageBase64,
-    imageMimeType: reqJson.imageMimeType,
-    imageName: reqJson.imageName,
+    section: reqJson.section,
+    subSection: reqJson.subSection,
+    selectedTab: reqJson.selectedTab,
+    solveStyle: reqJson.solveStyle,
+    nodeId: reqJson.nodeId,
   };
+  if (reqJson.imageBase64) payload.imageBase64 = reqJson.imageBase64;
+  if (reqJson.imageMimeType) payload.imageMimeType = reqJson.imageMimeType;
+  if (reqJson.imageName) payload.imageName = reqJson.imageName;
 
   return { mode, persona, payload };
 }

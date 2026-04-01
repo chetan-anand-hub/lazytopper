@@ -24,24 +24,73 @@ interface TeachCard {
 function extractFeedbackText(payload: any): string {
   if (!payload) return "Good effort! Let's continue.";
   const d = payload.data ?? payload;
-  if (typeof d.feedback === "string" && d.feedback.trim()) return d.feedback.trim();
-  if (typeof d.responseText === "string" && d.responseText.trim()) return d.responseText.trim();
-  if (typeof d.checkpointAnswer === "string" && d.checkpointAnswer.trim())
-    return d.checkpointAnswer.trim();
-  if (d.teach?.checkpoint?.answer && typeof d.teach.checkpoint.answer === "string")
-    return d.teach.checkpoint.answer.trim();
-  if (typeof d.text === "string" && d.text.trim()) return d.text.trim();
+  const structured = d.structured ?? d;
+
+  if (typeof d.feedback === "string" && d.feedback.trim())
+    return d.feedback.trim();
+  if (typeof d.responseText === "string" && d.responseText.trim())
+    return d.responseText.trim();
+  if (typeof structured.feedback === "string" && structured.feedback.trim())
+    return structured.feedback.trim();
+
+  if (structured.tutor && typeof structured.tutor === "object") {
+    const tutor = structured.tutor;
+    if (tutor.diagnosis && typeof tutor.diagnosis === "object") {
+      const parts: string[] = [];
+      if (tutor.diagnosis.analysis) parts.push(String(tutor.diagnosis.analysis));
+      if (tutor.diagnosis.verdict) parts.push(String(tutor.diagnosis.verdict));
+      if (parts.length > 0) return parts.join(" ");
+    }
+    if (typeof tutor.explanation === "string" && tutor.explanation.trim())
+      return tutor.explanation.trim();
+    if (typeof tutor.tutor === "string" && tutor.tutor.trim())
+      return tutor.tutor.trim();
+  }
+
+  if (typeof structured.commonMistake === "string" && structured.commonMistake.trim())
+    return "Watch out: " + structured.commonMistake.trim();
+  if (typeof structured.checkpointAnswer === "string" && structured.checkpointAnswer.trim())
+    return structured.checkpointAnswer.trim();
+
+  if (typeof d.text === "string" && d.text.trim()) {
+    try {
+      const parsed = JSON.parse(d.text);
+      if (parsed.checkpointAnswer) return String(parsed.checkpointAnswer).trim();
+      if (parsed.commonMistake) return "Watch out: " + String(parsed.commonMistake).trim();
+      if (parsed.goalLine) return String(parsed.goalLine).trim();
+    } catch {}
+    return d.text.trim().slice(0, 500);
+  }
+
   if (typeof payload.message === "string" && payload.message.trim())
     return payload.message.trim();
+
   return "Good effort! Let's continue.";
 }
 
 function extractTeachCard(payload: any): TeachCard | null {
   if (!payload) return null;
-  if (payload.teach && typeof payload.teach === "object") return payload.teach as TeachCard;
+  if (payload.teach && typeof payload.teach === "object")
+    return payload.teach as TeachCard;
   if (payload.data?.teach && typeof payload.data.teach === "object")
     return payload.data.teach as TeachCard;
-  const d = payload.data ?? payload;
+
+  const data = payload.data ?? null;
+  const structured = (data && data.structured) || payload.structured || null;
+  if (structured && (structured.goalLine || structured.keyIdeas || structured.checkpointQuestion)) {
+    return {
+      goal: structured.goalLine ?? "",
+      goalLine: structured.goalLine ?? "",
+      keyIdeas: Array.isArray(structured.keyIdeas) ? structured.keyIdeas : [],
+      checkpoint: {
+        question: structured.checkpointQuestion ?? structured.checkpoint?.question ?? "",
+        answer: structured.checkpointAnswer ?? structured.checkpoint?.answer ?? "",
+      },
+      diagram: structured.diagram ?? undefined,
+    };
+  }
+
+  const d = data ?? payload;
   if (d && (d.goalLine || d.keyIdeas || d.checkpointQuestion)) {
     return {
       goal: d.goalLine ?? "",
@@ -51,8 +100,28 @@ function extractTeachCard(payload: any): TeachCard | null {
         question: d.checkpointQuestion ?? d.checkpoint?.question ?? "",
         answer: d.checkpointAnswer ?? d.checkpoint?.answer ?? "",
       },
+      diagram: d.diagram ?? undefined,
     };
   }
+
+  if (typeof d?.text === "string" && d.text.trim()) {
+    try {
+      const parsed = JSON.parse(d.text);
+      if (parsed.goalLine || parsed.keyIdeas) {
+        return {
+          goal: parsed.goalLine ?? "",
+          goalLine: parsed.goalLine ?? "",
+          keyIdeas: Array.isArray(parsed.keyIdeas) ? parsed.keyIdeas : [],
+          checkpoint: {
+            question: parsed.checkpointQuestion ?? "",
+            answer: parsed.checkpointAnswer ?? "",
+          },
+          diagram: parsed.diagram ?? undefined,
+        };
+      }
+    } catch {}
+  }
+
   return null;
 }
 
@@ -108,7 +177,11 @@ export function TeachFlow({ topicKey, subject, grade, nodeId, onComplete }: Teac
       const res = await fetch("/api/mentor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          mode: (body as any).mode,
+          messages: (body as any).messages,
+          payload: body,
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

@@ -21,3 +21,13 @@ Health endpoint:
 Conclusion:
 LIVE PATH CONFIRMED via the server's preferred nested payload shape.
 The exact flat curl body is currently blocked by the mentor image validation bug, not by STUB_MODE.
+
+---
+2026-04-01 follow-up after image validation fix
+
+Flat payload smoke result (first 500 chars):
+{"ok":true,"data":{"text":"{\"kind\":\"learn_teach\",\"teach\":{\"goal\":\"Teacher goal: string (CBSE board-writing format).\",\"keyIdeas\":[\"Definition: define similarity in terms of corresponding angles/sides.\",\"Criterion: state AA/SAS/SSS or BPT criterion exactly before proof.\",\"Correspondence: maintain vertex correspondence order through all ratios.\",\"Conclusion: close with Therefore/Hence and required proportionality/result.\"],\"diagram\":{\"required\":false,\"type\":\"generic\",\"l
+
+Status:
+- Flat curl no longer returns the Invalid image error.
+- The server now accepts flat learn_teach requests and responds with ok=true.
