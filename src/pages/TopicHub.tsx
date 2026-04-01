@@ -2391,20 +2391,24 @@ const showInZombie = (sectionId: string) => {
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 14 }}>
           {isLearn ? (
             <TeachFlow
-              topicKey={topicKey ?? "Triangles"}
-              subject={subjectTitle ?? "Maths"}
-              grade={grade ?? "10"}
-              onComplete={() =>
-                navigateToPractice(navigate, {
-                  grade: grade ?? "10",
-                  subject: subjectTitle === "Science" ? "Science" : "Maths",
-                  topicKey,
-                  topicName: title,
-                  backPath: `${location.pathname}?tab=learn`,
-                  backLabel: "Back to TopicHub",
-                  source: "teach_flow",
-                })
-              }
+              topicKey={String(topicKey ?? "Triangles")}
+              subject={String(subjectTitle ?? "Maths")}
+              grade={String(grade ?? "10")}
+              nodeId={String(currentTutorNodeId ?? topicKey ?? "Triangles")}
+              onComplete={() => {
+                try {
+                  updateTopicMastery((prev) =>
+                    markNodeLearning(prev, String(currentTutorNodeId ?? topicKey ?? "Triangles"))
+                  );
+                } catch (_) {}
+                try {
+                  navigateToPractice(navigate, {
+                    topicKey: String(topicKey ?? "Triangles"),
+                    subject: subjectTitle === "Science" ? "Science" : "Maths",
+                    grade: String(grade ?? "10"),
+                  });
+                } catch (_) {}
+              }}
             />
           ) : (
             <>
